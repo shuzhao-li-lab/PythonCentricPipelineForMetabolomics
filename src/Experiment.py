@@ -26,8 +26,6 @@ class Experiment(object):
 
         self.header = {}
 
-    #def convert_to_mzML(self):
-
     def convert_raw_to_mzML(self, mono_path, exe_path, multiprocessing=False):
         converter = ThermoRawFileConverter("/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono", "/Users/mitchjo/Projects/PCP/ThermoRawFileParser/ThermoRawFileParser.exe")
         if not os.path.isdir(self.converted_acquisitions_directory):
@@ -35,15 +33,17 @@ class Experiment(object):
         
         if multiprocessing:
             self.log.info("Converting in parallel")
-            converter.convert_multi(self.acquisitions, self.converted_acquisitions_directory)
+            mzml_filepaths = converter.convert_multi(self.acquisitions, self.converted_acquisitions_directory)
+            for acquisition, mzml_filepath in zip(self.acquisitions, mzml_filepaths):
+                acquisition.mzml_filepath = mzml_filepath
         else:
             for acquisition in self.acquisitions:
                 converter.convert(acquisition, self.converted_acquisitions_directory)
+        
             
     @staticmethod
-    def construct_experiment_from_CSV(experiment_name, experiment_directory, sequence_CSV_filepath, metadata_CSV_filepath, linking_field="Name", strip_linking_field=True):
+    def construct_experiment_from_CSV(experiment_name, experiment_directory, sequence_CSV_filepath, metadata_CSV_filepath, linking_field="Name", strip_linking_field=True, filter=None):
         experiment = Experiment(experiment_name, experiment_directory)
-
         try:
             experiment.log.info("Reading metadata file: " + retrieve_abs_path(metadata_CSV_filepath))
             sample_metadata = {}
@@ -81,11 +81,13 @@ class Experiment(object):
             exit()
         else:
             for sequence_dict in sample_sequence:
-                acquisition = Acqusition.construct_acquisition_from_sequence_and_metadata_dict(sequence_dict, sample_metadata[sequence_dict[linking_field]])
-                experiment.add_acquisition(acquisition)
+                if filter is not None and filter not in sequence_dict[linking_field].lower():
+                    experiment.log.info("Skipping acquisition for " + sequence_dict[linking_field] + " as it does not match provided filter")
+                else:
+                    acquisition = Acqusition.construct_acquisition_from_sequence_and_metadata_dict(sequence_dict, sample_metadata[sequence_dict[linking_field]])
+                    experiment.add_acquisition(acquisition)
         experiment.summarize_acquisitions()
         return experiment
-    
     
     @staticmethod
     def load_experiment(pickle_path):
