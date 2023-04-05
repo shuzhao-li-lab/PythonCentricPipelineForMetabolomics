@@ -2,8 +2,8 @@
 Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <experiment_name> <sequence_csv> <metadata_csv> [--filter=<filter>]
   main.py convert_to_mzML_local <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> [--multi]
-  main.py spectral_QCQA <experiment_directory> <standards_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>]
+  main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
+  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_plot=<params>] 
   main.py asari_full_processing <experiment_directory> (pos|neg)
   main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
 '''
@@ -11,6 +11,7 @@ Usage:
 from docopt import docopt
 import os
 import logging
+import itertools
 from Experiment import Experiment
 from FeatureTable import FeatureTable
 import multiprocessing as mp
@@ -22,6 +23,54 @@ import json
 def job(job_desc):
     acquisition, spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory = job_desc
     acquisition.generate_report(spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory)
+
+def adductify_standards(standards_csv, adducts_csv):
+    isotope_mass_table = {
+        "12C": 12.0,
+        "13C": 13.00335483507,
+        "1H": 1.00782503223,
+        "2H": 2.01410177812,
+        "16O": 15.99491461957,
+        "14N": 14.00307400443,
+        "15N": 15.00010889888,
+        "32S": 31.9720711744,
+        "31P": 30.97376199842,
+        "23Na": 22.9897692820,
+        "e": 0.00054858
+    }
+    standards = []
+    with open(standards_csv, encoding='utf-8-sig') as standards_fh:
+        for standard in csv.DictReader(standards_fh):
+            standards.append(standard)
+    adducts = []
+    with open(adducts_csv, encoding='utf-8-sig') as adducts_fh:
+        for adduct in csv.DictReader(adducts_fh):
+            adducts.append(adduct)
+    adducted_standards = []
+    for standard, adduct in itertools.product(standards, adducts):
+        new_name = standard["Name"] + '[' + adduct["Name"] + '],z=' + str(adduct["Charge"])
+        new_formula = {}
+        for isotope, count in json.loads(standard['Isotope Dictionary']).items():
+            count = int(count)
+            if isotope not in new_formula:
+                new_formula[isotope] = count
+            else:
+                new_formula[isotope] += count
+        for isotope, count in json.loads(adduct['Isotope Dictionary']).items():
+            count = int(count)
+            if isotope not in new_formula:
+                new_formula[isotope] = count
+            else:
+                new_formula[isotope] += count
+        new_formula['e'] = -1 * int(adduct['Charge'])
+        uncharged_mass = sum([isotope_mass_table[isotope] * isotope_count for isotope, isotope_count in new_formula.items()])
+        mz = uncharged_mass / abs(int(adduct['Charge']))
+        adducted_standards.append({
+            "Name": new_name,
+            "Isotope Formula Dict": new_formula,
+            "Search Mass": mz,
+        })
+    return adducted_standards
 
 def main(args):
     if '<experiment_directory>' in args:
@@ -45,32 +94,10 @@ def main(args):
     if args['spectral_QCQA']:
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
         # todo - fix this to take external standards
-        spikeins = [
         # name, M+H, RT,
         #in extraction buffer
-        ('13C6-D-glucose', 187.0908, None),
-        ('trimethyl-13C3-caffeine', 198.0977, None),
-        ('15N-13C5-methionine', 156.0721, None),
-        ('13C5-L-glutamate', 153.0722, None),
-        ('15N2-uracil', 115.0286, None),
-        ('15N-L-tyrosine', 183.0782, None),
-        
-        #spiked into samples directly
-        ('15:0-18:1(d7) PC', 753.6134, None),
-        ('18:1(d7) Lyso PC', 529.3994, None),
-        ('15:0-18:1(d7) PE', 711.5664, None),
-        ('18:1(d7) Lyso PE', 487.3524, None),
-        ('15:0-18:1(d7) PG', 759.5875, None),
-        ('15:0-18:1(d7) PI', 847.6036, None),
-        ('15:0-18:1(d7) PS', 755.5562, None),
-        ('15:0-18:1(d7)-15:0 TAG', 829.7985, None),
-        ('15:0-18:1(d7) DAG', 605.5844, None),
-        ('18:1(d7) MAG [H+]', 364.3429, None),
-        ('18:1(d7) MAG [NH4+]', 381.3704, None),
-        ('18:1(d7) Chol Ester', 675.6779, None),
-        ('d18:1-18:1(d9) SM', 738.647, None),
-        ('Cholesterol-d7', 411.4326, None)   
-        ]
+
+        spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
 
         if args['--multi']:
             job_descs = [(
@@ -87,7 +114,6 @@ def main(args):
             pool.map(job, job_descs)
         else:
             for acquisition in experiment.acquisitions:
-                print(acquisition.name)
                 acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
         experiment.save_experiment()
     if args['asari_full_processing']:
@@ -121,12 +147,26 @@ def main(args):
         else:
             sort = None
 
-        experiment.feature_table.qcqa(tag=tag, sort=sort)
+        if args['--missing_feature_plot'] is not None:
+            missing_feature_plot_config = json.loads(args['--missing_feature_plot'])
+        else:
+            missing_feature_plot_config = None
+        print(missing_feature_plot_config)
+
+        experiment.feature_table.qcqa(tag=tag, 
+                                      sort=sort, 
+                                      interactive=args["--interactive"], 
+                                      pca=args['--pca'], 
+                                      tsne=args['--tsne'], 
+                                      pearson=args['--pearson'], 
+                                      spearman=args['--spearman'], 
+                                      kendall=args['--kendall'], 
+                                      missing_feature_percentiles=args['--missing_feature_percentiles'],
+                                      missing_feature_plot=missing_feature_plot_config)
         
         
 if __name__ == '__main__':
     args = docopt(__doc__)
-    print(args)
     main(args)
 
     
