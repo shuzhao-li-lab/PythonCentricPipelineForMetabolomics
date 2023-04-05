@@ -5,6 +5,7 @@ import json
 import pymzml
 import matplotlib.pyplot as plt
 import numpy as np
+import bisect
 
 class Acqusition(object):
     log = logging.getLogger(__name__)
@@ -40,7 +41,6 @@ class Acqusition(object):
         return self.__max_mz
 
     def __extract_mzml(self, ms_level=None):
-        Acqusition.log.info("Parsing .mzml file: " + self.mzml_filepath)
         try:
             for spec in pymzml.run.Reader(self.mzml_filepath):
                 if spec.ms_level == ms_level or ms_level is None:
@@ -50,6 +50,8 @@ class Acqusition(object):
                     peaks = [Acqusition.Peak(spec.ms_level, spec.scan_time[0], float(mz), int(intensity), id + len(self.spectra[(spec.ms_level, "peaks")])) for id, (mz, intensity) in enumerate(spec.peaks("centroided"))]
                     self.spectra[(spec.ms_level, "spectra")].append(peaks)
                     self.spectra[(spec.ms_level, "peaks")].extend(peaks)
+            self.spectra[(spec.ms_level, "mz_sorted_peaks")] = sorted(self.spectra[(spec.ms_level, "peaks")], key=lambda x: x.mz)
+            self.spectra[(spec.ms_level, "mz_sorted_mzs")] = [peak.mz for peak in self.spectra[(spec.ms_level, "mz_sorted_peaks")]]
         except:
             Acqusition.log.exception("Parsing .mzml file FAILED!: ", self.mzml_filepath)
             exit()
@@ -79,15 +81,15 @@ class Acqusition(object):
     def search_for_peak_match(self, mz, rt, mslevel, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity):
         Acqusition.log.info("Searching " + self.mzml_filepath + " for mz=" + str(mz) + " rt=" + str(rt) + " mslevel=" + str(mslevel) + " ppm_tolerance=" + str(mz_search_tolerance_ppm) + " rt_tolerance" + str(rt_search_tolerance) + " min_intensity=" + str(min_intensity))
         try:
-            peaks = self.__extract_ms_information(mslevel, 'peaks')
-            if min_intensity:
-                peaks = [peak for peak in peaks if peak.intensity > min_intensity]
-
+            mzs = self.__extract_ms_information(mslevel, 'mz_sorted_mzs')
+            peaks = self.__extract_ms_information(mslevel, 'mz_sorted_peaks')
             if mz is not None:
                 mz_match_ids = set()
-                for peak in peaks:
-                    mz_tolerance = peak.mz / 1e6 * mz_search_tolerance_ppm
-                    if peak.mz - mz_tolerance < mz < peak.mz + mz_tolerance:
+                #todo - check that we don't need a minus one or something to ensure we aren't missing anything with this index nonsense. 
+                lower_index = bisect.bisect_left(mzs, mz - mz / 1e6 * mz_search_tolerance_ppm)
+                upper_index = bisect.bisect_right(mzs, mz + mz / 1e6 * mz_search_tolerance_ppm)
+                for peak in peaks[lower_index:upper_index]:
+                    if peak.intensity > min_intensity:
                         mz_match_ids.add(peak.id)
             else:
                 mz_match_ids = {peak.id for peak in peaks}
@@ -123,6 +125,7 @@ class Acqusition(object):
     def check_for_standards(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=False):
         #todo - rewrite this to use JMS objects
         #todo - rewrite to avoid hard coding
+
         Acqusition.log.info("Searching for standards in " + self.name)
         try:
             if not null_distro_override:
@@ -149,8 +152,8 @@ class Acqusition(object):
     
     def generate_report(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, text_report=False, output_directory=None):
         Acqusition.log.info("Generating report for: " + self.name)
-        print(self.name)
         try:
+            print("Start: ", self.name)
             null_match_count = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
             standards_matching = self.check_for_standards(standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=null_match_count)
             if text_report:
@@ -163,6 +166,8 @@ class Acqusition(object):
                 for standard in standards_matching:
                     report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(len(standard["matching_peaks"])) + " - Detected: " + str(standard["detected"])  + "\n")
                 report_fh.close()
+            print("Stop: ", self.name)
+            return True
         except:
             Acqusition.log.exception("Generating report for: " + self.name + " FAILED!")
             exit()
