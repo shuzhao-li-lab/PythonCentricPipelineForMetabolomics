@@ -3,7 +3,7 @@ Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <experiment_name> <sequence_csv> <metadata_csv> [--filter=<filter>]
   main.py convert_to_mzML_local <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> [--multi]
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_plot=<params>] 
+  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_plot=<params>] [--median_correlation_outlier_detection]
   main.py asari_full_processing <experiment_directory> (pos|neg)
   main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
 '''
@@ -135,7 +135,7 @@ def main(args):
         experiment.save_experiment()
     if args['feature_QCQA']:
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
-        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "export/full_Feature_table.tsv") 
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
         experiment.feature_table = FeatureTable(feature_table_path, experiment)
         if args['--tag'] is not None:
             tag = args['--tag']
@@ -162,7 +162,8 @@ def main(args):
                                       spearman=args['--spearman'], 
                                       kendall=args['--kendall'], 
                                       missing_feature_percentiles=args['--missing_feature_percentiles'],
-                                      missing_feature_plot=missing_feature_plot_config)
+                                      missing_feature_plot=missing_feature_plot_config,
+                                      median_correlation_outlier_detection=args['--median_correlation_outlier_detection'])
         
         
 if __name__ == '__main__':
