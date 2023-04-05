@@ -5,12 +5,22 @@ import matplotlib.pyplot as plt
 import scipy.stats
 import math
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA, NMF
 from sklearn.manifold import TSNE
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
-        constant_fields = ('id_number', 'mz', 'rtime', 'goodness_fitting', 'snr', 'detection_counts', 'rtime_left_base', 'rtime_right_base', 'parent_masstrack_id', 'peak_area', 'cSelectivity')
+        constant_fields = ('id_number', 
+                           'mz', 
+                           'rtime', 
+                           'goodness_fitting', 
+                           'snr', 
+                           'detection_counts', 
+                           'rtime_left_base', 
+                           'rtime_right_base', 
+                           'parent_masstrack_id', 
+                           'peak_area', 
+                           'cSelectivity')
         self.features = []
         with open(feature_table_filepath) as feature_table_fh:
             for feature in csv.DictReader(feature_table_fh, delimiter="\t"):
@@ -39,7 +49,7 @@ class FeatureTable:
                         if acquisition.metadata_tags['Sample Type'] == tag:
                             self.name_cache[tag].append(acquisition)
         return self.name_cache[tag]
-    
+        
     def retrieve_features_for_names(self, selected_acquisitions=None, tag=None):
         if tag and selected_acquisitions is None:
             selected_acquisitions = self.acquisitions_for_tag(tag)
@@ -56,6 +66,24 @@ class FeatureTable:
                 sample_feature_vectors[name].append(float(feature[name]))
         feature_vector_matrix = np.array([sample_feature_vectors[name] for name in selected_names], dtype=np.float64)
         return feature_vector_matrix
+    
+    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisitions, correlation_type='pearson', interactive_plot=False):
+        corr_matrix = self.correlation_heatmap(feature_vector_matrix, acquisitions, "pearson", tag=None, log_transform=True, interactive_plot=False)
+        median_correlations = np.median(corr_matrix, axis=1)
+        if interactive_plot:
+            plt.scatter(list(range(median_correlations.shape[0])), median_correlations)
+            for acquisition, x,y in zip(acquisitions, list(range(median_correlations.shape[0])), median_correlations):
+                plt.text(x,y+.05,acquisition.name,rotation='vertical')
+            ax = plt.gca()
+            ax.set_ylim([0,1])
+            plt.show()
+        z_scores = (median_correlations - np.median(corr_matrix)) / np.std(corr_matrix)
+        if interactive_plot:
+            for acquisition, x,y in zip(acquisitions, list(range(median_correlations.shape[0])), z_scores):
+                plt.text(x,y+.05,acquisition.name,rotation='vertical')
+            plt.scatter(list(range(median_correlations.shape[0])), z_scores)
+            plt.show()
+        return z_scores
 
     def correlation_heatmap(self, feature_vector_matrix, acquisitions, correlation_type, tag=None, log_transform=True, interactive_plot=False):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         names = [a.name for a in acquisitions]
@@ -95,8 +123,9 @@ class FeatureTable:
     def PCA(self, feature_vector_matrix, acquisitions, interactive_plot=False):
         names = [a.name for a in acquisitions]
         scaler = StandardScaler()
-        transformed_vector_matrix = scaler.fit_transform(feature_vector_matrix)
-        pca_embedder = PCA(n_components=2)
+        #transformed_vector_matrix = scaler.fit_transform(feature_vector_matrix)
+        transformed_vector_matrix = feature_vector_matrix
+        pca_embedder = NMF(n_components=2)
         pca_embedded_vector_matrix = pca_embedder.fit_transform(transformed_vector_matrix)
         if interactive_plot:
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
@@ -132,6 +161,7 @@ class FeatureTable:
             plt.axhline(feature_vector_matrix.shape[1], color='r', linestyle='-')
             plt.scatter([x[0] for x in percentile_table], [x[1] for x in percentile_table])
             plt.show()
+        return percentile_table
 
     
     def missing_feature_distribution(self, feature_vector_matrix, sort_by=None, percentile_cutoff=None, interactive_plot=False):
@@ -148,13 +178,13 @@ class FeatureTable:
         for _, feature_index in zip(x_vals, y_vals):
             num_nonzero = np.nonzero(feature_vector_matrix[:, feature_index])[0].shape[0]
             num_samples_threshold = math.ceil((feature_vector_matrix.shape[0]) * percentile_cutoff/100)
-
             if num_nonzero < num_samples_threshold:
                 missing_count += 1
             missing.append(missing_count)
         if interactive_plot:
             plt.scatter(x_vals, missing)
             plt.show()
+        return x_vals, missing
             
     def qcqa(self, 
              tag=None, 
@@ -166,7 +196,8 @@ class FeatureTable:
              spearman=False, 
              kendall=False, 
              missing_feature_percentiles=False,
-             missing_feature_plot=False):
+             missing_feature_plot=False,
+             median_correlation_outlier_detection=False):
         if tag:
             acquisitions = self.acquisitions_for_tag(tag)
         else:
@@ -177,6 +208,7 @@ class FeatureTable:
             acquisitions = acquisitions
 
         feature_vector_matrix = self.retrieve_features_for_names(selected_acquisitions=acquisitions)
+
 
         if pca:
             self.PCA(feature_vector_matrix, acquisitions, interactive_plot=interactive)
@@ -197,3 +229,6 @@ class FeatureTable:
             if "percentile_cutoff" in missing_feature_plot:
                 percentile_cutoff = float(missing_feature_plot['percentile_cutoff'])
             self.missing_feature_distribution(feature_vector_matrix, sort_by=sort_by, percentile_cutoff=percentile_cutoff, interactive_plot=interactive)
+        if median_correlation_outlier_detection:
+            self.median_correlation_outlier_detection(feature_vector_matrix, acquisitions, interactive_plot=interactive)
+
