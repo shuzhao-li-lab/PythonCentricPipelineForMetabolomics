@@ -128,12 +128,15 @@ class Acqusition(object):
 
         Acqusition.log.info("Searching for standards in " + self.name)
         try:
-            if not null_distro_override:
-                cutoff = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
-            else:
+            if null_distro_override:
                 cutoff = float(null_distro_override)
+            else:
+                cutoff = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
             standards_matches = []
-            for name, mz, rt in standards:
+            for standard in standards:
+                name = standard['Name']
+                mz = standard['Search Mass']
+                rt = None
                 standard_hits = self.search_for_peak_match(mz, rt, 1, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity)
                 if standard_hits is None:
                     standard_hits = []
@@ -145,7 +148,7 @@ class Acqusition(object):
                     "detected": detected,
                     "matching_peaks": standard_hits
                 })
-            return standards_matches
+            return {"null_cutoff": cutoff, "standards": standards_matches}
         except:
             Acqusition.log.exception("Searching for standards in " + self.name + " FAILED!")
             exit()
@@ -155,7 +158,7 @@ class Acqusition(object):
         try:
             print("Start: ", self.name)
             null_match_count = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
-            standards_matching = self.check_for_standards(standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=null_match_count)
+            search_results = self.check_for_standards(standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=null_match_count)
             if text_report:
                 try:
                     os.makedirs(output_directory)
@@ -163,11 +166,11 @@ class Acqusition(object):
                     pass
                 report_fh = open(os.path.join(output_directory, self.name + "_report.txt"), 'w+')
                 report_fh.write("Null matches: " + str(null_match_count) + "\n")
-                for standard in standards_matching:
+                for standard in search_results["standards"]:
                     report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(len(standard["matching_peaks"])) + " - Detected: " + str(standard["detected"])  + "\n")
                 report_fh.close()
             print("Stop: ", self.name)
-            return True
+            return search_results
         except:
             Acqusition.log.exception("Generating report for: " + self.name + " FAILED!")
             exit()
