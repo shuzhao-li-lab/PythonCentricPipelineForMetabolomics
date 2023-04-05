@@ -3,6 +3,7 @@ import logging
 import csv
 import pickle
 import shutil
+import json
 from collections import defaultdict
 
 from ThermoRawFileConverter import ThermoRawFileConverter
@@ -15,6 +16,7 @@ class Experiment(object):
         self.experiment_name = experiment_name
         self.experiment_directory = retrieve_abs_path(experiment_directory)
         self.acquisitions = []
+        self.feature_table = None
         self._used_acquisition_names = set()
         self._used_acquisition_files = set()
 
@@ -23,7 +25,6 @@ class Experiment(object):
         self.asari_output = os.path.join(self.experiment_directory, "asari_intermediate/")
         self.header_path = os.path.join(self.experiment_directory, "metadata.json")
         self.pickle_path = os.path.join(self.experiment_directory, "experiment.pickle")
-
         self.header = {}
 
     def convert_raw_to_mzML(self, mono_path, exe_path, multiprocessing=False):
@@ -43,6 +44,9 @@ class Experiment(object):
             
     @staticmethod
     def construct_experiment_from_CSV(experiment_name, experiment_directory, sequence_CSV_filepath, metadata_CSV_filepath, linking_field="Name", strip_linking_field=True, filter=None):
+        filter = json.loads(filter)
+        filter_key, filter_value = list(filter.items())[0]
+        
         experiment = Experiment(experiment_name, experiment_directory)
         try:
             experiment.log.info("Reading metadata file: " + retrieve_abs_path(metadata_CSV_filepath))
@@ -81,7 +85,7 @@ class Experiment(object):
             exit()
         else:
             for sequence_dict in sample_sequence:
-                if filter is not None and filter not in sequence_dict[linking_field].lower():
+                if filter is not None and filter_value not in sequence_dict[filter_key].lower():
                     experiment.log.info("Skipping acquisition for " + sequence_dict[linking_field] + " as it does not match provided filter")
                 else:
                     acquisition = Acqusition.construct_acquisition_from_sequence_and_metadata_dict(sequence_dict, sample_metadata[sequence_dict[linking_field]])

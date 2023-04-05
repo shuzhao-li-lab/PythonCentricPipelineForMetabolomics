@@ -3,15 +3,20 @@ Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <experiment_name> <sequence_csv> <metadata_csv> [--filter=<filter>]
   main.py convert_to_mzML_local <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> [--multi]
   main.py spectral_QCQA <experiment_directory> <standards_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py asari <experiment_directory>
+  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>]
+  main.py asari_full_processing <experiment_directory> (pos|neg)
+  main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
 '''
 
 from docopt import docopt
 import os
 import logging
 from Experiment import Experiment
+from FeatureTable import FeatureTable
 import multiprocessing as mp
 import subprocess
+import csv
+import json
 
 
 def job(job_desc):
@@ -24,7 +29,7 @@ def main(args):
             pass
         else:
             os.makedirs(args['<experiment_directory>'])
-        logging.basicConfig(filename = args['<experiment_directory>'] + "./analysis.log",
+        logging.basicConfig(filename = args['<experiment_directory>'] + "/analysis.log",
                             filemode='a',
                             format='%(asctime)s,%(msecs)d %(name)s %(levelname)s [%(filename)s:%(lineno)d] %(message)s',
                             datefmt='%H:%M:%S',
@@ -43,7 +48,7 @@ def main(args):
         spikeins = [
         # name, M+H, RT,
         #in extraction buffer
-        #('13C6-D-glucose', 187.0908, 20),
+        ('13C6-D-glucose', 187.0908, None),
         ('trimethyl-13C3-caffeine', 198.0977, None),
         ('15N-13C5-methionine', 156.0721, None),
         ('13C5-L-glutamate', 153.0722, None),
@@ -85,9 +90,43 @@ def main(args):
                 print(acquisition.name)
                 acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
         experiment.save_experiment()
+    if args['asari_full_processing']:
+        print(args)
+        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        try:
+            os.makedirs(experiment.asari_output)
+        except:
+            pass
+        print(experiment.asari_output)
 
+        if args['pos']:
+            os.system("asari process -m pos -i " + experiment.converted_acquisitions_directory + "/" + " -o " + experiment.asari_output)
+        elif args['neg']:
+            os.system("asari process -m neg -i " + experiment.converted_acquisitions_directory + "/" + " -o " + experiment.asari_output)
+
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "export/full_Feature_table.tsv") 
+        experiment.feature_table = FeatureTable(feature_table_path, experiment)
+        experiment.save_experiment()
+    if args['feature_QCQA']:
+        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "export/full_Feature_table.tsv") 
+        experiment.feature_table = FeatureTable(feature_table_path, experiment)
+        if args['--tag'] is not None:
+            tag = args['--tag']
+        else:
+            tag = None
+
+        if args['--sort'] is not None:
+            sort = json.loads(args['--sort'])
+        else:
+            sort = None
+
+        experiment.feature_table.qcqa(tag=tag, sort=sort)
+        
+        
 if __name__ == '__main__':
     args = docopt(__doc__)
+    print(args)
     main(args)
 
     
