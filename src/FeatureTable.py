@@ -10,83 +10,121 @@ from sklearn.manifold import TSNE
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
-        constant_fields = ('id_number', 
-                           'mz', 
-                           'rtime', 
-                           'goodness_fitting', 
-                           'snr', 
-                           'detection_counts', 
-                           'rtime_left_base', 
-                           'rtime_right_base', 
-                           'parent_masstrack_id', 
-                           'peak_area', 
-                           'cSelectivity')
-        self.features = []
+        self.experiment = experiment
+        self.feature_matrix_header = None
+        feature_matrix = []
         with open(feature_table_filepath) as feature_table_fh:
             for feature in csv.DictReader(feature_table_fh, delimiter="\t"):
-                self.features.append(feature)
-        
-        self.feature_ids = []
-        self.mzs = []
-        self.rtimes = []
-        for field in constant_fields:
-            if field not in self.features[0].keys():
-                raise Exception
-            
-        self.feature_ids = [f['id_number'] for f in self.features]
-        self.mzs = [f['mz'] for f in self.features]
-        self.rtimes = [f['rtime'] for f in self.features]
-        self.experiment = experiment
-        self.sample_names = [name for name in self.features[0].keys() if name not in constant_fields]
-        self.name_cache = {}
+                if self.feature_matrix_header is None:
+                    self.feature_matrix_header = list(feature.keys())
+                feature_matrix_row = []
+                for column_name in self.feature_matrix_header:
+                    if column_name != 'id_number':
+                        feature_matrix_row.append(np.float64(feature[column_name]))
+                    else:
+                        feature_matrix_row.append(feature[column_name])
+                feature_matrix.append(feature_matrix_row)
+        self.feature_matrix = np.array(feature_matrix).T
 
-    def acquisitions_for_tag(self, tag):
-        if tag not in self.name_cache:
-            self.name_cache[tag] = []
-            for name in self.sample_names:
-                for acquisition in self.experiment.acquisitions:
-                    if name == acquisition.name:
-                        if acquisition.metadata_tags['Sample Type'] == tag:
-                            self.name_cache[tag].append(acquisition)
-        return self.name_cache[tag]
-        
-    def retrieve_features_for_names(self, selected_acquisitions=None, tag=None):
-        if tag and selected_acquisitions is None:
-            selected_acquisitions = self.acquisitions_for_tag(tag)
-        elif tag is None and selected_acquisitions:
-            pass
-        else:
-            raise Exception
-        selected_names = [a.name for a in selected_acquisitions]
-        sample_feature_vectors = {}
-        for feature in self.features:
-            for name in selected_names:
-                if name not in sample_feature_vectors:
-                    sample_feature_vectors[name] = []
-                sample_feature_vectors[name].append(float(feature[name]))
-        feature_vector_matrix = np.array([sample_feature_vectors[name] for name in selected_names], dtype=np.float64)
-        return feature_vector_matrix
+    def selected_feature_matrix(self, tag=None):
+        sample_names_for_tags = [acquisition.name for acquisition in self.experiment.acquisitions if acquisition.metadata_tags['Sample Type'] == tag or tag is None]
+        matching_column_indices = []
+        for column_index, name in enumerate(self.feature_matrix_header):
+            if name in sample_names_for_tags:
+                matching_column_indices.append(column_index)
+        feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
+        return feature_matrix_subset.T, sample_names_for_tags
+
+    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False):
+        correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False)
+        all_correlations = []
+        median_correlations = {}
+        for sample_name_1, corr_dict in correlation_result["Result"].items():
+            correlation_for_sample_name_1 = []
+            for sample_name_2, corr_value in corr_dict.items():
+                if sample_name_1 != sample_name_2:
+                    correlation_for_sample_name_1.append(corr_value)
+            median_correlations[sample_name_1] = np.median(correlation_for_sample_name_1)
+            all_correlations.extend(correlation_for_sample_name_1)
+        all_correlations_std = np.std(all_correlations)
+        all_correlations_median = np.median(all_correlations)
+        z_score_correlations = {name: (median_correlation - all_correlations_median)/all_correlations_std for name, median_correlation in median_correlations.items()}
+        if interactive_plot:
+            plt.scatter(list(range(len(median_correlations))), list(median_correlations.values()))
+            plt.show()
+            plt.scatter(list(range(len(z_score_correlations))), list(z_score_correlations.values()))
+            plt.show()
+        result = {
+            "Type": "MedianCorrelationZScores",
+            "Config": {},
+            "Results": z_score_correlations
+        }
+        return result
     
-    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisitions, correlation_type='pearson', interactive_plot=False):
-        corr_matrix = self.correlation_heatmap(feature_vector_matrix, acquisitions, "pearson", tag=None, log_transform=True, interactive_plot=False)
-        median_correlations = np.median(corr_matrix, axis=1)
+    def intensity_analysis(self, feature_vector_matrix, acquisition_names, drop_missing, interactive_plot=False):
+        intensity_sums = np.sum(feature_vector_matrix, axis=0)
+        mean_feature_intensity = np.mean(feature_vector_matrix, axis=0)
+        median_feature_intensity = np.median(feature_vector_matrix, axis=0)
         if interactive_plot:
-            plt.scatter(list(range(median_correlations.shape[0])), median_correlations)
-            for acquisition, x,y in zip(acquisitions, list(range(median_correlations.shape[0])), median_correlations):
-                plt.text(x,y+.05,acquisition.name,rotation='vertical')
-            ax = plt.gca()
-            ax.set_ylim([0,1])
+            X = list(range(len(intensity_sums)))
+            plt.scatter(X, intensity_sums)
             plt.show()
-        z_scores = (median_correlations - np.median(corr_matrix)) / np.std(corr_matrix)
-        if interactive_plot:
-            for acquisition, x,y in zip(acquisitions, list(range(median_correlations.shape[0])), z_scores):
-                plt.text(x,y+.05,acquisition.name,rotation='vertical')
-            plt.scatter(list(range(median_correlations.shape[0])), z_scores)
-            plt.show()
-        return z_scores
 
-    def correlation_heatmap(self, feature_vector_matrix, acquisitions, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
-        names = [a.name for a in acquisitions]
+            plt.scatter(X, mean_feature_intensity)
+            plt.show()
+
+            plt.scatter(X, median_feature_intensity)
+            plt.show()
+
+        filtered_feature_vector_matrix = feature_vector_matrix
+        filtered_feature_vector_matrix[filtered_feature_vector_matrix == 0] = np.nan
+        filtered_mean_feature_intensity = np.nanmean(filtered_feature_vector_matrix, axis=0)
+        filtered_median_feature_intensity = np.nanmedian(filtered_feature_vector_matrix, axis=0)
+        if interactive_plot:
+            X = list(range(len(intensity_sums)))
+            plt.scatter(X, intensity_sums)
+            plt.show()
+
+            plt.scatter(X, filtered_mean_feature_intensity)
+            plt.show()
+
+            plt.scatter(X, filtered_median_feature_intensity)
+            plt.show()
+
+        log_filtered_feature_vector_matrix = np.log2(filtered_feature_vector_matrix)
+        log_filtered_intensity_sum = np.nansum(log_filtered_feature_vector_matrix, axis=0)
+        log_filtered_mean_feature_intensity = np.nanmean(log_filtered_feature_vector_matrix, axis=0)
+        log_filtered_median_feature_intensity = np.nanmedian(log_filtered_feature_vector_matrix, axis=0)
+        if interactive_plot:
+            X = list(range(len(intensity_sums)))
+            plt.scatter(X, log_filtered_intensity_sum)
+            plt.show()
+
+            plt.scatter(X, log_filtered_mean_feature_intensity)
+            plt.show()
+
+            plt.scatter(X, log_filtered_median_feature_intensity)
+            plt.show()
+
+        result = {
+            "Type": "IntensitySummary",
+            "Config": {},
+            "Results": {
+                "SumIntensity": {name: value for name, value in zip(acquisition_names, intensity_sums)},
+                "MeanIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
+                "MedianIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
+                "MissingDroppedSumIntensity": {name: value for name, value in zip(acquisition_names, intensity_sums)},
+                "MissingDroppedMeanIntensity": {name: value for name, value in zip(acquisition_names, filtered_mean_feature_intensity)},
+                "MissingDroppedMedianIntensity": {name: value for name, value in zip(acquisition_names, filtered_median_feature_intensity)},
+                "LogMissingDroppedSumIntensity": {name: value for name, value in zip(acquisition_names, log_filtered_intensity_sum)},
+                "LogMissingDroppedMeanIntensity": {name: value for name, value in zip(acquisition_names, log_filtered_mean_feature_intensity)},
+                "LogMissingDroppedMedianIntensity": {name: value for name, value in zip(acquisition_names, log_filtered_median_feature_intensity)}
+            }
+        }
+        return result
+        
+    def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
+        feature_vector_matrix = feature_vector_matrix.T
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
             feature_vector_matrix = np.log2(feature_vector_matrix)        
@@ -103,10 +141,9 @@ class FeatureTable:
             corr_matrix = np.zeros((feature_vector_matrix.shape[0], feature_vector_matrix.shape[0]))
             for i in range(feature_vector_matrix.shape[0]):
                 for j in range(i, feature_vector_matrix.shape[0]):
-                    tau = scipy.stats.spearmanr(feature_vector_matrix[i], feature_vector_matrix[j]).statistic
-                    corr_matrix[i][j] = tau
-                    corr_matrix[j][i] = tau
-
+                    spearmanr = scipy.stats.spearmanr(feature_vector_matrix[i], feature_vector_matrix[j]).statistic
+                    corr_matrix[i][j] = spearmanr
+                    corr_matrix[j][i] = spearmanr
         if interactive_plot:
             if tag:
                 heatmap_title = "Correlation Heatmap for Samples of Type: " + tag + "\n"
@@ -116,108 +153,118 @@ class FeatureTable:
             if log_transform:
                 heatmap_title += " Log2 Transformed"
             plt.title(heatmap_title)
-            sns.heatmap(corr_matrix, xticklabels=names, yticklabels=names)
+            sns.heatmap(corr_matrix, xticklabels=acquisition_names, yticklabels=acquisition_names)
             plt.show()
-        return corr_matrix
+        result = {
+            "Type": "Correlation",
+            "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
+            "Result": {acquisition_names[i] : {acquisition_names[j]: float(corr_matrix[i][j]) for j in range(corr_matrix.shape[0])} for i in range(corr_matrix.shape[0])}
+            }
+        return result
 
-    def PCA(self, feature_vector_matrix, acquisitions, interactive_plot=False):
-        names = [a.name for a in acquisitions]
+    def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
         scaler = StandardScaler()
-        transformed_vector_matrix = scaler.fit_transform(feature_vector_matrix)
         pca_embedder = PCA(n_components=2)
-        pca_embedded_vector_matrix = pca_embedder.fit_transform(transformed_vector_matrix)
+        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform(feature_vector_matrix.T))
         if interactive_plot:
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
-            for (x, y), name in zip(pca_embedded_vector_matrix, names):
+            for (x, y), name in zip(pca_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
             plt.show()
-        return pca_embedded_vector_matrix
-
-    def TSNE(self, feature_vector_matrix, acquisitions, interactive_plot=False):
-        names = [a.name for a in acquisitions]
-        tsne_embedder = TSNE(n_components=2)
-        tnse_embedded_vector_matrix = tsne_embedder.fit_transform(feature_vector_matrix)
+        result = {
+            "Type": "PCA",
+            "Config": {"n_components": 2, "scaler": "StandardScaler"},
+            "Result": {"Sample_Coord_Dict": {name: list(coord) for name, coord in zip(acquisition_names, pca_embedded_vector_matrix)}}
+        }
+        return result
+            
+    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+        tnse_embedded_vector_matrix = TSNE(n_components=2).fit_transform(feature_vector_matrix.T)
         if interactive_plot:
             plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
-            for (x, y), name in zip(tnse_embedded_vector_matrix, names):
+            for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
             plt.show()
-        return tnse_embedded_vector_matrix
+        result = {
+            "Type": "TSNE",
+            "Config": {"n_components": 2},
+            "Result": {"Sample_Coord_Dict": {name: [float(x) for x in coord] for name, coord in zip(acquisition_names, tnse_embedded_vector_matrix)}}
+        }
+        return result
     
     def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False):
+        num_sample_with_feature = np.sum(feature_vector_matrix > 0, axis=1)
         percentile_table = []
         for percentile in range(101):
-            missing_for_percentile = 0
-            for feature_index in range(feature_vector_matrix.shape[1]):
-                num_nonzero = np.nonzero(feature_vector_matrix[:, feature_index])[0].shape[0]
-                num_samples_threshold = math.ceil((feature_vector_matrix.shape[0]) * percentile/100)
-                if num_nonzero <= num_samples_threshold:
-                    missing_for_percentile += 1
-            percentile_table.append([percentile, missing_for_percentile, num_samples_threshold])
+            num_samples_threshold = feature_vector_matrix.shape[1] * percentile/100
+            percentile_table.append([percentile, num_samples_threshold, int(np.sum(num_sample_with_feature <= num_samples_threshold))])
         if interactive_plot:
-            for x in percentile_table:
-                print(x)
-            plt.axhline(feature_vector_matrix.shape[1], color='r', linestyle='-')
-            plt.scatter([x[0] for x in percentile_table], [x[1] for x in percentile_table])
+            plt.scatter([x[0] for x in percentile_table], [x[2] for x in percentile_table])
+            plt.axhline(feature_vector_matrix.shape[0], color='r', linestyle='-')
             plt.show()
-        return percentile_table
-
+        result = {
+            "Type": "MissingFeaturePercentiles",
+            "Config": {},
+            "Result": {"PercentileTable": percentile_table}
+        }
+        return result
     
-    def missing_feature_distribution(self, feature_vector_matrix, sort_by=None, percentile_cutoff=None, interactive_plot=False):
-        missing = []
-        missing_count = 0
-        feature_indices = list(range(feature_vector_matrix.shape[1]))
-        if sort_by is None:
-            x_vals = feature_indices
-        elif sort_by == "mz":
-            x_vals = self.mzs
-        elif sort_by == "rtimes":
-            x_vals = self.rtimes
-        x_vals, y_vals = zip(*sorted(zip(x_vals, feature_indices)))
-        for _, feature_index in zip(x_vals, y_vals):
-            num_nonzero = np.nonzero(feature_vector_matrix[:, feature_index])[0].shape[0]
-            num_samples_threshold = math.ceil((feature_vector_matrix.shape[0]) * percentile_cutoff/100)
-            if num_nonzero < num_samples_threshold:
-                missing_count += 1
-            missing.append(missing_count)
+    def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
+        missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
         if interactive_plot:
-            plt.scatter(x_vals, missing)
+            plt.bar(acquisition_names, missing_feature_count)
+            plt.xticks(rotation='vertical')
             plt.show()
-        return x_vals, missing
+        result = {
+            "Type": "MissingFeatureDistribution",
+            "Config": {"intensity_cutoff": intensity_cutoff},
+            "Result": {name: int(num_missing) for name, num_missing in zip(acquisition_names, missing_feature_count)}
+        }
+        return result
+    
+    def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
+        sample_names = [*missing_feature_counts_result["Result"].keys()]
+        missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
+        missing_feature_z_scores = (missing_feature_counts - np.mean(missing_feature_counts)) / np.std(missing_feature_counts)
+        if interactive_plot:
+            plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
+            plt.show()
+        result = {
+            "Type": "MissingFeatureZScores",
+            "Config": {"intensity_cutoff": intensity_cutoff},
+            "Result": {name: float(z_score) for name, z_score in zip(acquisition_names, missing_feature_z_scores)}
+        }
+        return result
     
     def drop_features(
             self,
             blank_masking=False
     ):
         if blank_masking:
-            blanks = self.acquisitions_for_tag("Blank")
-            blank_feature_vector_matrix = self.retrieve_features_for_names(selected_acquisitions=blanks)
-            min_count = None
+            blank_feature_vector_matrix, names = self.selected_feature_matrix("Blank")
+            num_blanks = len(names) + 1
             if "AbsCount" in blank_masking:
                 min_count = int(blank_masking["AbsCount"])
             elif "RelCount" in blank_masking:
-                min_count = max(0, blank_masking["RelCount"] * len(blanks)+1)
+                min_count = max(0, blank_masking["RelCount"] * num_blanks)
             else:
                 min_count = 0
+            
+            if "MinIntensity" in blank_masking:
+                min_intensity = float(blank_masking["MinIntensity"])
+            else:
+                min_intensity = 0
 
-            blank_dropped_features = {}
-            for sample_id, feature_index in np.transpose(np.nonzero(blank_feature_vector_matrix)):
-                if feature_index not in blank_dropped_features:
-                    blank_dropped_features[feature_index] = 0
-                blank_dropped_features[feature_index] += 1
-            dropped_feature_ids = []
-            for feature_index, count in blank_dropped_features.items():
-                if count > min_count:
-                    dropped_feature_ids.append(self.feature_ids[feature_index])
+            features_to_drop = self.feature_matrix[0][np.sum(blank_feature_vector_matrix > min_intensity, axis=1) > min_count]
             output = {
                 "drop_config": blank_masking,
                 "blank_count_threshold_effective": min_count,
-                "dropped_feature_ids": dropped_feature_ids
+                "dropped_feature_ids": list(features_to_drop)
             }
-            print(output)
+            return output
             
-
-
     def qcqa(self, 
              tag=None, 
              sort=None, 
@@ -228,38 +275,31 @@ class FeatureTable:
              spearman=False, 
              kendall=False, 
              missing_feature_percentiles=False,
-             missing_feature_plot=False,
-             median_correlation_outlier_detection=False):
-        if tag:
-            acquisitions = self.acquisitions_for_tag(tag)
-        else:
-            acquisitions = self.experiment.acquisitions
-        if sort:
-            acquisitions = sorted(acquisitions, key=lambda x: [x.metadata_tags[y] for y in sort])
-        else:
-            acquisitions = acquisitions
-
-        feature_vector_matrix = self.retrieve_features_for_names(selected_acquisitions=acquisitions)
-        qcqa_result = {}
+             missing_feature_distribution=False,
+             median_correlation_outlier_detection=False,
+             missing_feature_outlier_detection=False,
+             intensity_analysis=False):
+        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag)
+        qcqa_result = []
         if pca:
-            self.PCA(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
+            qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         if tsne:
-            self.TSNE(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
+            qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         if pearson:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
-        if kendall:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive))
         if spearman:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive))
+        if kendall:
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
         if missing_feature_percentiles:
-            self.missing_feature_percentiles(feature_vector_matrix, interactive_plot=interactive, result=qcqa_result)
-        if missing_feature_plot:
-            sort_by, percentile_cutoff = None, 0
-            if "sort_by" in missing_feature_plot:
-                sort_by = missing_feature_plot['sort_by']
-            if "percentile_cutoff" in missing_feature_plot:
-                percentile_cutoff = float(missing_feature_plot['percentile_cutoff'])
-            self.missing_feature_distribution(feature_vector_matrix, sort_by=sort_by, percentile_cutoff=percentile_cutoff, interactive_plot=interactive, result=qcqa_result)
+            qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive))
+        if missing_feature_distribution:
+            qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+        if missing_feature_outlier_detection:
+            qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         if median_correlation_outlier_detection:
-            self.median_correlation_outlier_detection(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
-
+            qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+        if intensity_analysis:
+            qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, drop_missing=True, interactive_plot=interactive))
+        import json
+        print(json.dumps(qcqa_result, indent=4))
