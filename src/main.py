@@ -4,6 +4,7 @@ Usage:
   main.py convert_to_mzML_local <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> [--multi]
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_plot=<params>] [--median_correlation_outlier_detection]
+  main.py generate_drop_list <experiment_directory> <drop_list_path> [--blank_masking=<blank_masking_config>]
   main.py asari_full_processing <experiment_directory> (pos|neg)
   main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
 '''
@@ -133,6 +134,14 @@ def main(args):
         feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "export/full_Feature_table.tsv") 
         experiment.feature_table = FeatureTable(feature_table_path, experiment)
         experiment.save_experiment()
+    if args['generate_drop_list']:
+        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
+        experiment.feature_table = FeatureTable(feature_table_path, experiment)
+        if args['--blank_masking']:
+            blank_drop_config = json.loads(args["--blank_masking"])
+            experiment.feature_table.drop_features(blank_masking=blank_drop_config)
+
     if args['feature_QCQA']:
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
         feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
@@ -168,6 +177,7 @@ def main(args):
         
 if __name__ == '__main__':
     args = docopt(__doc__)
+    print(args)
     main(args)
 
     

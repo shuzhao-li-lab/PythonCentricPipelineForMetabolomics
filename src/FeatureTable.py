@@ -85,7 +85,7 @@ class FeatureTable:
             plt.show()
         return z_scores
 
-    def correlation_heatmap(self, feature_vector_matrix, acquisitions, correlation_type, tag=None, log_transform=True, interactive_plot=False):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
+    def correlation_heatmap(self, feature_vector_matrix, acquisitions, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         names = [a.name for a in acquisitions]
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
@@ -123,9 +123,8 @@ class FeatureTable:
     def PCA(self, feature_vector_matrix, acquisitions, interactive_plot=False):
         names = [a.name for a in acquisitions]
         scaler = StandardScaler()
-        #transformed_vector_matrix = scaler.fit_transform(feature_vector_matrix)
-        transformed_vector_matrix = feature_vector_matrix
-        pca_embedder = NMF(n_components=2)
+        transformed_vector_matrix = scaler.fit_transform(feature_vector_matrix)
+        pca_embedder = PCA(n_components=2)
         pca_embedded_vector_matrix = pca_embedder.fit_transform(transformed_vector_matrix)
         if interactive_plot:
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
@@ -185,7 +184,40 @@ class FeatureTable:
             plt.scatter(x_vals, missing)
             plt.show()
         return x_vals, missing
+    
+    def drop_features(
+            self,
+            blank_masking=False
+    ):
+        if blank_masking:
+            blanks = self.acquisitions_for_tag("Blank")
+            blank_feature_vector_matrix = self.retrieve_features_for_names(selected_acquisitions=blanks)
+            min_count = None
+            if "AbsCount" in blank_masking:
+                min_count = int(blank_masking["AbsCount"])
+            elif "RelCount" in blank_masking:
+                min_count = max(0, blank_masking["RelCount"] * len(blanks)+1)
+            else:
+                min_count = 0
+
+            blank_dropped_features = {}
+            for sample_id, feature_index in np.transpose(np.nonzero(blank_feature_vector_matrix)):
+                if feature_index not in blank_dropped_features:
+                    blank_dropped_features[feature_index] = 0
+                blank_dropped_features[feature_index] += 1
+            dropped_feature_ids = []
+            for feature_index, count in blank_dropped_features.items():
+                if count > min_count:
+                    dropped_feature_ids.append(self.feature_ids[feature_index])
+            output = {
+                "drop_config": blank_masking,
+                "blank_count_threshold_effective": min_count,
+                "dropped_feature_ids": dropped_feature_ids
+            }
+            print(output)
             
+
+
     def qcqa(self, 
              tag=None, 
              sort=None, 
@@ -208,27 +240,26 @@ class FeatureTable:
             acquisitions = acquisitions
 
         feature_vector_matrix = self.retrieve_features_for_names(selected_acquisitions=acquisitions)
-
-
+        qcqa_result = {}
         if pca:
-            self.PCA(feature_vector_matrix, acquisitions, interactive_plot=interactive)
+            self.PCA(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
         if tsne:
-            self.TSNE(feature_vector_matrix, acquisitions, interactive_plot=interactive)
+            self.TSNE(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
         if pearson:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive)
+            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
         if kendall:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive)
+            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
         if spearman:
-            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive)
+            self.correlation_heatmap(feature_vector_matrix, acquisitions, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive, result=qcqa_result)
         if missing_feature_percentiles:
-            self.missing_feature_percentiles(feature_vector_matrix, interactive_plot=interactive)
+            self.missing_feature_percentiles(feature_vector_matrix, interactive_plot=interactive, result=qcqa_result)
         if missing_feature_plot:
             sort_by, percentile_cutoff = None, 0
             if "sort_by" in missing_feature_plot:
                 sort_by = missing_feature_plot['sort_by']
             if "percentile_cutoff" in missing_feature_plot:
                 percentile_cutoff = float(missing_feature_plot['percentile_cutoff'])
-            self.missing_feature_distribution(feature_vector_matrix, sort_by=sort_by, percentile_cutoff=percentile_cutoff, interactive_plot=interactive)
+            self.missing_feature_distribution(feature_vector_matrix, sort_by=sort_by, percentile_cutoff=percentile_cutoff, interactive_plot=interactive, result=qcqa_result)
         if median_correlation_outlier_detection:
-            self.median_correlation_outlier_detection(feature_vector_matrix, acquisitions, interactive_plot=interactive)
+            self.median_correlation_outlier_detection(feature_vector_matrix, acquisitions, interactive_plot=interactive, result=qcqa_result)
 
