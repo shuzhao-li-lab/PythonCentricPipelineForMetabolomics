@@ -50,8 +50,10 @@ class FeatureTable:
         all_correlations_median = np.median(all_correlations)
         z_score_correlations = {name: (median_correlation - all_correlations_median)/all_correlations_std for name, median_correlation in median_correlations.items()}
         if interactive_plot:
+            plt.title("Median Correlation Values for Samples")
             plt.scatter(list(range(len(median_correlations))), list(median_correlations.values()))
             plt.show()
+            plt.title("Median Correlation Z-Scores for Samples")
             plt.scatter(list(range(len(z_score_correlations))), list(z_score_correlations.values()))
             plt.show()
         result = {
@@ -67,12 +69,13 @@ class FeatureTable:
         median_feature_intensity = np.median(feature_vector_matrix, axis=0)
         if interactive_plot:
             X = list(range(len(intensity_sums)))
+            plt.title("Sum Feature Intensities for Samples")
             plt.scatter(X, intensity_sums)
             plt.show()
-
+            plt.title("Mean Feature Intensity for Samples")
             plt.scatter(X, mean_feature_intensity)
             plt.show()
-
+            plt.title("Median Feature Intensity for Samples")
             plt.scatter(X, median_feature_intensity)
             plt.show()
 
@@ -82,12 +85,13 @@ class FeatureTable:
         filtered_median_feature_intensity = np.nanmedian(filtered_feature_vector_matrix, axis=0)
         if interactive_plot:
             X = list(range(len(intensity_sums)))
+            plt.title("Sum Feature Intensities for Samples (missing features dropped)")
             plt.scatter(X, intensity_sums)
             plt.show()
-
+            plt.title("Mean Feature Intensity for Samples (missing features dropped)")
             plt.scatter(X, filtered_mean_feature_intensity)
             plt.show()
-
+            plt.title("Median Feature Intensity for Samples (missing features dropped)")
             plt.scatter(X, filtered_median_feature_intensity)
             plt.show()
 
@@ -97,12 +101,13 @@ class FeatureTable:
         log_filtered_median_feature_intensity = np.nanmedian(log_filtered_feature_vector_matrix, axis=0)
         if interactive_plot:
             X = list(range(len(intensity_sums)))
+            plt.title("Sum Log Intensity for Samples (missing features dropped)")
             plt.scatter(X, log_filtered_intensity_sum)
             plt.show()
-
+            plt.title("Mean Log Feature Intensity for Samples (missing features dropped)")
             plt.scatter(X, log_filtered_mean_feature_intensity)
             plt.show()
-
+            plt.title("Median Log Feature Intensity for Samples (missing features dropped)")
             plt.scatter(X, log_filtered_median_feature_intensity)
             plt.show()
 
@@ -167,6 +172,7 @@ class FeatureTable:
         pca_embedder = PCA(n_components=2)
         pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform(feature_vector_matrix.T))
         if interactive_plot:
+            plt.title("PCA (n_components=2)")
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
             for (x, y), name in zip(pca_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
@@ -181,6 +187,7 @@ class FeatureTable:
     def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
         tnse_embedded_vector_matrix = TSNE(n_components=2).fit_transform(feature_vector_matrix.T)
         if interactive_plot:
+            plt.title("TSNE")
             plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
             for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
@@ -199,6 +206,9 @@ class FeatureTable:
             num_samples_threshold = feature_vector_matrix.shape[1] * percentile/100
             percentile_table.append([percentile, num_samples_threshold, int(np.sum(num_sample_with_feature <= num_samples_threshold))])
         if interactive_plot:
+            plt.title("Missing Feature Percentiles")
+            plt.xlabel("Percentile")
+            plt.ylabel("Num. Dropped Features")
             plt.scatter([x[0] for x in percentile_table], [x[2] for x in percentile_table])
             plt.axhline(feature_vector_matrix.shape[0], color='r', linestyle='-')
             plt.show()
@@ -213,6 +223,8 @@ class FeatureTable:
         intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
         missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
         if interactive_plot:
+            plt.title("Missing Feature Counts")
+            plt.ylabel("Num. Missing Features")
             plt.bar(acquisition_names, missing_feature_count)
             plt.xticks(rotation='vertical')
             plt.show()
@@ -223,12 +235,45 @@ class FeatureTable:
         }
         return result
     
+    def feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        intensity_masked_feature_matrix = feature_vector_matrix > intensity_cutoff
+        feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
+        if interactive_plot:
+            plt.title("Feature Counts")
+            plt.ylabel("Num. Features")
+            plt.bar(acquisition_names, feature_count)
+            plt.xticks(rotation='vertical')
+            plt.show()
+        result = {
+            "Type": "FeatureDistribution",
+            "Config": {"intensity_cutoff": intensity_cutoff},
+            "Result": {name: int(num_missing) for name, num_missing in zip(acquisition_names, feature_count)}
+        }
+        return result
+    
+    def feature_distribution_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        feature_counts_result = self.feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
+        sample_names = [*feature_counts_result["Result"].keys()]
+        feature_counts = np.array([*feature_counts_result["Result"].values()])
+        feature_z_scores = (feature_counts - np.mean(feature_counts)) / np.std(feature_counts)
+        if interactive_plot:
+            plt.title("Num Feature Z-Score")
+            plt.scatter(list(range(len(feature_z_scores))), feature_z_scores)
+            plt.show()
+        result = {
+            "Type": "FeatureCountZScores",
+            "Config": {"intensity_cutoff": intensity_cutoff},
+            "Result": {name: float(z_score) for name, z_score in zip(acquisition_names, feature_z_scores)}
+        }
+        return result
+
     def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
         missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
         sample_names = [*missing_feature_counts_result["Result"].keys()]
         missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
         missing_feature_z_scores = (missing_feature_counts - np.mean(missing_feature_counts)) / np.std(missing_feature_counts)
         if interactive_plot:
+            plt.title("Num Missing Feature Z-Score")
             plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
             plt.show()
         result = {
@@ -278,7 +323,9 @@ class FeatureTable:
              missing_feature_distribution=False,
              median_correlation_outlier_detection=False,
              missing_feature_outlier_detection=False,
-             intensity_analysis=False):
+             intensity_analysis=False,
+             feature_distribution=False,
+             feature_outlier_detection=False):
         selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag)
         qcqa_result = []
         if pca:
@@ -301,5 +348,9 @@ class FeatureTable:
             qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         if intensity_analysis:
             qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, drop_missing=True, interactive_plot=interactive))
+        if feature_distribution:
+            qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+        if feature_outlier_detection:
+            qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         import json
         print(json.dumps(qcqa_result, indent=4))

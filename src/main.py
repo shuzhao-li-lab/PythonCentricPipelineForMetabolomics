@@ -3,7 +3,7 @@ Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <experiment_name> <sequence_csv> <metadata_csv> [--filter=<filter>]
   main.py convert_to_mzML_local <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> [--multi]
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py feature_QCQA <experiment_directory> [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--intensity_analysis]
+  main.py feature_QCQA <experiment_directory> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py generate_drop_list <experiment_directory> <drop_list_path> [--blank_masking=<blank_masking_config>]
   main.py asari_full_processing <experiment_directory> (pos|neg)
   main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
@@ -156,21 +156,38 @@ def main(args):
         else:
             sort = None
 
-
-        experiment.feature_table.qcqa(tag=tag, 
+        if args['--all']:
+            experiment.feature_table.qcqa(tag=tag, 
                                       sort=sort, 
                                       interactive=args["--interactive"], 
-                                      pca=args["--pca"], 
-                                      tsne=args['--tsne'], 
-                                      pearson=args['--pearson'], 
-                                      spearman=args['--spearman'], 
-                                      kendall=args['--kendall'], 
-                                      missing_feature_percentiles=args['--missing_feature_percentiles'],
-                                      missing_feature_distribution=args['--missing_feature_distribution'],
-                                      median_correlation_outlier_detection=args['--median_correlation_outlier_detection'],
-                                      missing_feature_outlier_detection=args['--missing_feature_outlier_detection'],
-                                      intensity_analysis=args['--intensity_analysis'])
-        
+                                      pca=True, 
+                                      tsne=True, 
+                                      pearson=True, 
+                                      spearman=True, 
+                                      kendall=True, 
+                                      missing_feature_percentiles=True,
+                                      missing_feature_distribution=True,
+                                      median_correlation_outlier_detection=True,
+                                      missing_feature_outlier_detection=True,
+                                      intensity_analysis=True,
+                                      feature_distribution=True,
+                                      feature_outlier_detection=True)
+        else:
+            experiment.feature_table.qcqa(tag=tag, 
+                                        sort=sort, 
+                                        interactive=args["--interactive"], 
+                                        pca=args["--pca"], 
+                                        tsne=args['--tsne'], 
+                                        pearson=args['--pearson'], 
+                                        spearman=args['--spearman'], 
+                                        kendall=args['--kendall'], 
+                                        missing_feature_percentiles=args['--missing_feature_percentiles'],
+                                        missing_feature_distribution=args['--missing_feature_distribution'],
+                                        median_correlation_outlier_detection=args['--median_correlation_outlier_detection'],
+                                        missing_feature_outlier_detection=args['--missing_feature_outlier_detection'],
+                                        intensity_analysis=args['--intensity_analysis'],
+                                        feature_distribution=args['--feature_distribution'],
+                                        feature_outlier_detection=args['--feature_outlier_detection'])
         
 if __name__ == '__main__':
     args = docopt(__doc__)
