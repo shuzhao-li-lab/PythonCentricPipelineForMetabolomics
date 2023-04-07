@@ -6,7 +6,7 @@ Usage:
   main.py feature_QCQA <experiment_directory> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py generate_drop_list <experiment_directory> <drop_list_path> [--blank_masking=<blank_masking_config>]
   main.py asari_full_processing <experiment_directory> (pos|neg)
-  main.py asari_target_processing_NOT_IMPLEMENTED <experiment_directory> (pos|neg) <targets> 
+  main.py MS1_annotate <experiment_directory> [--hmdb]
 '''
 
 from docopt import docopt
@@ -21,9 +21,13 @@ import csv
 import json
 
 
-def job(job_desc):
+def job_standards_search(job_desc):
     acquisition, spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory = job_desc
-    acquisition.generate_report(spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory)
+    return acquisition.generate_report(spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory)
+
+def job_TICs(job_desc):
+    acquisition, rt_resolution = job_desc
+    return acquisition.TIC(rt_resolution)
 
 def adductify_standards(standards_csv, adducts_csv):
     isotope_mass_table = {
@@ -93,11 +97,8 @@ def main(args):
         experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'], multiprocessing=args['--multi'])
         experiment.save_experiment()
     if args['spectral_QCQA']:
+        import matplotlib.pyplot as plt
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
-        # todo - fix this to take external standards
-        # name, M+H, RT,
-        #in extraction buffer
-
         spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
 
         if args['--multi']:
@@ -110,13 +111,44 @@ def main(args):
                 int(args["<min_intensity>"]), 
                 True, 
                 os.path.join(experiment.experiment_directory, "reports")) for acquisition in experiment.acquisitions]
-
             pool = mp.Pool(mp.cpu_count())
-            pool.map(job, job_descs)
+            standards_search_results = pool.map(job_standards_search, job_descs)
         else:
+            standards_search_results = []
             for acquisition in experiment.acquisitions:
-                acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
-        experiment.save_experiment()
+                standards_search_result = acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
+                standards_search_results.append(standards_search_result)
+        print(standards_search_results)
+        sample_names = [a.name for a in experiment.acquisitions]
+        for spikein in spikeins:
+            spikein_name = spikein['Name']
+            Y = []
+            colors = []
+            for result in standards_search_results:
+                for result_for_standard in result["standards"]:
+                    if result_for_standard['name'] == spikein_name:
+                        Y.append(result_for_standard['matching_peaks'])
+                        if result_for_standard['detected']:
+                            colors.append('green')
+                        else:
+                            colors.append('red')
+            plt.title(spikein_name)
+            plt.scatter(list(range(len(Y))), Y, c=colors)
+            for x,y,name in zip(range(len(Y)), Y, sample_names):
+                plt.text(x,y,name, rotation='vertical')
+            plt.show()
+            
+
+
+        #if True:
+        #    all_standard_names
+
+        #    for standard_search in standards_search_results:
+                
+
+
+        #print(json.dumps(standards_search_results, indent=4))
+        #experiment.save_experiment()
     if args['asari_full_processing']:
         print(args)
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
@@ -134,14 +166,6 @@ def main(args):
         feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "export/full_Feature_table.tsv") 
         experiment.feature_table = FeatureTable(feature_table_path, experiment)
         experiment.save_experiment()
-    if args['generate_drop_list']:
-        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
-        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
-        experiment.feature_table = FeatureTable(feature_table_path, experiment)
-        if args['--blank_masking']:
-            blank_drop_config = json.loads(args["--blank_masking"])
-            experiment.feature_table.drop_features(blank_masking=blank_drop_config)
-
     if args['feature_QCQA']:
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
         feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
@@ -188,7 +212,21 @@ def main(args):
                                         intensity_analysis=args['--intensity_analysis'],
                                         feature_distribution=args['--feature_distribution'],
                                         feature_outlier_detection=args['--feature_outlier_detection'])
-        
+    if args['generate_drop_list']:
+        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
+        experiment.feature_table = FeatureTable(feature_table_path, experiment)
+        if args['--blank_masking']:
+            blank_drop_config = json.loads(args["--blank_masking"])
+            experiment.feature_table.drop_features(blank_masking=blank_drop_config)
+    if args['MS1_annotate']:
+        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        annotate_with_hmdb = args['--hmdb']
+        feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
+        experiment.feature_table = FeatureTable(feature_table_path, experiment)
+        experiment.feature_table.annotate()
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
     main(args)

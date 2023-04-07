@@ -23,6 +23,24 @@ class Acqusition(object):
 
         self.__min_mz = None
         self.__max_mz = None
+        self.__min_rt = None
+        self.__max_rt = None
+
+    @property
+    def min_rt(self):
+        if self.__min_rt is None:
+            peaks = self.__extract_ms_information(1, "peaks")
+            self.__min_rt = min([peak.rt for peak in peaks])
+            self.__max_rt = max([peak.rt for peak in peaks])
+        return self.__min_rt
+    
+    @property
+    def max_rt(self):
+        if self.__max_rt is None:
+            peaks = self.__extract_ms_information(1, "peaks")
+            self.__min_rt = min([peak.rt for peak in peaks])
+            self.__max_rt = max([peak.rt for peak in peaks])
+        return self.__max_rt
 
     @property
     def min_mz(self):
@@ -30,6 +48,7 @@ class Acqusition(object):
         if self.__min_mz is None:
             peaks = self.__extract_ms_information(1, "peaks")
             self.__min_mz = min([peak.mz for peak in peaks])
+            self.__max_mz = max([peak.mz for peak in peaks])
         return self.__min_mz
 
     @property
@@ -37,6 +56,7 @@ class Acqusition(object):
         Acqusition.log.info("Calculating max_mz for MS1 for " + self.mzml_filepath)
         if self.__max_mz is None:
             peaks = self.__extract_ms_information(1, "peaks")
+            self.__max_mz = max([peak.mz for peak in peaks])
             self.__max_mz = max([peak.mz for peak in peaks])
         return self.__max_mz
 
@@ -146,12 +166,12 @@ class Acqusition(object):
                     "mz": mz,
                     "rt": rt,
                     "detected": detected,
-                    "matching_peaks": standard_hits
+                    "matching_peaks": len(standard_hits)
                 })
             return {"null_cutoff": cutoff, "standards": standards_matches}
         except:
             Acqusition.log.exception("Searching for standards in " + self.name + " FAILED!")
-            exit()
+            return {}
     
     def generate_report(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, text_report=False, output_directory=None):
         Acqusition.log.info("Generating report for: " + self.name)
@@ -167,9 +187,8 @@ class Acqusition(object):
                 report_fh = open(os.path.join(output_directory, self.name + "_report.txt"), 'w+')
                 report_fh.write("Null matches: " + str(null_match_count) + "\n")
                 for standard in search_results["standards"]:
-                    report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(len(standard["matching_peaks"])) + " - Detected: " + str(standard["detected"])  + "\n")
+                    report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(standard["matching_peaks"]) + " - Detected: " + str(standard["detected"])  + "\n")
                 report_fh.close()
-            print("Stop: ", self.name)
             return search_results
         except:
             Acqusition.log.exception("Generating report for: " + self.name + " FAILED!")

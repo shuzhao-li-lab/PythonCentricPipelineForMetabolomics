@@ -10,6 +10,7 @@ from sklearn.manifold import TSNE
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
+        self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
         self.feature_matrix_header = None
         feature_matrix = []
@@ -354,3 +355,34 @@ class FeatureTable:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         import json
         print(json.dumps(qcqa_result, indent=4))
+
+    def annotate(self):
+        from mass2chem.epdsConstructor import epdsConstructor
+        from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
+        from jms.io import read_table_to_peaks
+        import json
+
+        list_peaks = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
+        #print(list_peaks)
+        
+        ECCON = epdsConstructor(list_peaks, mode='pos')
+        dict_empCpds = ECCON.peaks_to_epdDict(
+            seed_search_patterns = ECCON.seed_search_patterns,
+            ext_search_patterns = ECCON.ext_search_patterns,
+            mz_tolerance_ppm=5,
+            coelution_function='distance',
+            check_isotope_ratio=False
+        )
+        EED = ExperimentalEcpdDatabase(mode='pos')
+        EED.dict_empCpds = dict_empCpds
+        EED.index_empCpds()
+
+        KCD = knownCompoundDatabase()
+        list_compounds = json.load(open('/Users/mitchjo/Datasets/Compounds/list_compounds_HMDB4.json'))
+        KCD.mass_index_list_compounds(list_compounds)
+        KCD.build_emp_cpds_index()
+
+        EED.extend_empCpd_annotation(KCD)
+        EED.annotate_singletons(KCD)
+
+        print(json.dumps(dict_empCpds, indent=4))
