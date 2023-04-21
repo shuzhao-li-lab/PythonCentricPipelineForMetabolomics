@@ -6,7 +6,7 @@ Usage:
   main.py feature_QCQA <experiment_directory> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py generate_drop_list <experiment_directory> <drop_list_path> [--blank_masking=<blank_masking_config>]
   main.py asari_full_processing <experiment_directory> (pos|neg)
-  main.py MS1_annotate <experiment_directory> [--hmdb]
+  main.py MS1_annotate <experiment_directory> [--hmdb] [--auth_std=<auth_std_path>]
 '''
 
 from docopt import docopt
@@ -139,16 +139,6 @@ def main(args):
             plt.show()
             
 
-
-        #if True:
-        #    all_standard_names
-
-        #    for standard_search in standards_search_results:
-                
-
-
-        #print(json.dumps(standards_search_results, indent=4))
-        #experiment.save_experiment()
     if args['asari_full_processing']:
         print(args)
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
@@ -221,10 +211,17 @@ def main(args):
             experiment.feature_table.drop_features(blank_masking=blank_drop_config)
     if args['MS1_annotate']:
         experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
-        annotate_with_hmdb = args['--hmdb']
         feature_table_path = os.path.join(experiment.asari_output, os.listdir(experiment.asari_output)[0], "preferred_Feature_table.tsv") 
         experiment.feature_table = FeatureTable(feature_table_path, experiment)
-        experiment.feature_table.annotate()
+        annotation_databases = set()
+        if args['--hmdb']:
+            annotation_databases.add("HMDB")
+        if args['--auth_std']:
+            auth_std_path = args['--auth_std']
+        else:
+            auth_std_path = None
+
+        experiment.feature_table.annotate(annotation_databases, auth_std_path)
 
 
 if __name__ == '__main__':
