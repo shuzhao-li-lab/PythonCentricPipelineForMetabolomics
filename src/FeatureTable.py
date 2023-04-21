@@ -7,6 +7,12 @@ import math
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, NMF
 from sklearn.manifold import TSNE
+from mass2chem.epdsConstructor import epdsConstructor
+from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
+from jms.io import read_table_to_peaks
+import json
+# need to update the blank dropping. 
+
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
@@ -223,6 +229,8 @@ class FeatureTable:
     def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
         intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
         missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
+        for i, a in enumerate(acquisition_names):
+            print(i, a)
         if interactive_plot:
             plt.title("Missing Feature Counts")
             plt.ylabel("Num. Missing Features")
@@ -356,15 +364,8 @@ class FeatureTable:
         import json
         print(json.dumps(qcqa_result, indent=4))
 
-    def annotate(self):
-        from mass2chem.epdsConstructor import epdsConstructor
-        from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
-        from jms.io import read_table_to_peaks
-        import json
-
+    def annotate(self, annotation_databases = None, auth_std_path = "rppos.json" ):
         list_peaks = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
-        #print(list_peaks)
-        
         ECCON = epdsConstructor(list_peaks, mode='pos')
         dict_empCpds = ECCON.peaks_to_epdDict(
             seed_search_patterns = ECCON.seed_search_patterns,
@@ -376,13 +377,24 @@ class FeatureTable:
         EED = ExperimentalEcpdDatabase(mode='pos')
         EED.dict_empCpds = dict_empCpds
         EED.index_empCpds()
+        
+        if auth_std_path:
+            KCD = knownCompoundDatabase()
+            list_compounds = json.load(open(auth_std_path))
+            KCD.mass_index_list_compounds(list_compounds)
+            KCD.build_emp_cpds_index()
+            EED.extend_empCpd_annotation(KCD)
+            EED.annotate_singletons(KCD)
 
-        KCD = knownCompoundDatabase()
-        list_compounds = json.load(open('/Users/mitchjo/Datasets/Compounds/list_compounds_HMDB4.json'))
-        KCD.mass_index_list_compounds(list_compounds)
-        KCD.build_emp_cpds_index()
+        filtered_dict_empCpds = {}
+        for interim_id, interim_id_dict in dict_empCpds.items():
+            if 'list_matches' in interim_id_dict:
+                filtered_dict_empCpds[interim_id] = interim_id_dict
+        with open("output.json", 'w+') as out:
+            json.dump(filtered_dict_empCpds, out, indent=4)
+        #print(json.dumps(filtered_dict_empCpds, indent=4))
 
-        EED.extend_empCpd_annotation(KCD)
-        EED.annotate_singletons(KCD)
 
-        print(json.dumps(dict_empCpds, indent=4))
+
+        #print(json.load(open(auth_std_path)))
+        

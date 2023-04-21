@@ -37,7 +37,7 @@ class ThermoRawFileConverter(AbstractThermoRawFileConverter):
             self.log.exception("Error converting " + raw_acquisition.raw_filepath)
 
     def convert_multi(self, raw_acquisitions, output_directory):
-        workers = mp.Pool(mp.cpu_count())
+        workers = mp.Pool(mp.cpu_count()-1)
         jobs = []
         for raw_acquisition in raw_acquisitions:
             output_filepath = os.path.join(output_directory, os.path.basename(raw_acquisition.raw_filepath)).replace(".raw", ".mzML")
