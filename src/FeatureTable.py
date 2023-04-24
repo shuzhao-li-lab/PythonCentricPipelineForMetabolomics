@@ -66,7 +66,7 @@ class FeatureTable:
         result = {
             "Type": "MedianCorrelationZScores",
             "Config": {},
-            "Results": z_score_correlations
+            "Result": z_score_correlations
         }
         return result
     
@@ -121,7 +121,7 @@ class FeatureTable:
         result = {
             "Type": "IntensitySummary",
             "Config": {},
-            "Results": {
+            "Result": {
                 "SumIntensity": {name: value for name, value in zip(acquisition_names, intensity_sums)},
                 "MeanIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
                 "MedianIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
@@ -361,8 +361,7 @@ class FeatureTable:
             qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         if feature_outlier_detection:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
-        import json
-        print(json.dumps(qcqa_result, indent=4))
+        return qcqa_result
 
     def annotate(self, annotation_databases = None, auth_std_path = "rppos.json" ):
         list_peaks = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
