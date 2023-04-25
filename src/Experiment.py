@@ -18,7 +18,9 @@ class Experiment:
     subdirectories = {
         "asari_results": "asari_results/",
         "converted": "converted_acquisitions/",
-        "raw": "raw_acquisitions/"
+        "raw": "raw_acquisitions/",
+        "annotations": "annotations/",
+        "filtered_feature_tables": "filtered_feature_tables/"
     }
     def __init__(self, 
                  experiment_name, 
@@ -28,7 +30,8 @@ class Experiment:
                  full_feature_table_path=None, 
                  preferred_feature_table_path=None,
                  qcqa_results=None,
-                 drop_results=None):
+                 drop_results=None,
+                 ionization_mode=None):
         self.experiment_name = experiment_name
         self.experiment_directory = experiment_directory
         if acquisitions is None:
@@ -39,6 +42,8 @@ class Experiment:
         self.asari_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["asari_results"])
         self.converted_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["converted"])
         self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["raw"])
+        self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["annotations"])
+        self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["filtered_feature_tables"])
         self.full_feature_table_path = full_feature_table_path
         self.preferred_feature_table_path = preferred_feature_table_path
         if qcqa_results is None:
@@ -47,6 +52,7 @@ class Experiment:
         if drop_results is None:
             drop_results = {}
         self.drop_results = drop_results
+        self.ionization_mode = ionization_mode
 
     def initialize_subdirectories(self):
         to_create = [os.path.abspath(self.experiment_directory)]
@@ -54,8 +60,6 @@ class Experiment:
         for subdirectory_full_path in to_create:
             if not os.path.isdir(subdirectory_full_path):
                 os.makedirs(subdirectory_full_path)
-            #else:
-            #    raise Exception()
     
     @staticmethod
     def load(experiment_json_filepath):
@@ -81,7 +85,8 @@ class Experiment:
                                     full_feature_table_path=JSON_repr["full_feature_table_path"],
                                     preferred_feature_table_path=JSON_repr["preferred_feature_table_path"],
                                     qcqa_results=JSON_repr["qcqa_results"],
-                                    drop_results=JSON_repr["drop_results"]
+                                    drop_results=JSON_repr["drop_results"],
+                                    ionization_mode=JSON_repr["ionization_mode"]
                                     )
         return experiment
         
@@ -94,7 +99,8 @@ class Experiment:
                 "full_feature_table_path": self.full_feature_table_path,
                 "preferred_feature_table_path": self.preferred_feature_table_path,
                 "qcqa_results": self.QCQA_results,
-                "drop_results": self.drop_results
+                "drop_results": self.drop_results,
+                "ionization_mode": self.ionization_mode
             }
             for acquisition in self.acquisitions:
                 JSON_repr['acquisitions'].append(acquisition.JSON_repr)
@@ -120,7 +126,17 @@ class Experiment:
         converted_filepaths = converter.convert_multi(self.acquisitions, self.converted_subdirectory)
         for acquisition, mzml_filepath in zip(self.acquisitions, converted_filepaths):
             acquisition.mzml_filepath = mzml_filepath
-    
+
+    def filter_samples(self, filter, return_field="name"):
+        to_return = set()
+        for acquisition in self.acquisitions:
+            if acquisition.filter(filter):
+                to_return.add(acquisition)
+        if return_field:
+            return [getattr(x, return_field) for x in to_return]
+        else:
+            return to_return
+
     def construct_experiment_from_CSV(experiment_directory, CSV_filepath, filter=None, name_field='Name', path_field='Filepath'):
         if filter is None:
             filter = {}
@@ -139,15 +155,10 @@ class Experiment:
                 for key, filter_rules in filter.items():
                     if "includes" in filter_rules:
                         for must_include in filter_rules["includes"]:
-                            passed_filter = passed_filter and must_include in acquisition_info[key].lower()
+                            passed_filter = passed_filter and must_include.lower() in acquisition_info[key].lower()
                     if "lacks" in filter_rules:
                         for must_not_include in filter_rules["lacks"]:
-                            passed_filter = passed_filter and must_not_include not in acquisition_info[key].lower()
+                            passed_filter = passed_filter and must_not_include.lower() not in acquisition_info[key].lower()
                 if passed_filter:
                     experiment.add_acquisition(acquisition)
         return experiment
-    
-if __name__ == '__main__':
-    import sys
-    e = Experiment.load(sys.argv[1])
-    print(vars(e))

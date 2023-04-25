@@ -5,8 +5,9 @@ Usage:
   main.py spectral_QCQA <experiment_json> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py feature_QCQA <experiment_json> (preferred|full|both) [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py asari_full_processing <experiment_json> (pos|neg)
-  main.py drop_samples <experiment_json> <drop_monicker> (preferred|full|both) [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
-  main.py MS1_annotate <experiment_directory> [--hmdb] [--auth_std=<auth_std_path>]
+  main.py drop_samples <experiment_json> (preferred|full|both) [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
+  main.py preprocess_features <experiment_json> (preferred|full|both) <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--drop_samples]
+  main.py MS1_annotate <experiment_json> (preferred|full|both) <annotation_source>...
 '''
 
 from docopt import docopt
@@ -41,15 +42,17 @@ def main(args):
     elif args['asari_full_processing']:
         experiment = Experiment.load(args['<experiment_json>'])
         if args['pos']:
+            experiment.ionization_mode = 'pos'
             os.system("asari process -m pos -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
         elif args['neg']:
+            experiment.ionization_mode = 'neg'
             os.system("asari process -m neg -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
         experiment.full_feature_table_path = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
         experiment.preferred_feature_table_path = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
         experiment.save()
     elif args['spectral_QCQA']:
         import matplotlib.pyplot as plt
-        experiment = Experiment.load_experiment(os.path.join(args['<experiment_directory>'], "experiment.pickle"))
+        experiment = Experiment.load(args['<experiment_json>'])
         spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
 
         if args['--multi']:
@@ -159,10 +162,8 @@ def main(args):
                 config.update(auto_drop_config)
                 to_drop = set()
                 for key, cutoff in auto_drop_config.items():
-                    used = False
                     for qcqa_result in experiment.QCQA_results[ftable]:
                         if qcqa_result['Type'] == key:
-                            used = True
                             for sample_name, Z_score in qcqa_result['Result'].items():
                                 if abs(float(Z_score)) > cutoff:
                                     to_drop.add(sample_name) 
@@ -185,6 +186,41 @@ def main(args):
                 "config": config
             }
         experiment.save()
+    elif args['MS1_annotate']:
+        experiment = Experiment.load(args['<experiment_json>'])
+        to_annotate = []
+        if args['both'] or args['full']:
+            full_feature_table = FeatureTable(experiment.full_feature_table_path, experiment)
+            to_annotate.append(('full', full_feature_table))
+        if args['both'] or args['preferred']:
+            preferred_feature_table = FeatureTable(experiment.preferred_feature_table_path, experiment)
+            to_annotate.append(('preferred', preferred_feature_table))
+        for name, table in to_annotate:
+            table.annotate(args['<annotation_source>'], name)
+    elif args['preprocess_features']:
+        experiment = Experiment.load(args['<experiment_json>'])
+        blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))
+        sample_names = list(experiment.filter_samples(json.loads(args['<sample_filter>'])))
+
+        to_curate = []
+        if args['both'] or args['full']:
+            if args['--drop_samples']:
+                new_sample_names = []
+                to_drop = experiment.drop_results['full']['sample_names_to_drop']
+                for x in sample_names:
+                    if x not in to_drop:
+                        new_sample_names.append(x)
+                sample_names = new_sample_names
+            print(sample_names)
+            full_feature_table = FeatureTable(experiment.full_feature_table_path, experiment)
+            to_curate.append(('full', full_feature_table))
+        if args['both'] or args['preferred']:
+            preferred_feature_table = FeatureTable(experiment.preferred_feature_table_path, experiment)
+            to_curate.append(('preferred', preferred_feature_table))
+        for name, table in to_curate:
+            table.curate(blank_names, sample_names, float(args['<drop_percentile>']), float(args['<blank_intensity_ratio>']), float(args['<TIC_inclusion_percentile>']), 'filtered_' + name + "_Feature_table.tsv")
+
+
 
 if __name__ == '__main__':
     args = docopt(__doc__)
