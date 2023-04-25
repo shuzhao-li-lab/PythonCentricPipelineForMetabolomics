@@ -68,6 +68,19 @@ class Acqusition(object):
             "__min_rt": self.__min_rt,
             "__max_rt": self.__max_rt
         }
+    
+    def filter(self, filter):
+        passed_filter = True
+        for key, rules in filter.items():
+            values_to_filter = self.metadata_tags[key].lower()
+            if "includes" in rules:
+                for must_include in rules["includes"]:
+                    passed_filter = passed_filter and must_include in values_to_filter
+            if "lacks" in rules:
+                for not_include in rules["lacks"]:
+                    passed_filter = passed_filter and not_include not in values_to_filter
+        return passed_filter
+            
 
     def __extract_mzml(self, ms_level=None):
         for spec in pymzml.run.Reader(self.mzml_filepath):

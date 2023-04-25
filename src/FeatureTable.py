@@ -4,6 +4,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats
 import math
+import os
+import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA, NMF
 from sklearn.manifold import TSNE
@@ -41,6 +43,14 @@ class FeatureTable:
                 matching_column_indices.append(column_index)
         feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
         return feature_matrix_subset.T, sample_names_for_tags
+    
+    def select_feature_column(self, feature_name):
+        for column_index, name in enumerate(self.feature_matrix_header):
+            if name == feature_name:
+                try:
+                    return np.array([float(x) for x in self.feature_matrix[column_index]], dtype=np.float64)
+                except:
+                    return self.feature_matrix[column_index]
 
     def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False):
         correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False)
@@ -292,32 +302,35 @@ class FeatureTable:
         }
         return result
     
-    def drop_features(
-            self,
-            blank_masking=False
-    ):
-        if blank_masking:
-            blank_feature_vector_matrix, names = self.selected_feature_matrix("Blank")
-            num_blanks = len(names) + 1
-            if "AbsCount" in blank_masking:
-                min_count = int(blank_masking["AbsCount"])
-            elif "RelCount" in blank_masking:
-                min_count = max(0, blank_masking["RelCount"] * num_blanks)
-            else:
-                min_count = 0
-            
-            if "MinIntensity" in blank_masking:
-                min_intensity = float(blank_masking["MinIntensity"])
-            else:
-                min_intensity = 0
+    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path):
+        blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
+        samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
+        all_sample_names = {acquisition.name for acquisition in self.experiment.acquisitions}
+        for header_field in self.feature_matrix_header:
+            if header_field not in all_sample_names:
+                for table in [blanks, samples]:
+                    table[header_field] = self.select_feature_column(header_field)
+        
+        # calculate percent of samples where feature is present
+        samples["percent_inclusion"] = np.sum(samples[sample_names] > 0, axis=1) / len(sample_names)
 
-            features_to_drop = self.feature_matrix[0][np.sum(blank_feature_vector_matrix > min_intensity, axis=1) > min_count]
-            output = {
-                "drop_config": blank_masking,
-                "blank_count_threshold_effective": min_count,
-                "dropped_feature_ids": list(features_to_drop)
-            }
-            return output
+        # calculate TIC values and normalization factors then normalize
+        TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+        norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
+
+        # normalize 
+        for sample, norm_factor in norm_factors.items():
+            samples[sample] = samples[sample] * norm_factor
+
+        # mark features in blanks
+        to_filter = []
+        for blank_mean, sample_mean in zip(np.mean(blanks[blank_names], axis=1), np.mean(samples[sample_names], axis=1)):
+            to_filter.append(blank_mean > sample_mean * blank_intensity_ratio)
+        samples["blank_filtered"] = to_filter
+        
+        # drop features in blanks and drop features not in more than drop_percentile
+        samples = samples[(samples["blank_filtered"] == False) & (samples["percent_inclusion"] > drop_percentile)]
+        samples.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
             
     def qcqa(self, 
              tag=None, 
@@ -362,10 +375,13 @@ class FeatureTable:
         if feature_outlier_detection:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         return qcqa_result
+    
+    def identify_blank_names(self, blank_filter):
+        pass
 
-    def annotate(self, annotation_databases = None, auth_std_path = "rppos.json" ):
+    def annotate(self, annotation_sources, name):
         list_peaks = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
-        ECCON = epdsConstructor(list_peaks, mode='pos')
+        ECCON = epdsConstructor(list_peaks, mode=self.experiment.ionization_mode)
         dict_empCpds = ECCON.peaks_to_epdDict(
             seed_search_patterns = ECCON.seed_search_patterns,
             ext_search_patterns = ECCON.ext_search_patterns,
@@ -377,23 +393,14 @@ class FeatureTable:
         EED.dict_empCpds = dict_empCpds
         EED.index_empCpds()
         
-        if auth_std_path:
+        for source in annotation_sources:
             KCD = knownCompoundDatabase()
-            list_compounds = json.load(open(auth_std_path))
+            list_compounds = json.load(open(source))
             KCD.mass_index_list_compounds(list_compounds)
             KCD.build_emp_cpds_index()
             EED.extend_empCpd_annotation(KCD)
             EED.annotate_singletons(KCD)
 
-        filtered_dict_empCpds = {}
-        for interim_id, interim_id_dict in dict_empCpds.items():
-            if 'list_matches' in interim_id_dict:
-                filtered_dict_empCpds[interim_id] = interim_id_dict
-        with open("output.json", 'w+') as out:
-            json.dump(filtered_dict_empCpds, out, indent=4)
-        #print(json.dumps(filtered_dict_empCpds, indent=4))
-
-
-
-        #print(json.load(open(auth_std_path)))
-        
+        annotation_output = os.path.join(self.experiment.annotation_subdirectory, name + "_feature_table_annotation.json")
+        with open(annotation_output, 'w+') as annotation_output_fh:
+            json.dump(dict_empCpds, annotation_output_fh, indent=4)
