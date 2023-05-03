@@ -16,7 +16,6 @@ class Acqusition(object):
         
         self.raw_filepath = None
         self.mzml_filepath = None
-        self._mzml_handle = None
         self.spectra = {}
 
         self.__min_mz = None
@@ -43,15 +42,17 @@ class Acqusition(object):
     @property
     def min_mz(self):
         if self.__min_mz is None:
-            self.__min_mz = self.__extract_ms_information(1, "mz_sorted_mzs")[0]
-            self.__max_mz = self.__extract_ms_information(1, "mz_sorted_mzs")[1]
+            mz_sorted_mzs = self.__extract_ms_information(1, "mz_sorted_mzs")
+            self.__min_mz = mz_sorted_mzs[0]
+            self.__max_mz = mz_sorted_mzs[1]
         return self.__min_mz
 
     @property
     def max_mz(self):
         if self.__max_mz is None:
-            self.__min_mz = self.__extract_ms_information(1, "mz_sorted_mzs")[0]
-            self.__max_mz = self.__extract_ms_information(1, "mz_sorted_mzs")[1]
+            mz_sorted_mzs = self.__extract_ms_information(1, "mz_sorted_mzs")
+            self.__min_mz = mz_sorted_mzs[0]
+            self.__max_mz = mz_sorted_mzs[1]
         return self.__max_mz
     
     @property
@@ -96,7 +97,7 @@ class Acqusition(object):
 
     def __extract_ms_information(self, ms_level, type):
         if (ms_level, type) not in self.spectra:
-            self.log.info("mslevel " + str(ms_level) + " " + str(type) + "not found in cache")
+            #self.log.info("mslevel " + str(ms_level) + " " + str(type) + "not found in cache")
             self.__extract_mzml(ms_level=ms_level)
         return self.spectra[(ms_level, type)]
 
