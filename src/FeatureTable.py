@@ -7,9 +7,11 @@ import math
 import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA, NMF
+from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from mass2chem.epdsConstructor import epdsConstructor
+from khipu.epdsConstructor import epdsConstructor
+from khipu.extended import *
+from khipu.utils import *
 from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
 from jms.io import read_table_to_peaks
 import json
@@ -28,19 +30,27 @@ class FeatureTable:
                     self.feature_matrix_header = list(feature.keys())
                 feature_matrix_row = []
                 for column_name in self.feature_matrix_header:
-                    if column_name != 'id_number':
+                    #if column_name != 'id_number':
+                    try:
                         feature_matrix_row.append(np.float64(feature[column_name]))
-                    else:
+                    except:
                         feature_matrix_row.append(feature[column_name])
                 feature_matrix.append(feature_matrix_row)
         self.feature_matrix = np.array(feature_matrix).T
 
-    def selected_feature_matrix(self, tag=None):
-        sample_names_for_tags = [acquisition.name for acquisition in self.experiment.acquisitions if acquisition.metadata_tags['Sample Type'] == tag or tag is None]
+    def selected_feature_matrix(self, tag=None, sort=False):
+        sample_names_for_tags = [acquisition.name for acquisition in self.experiment.acquisitions if tag is None or acquisition.metadata_tags['Sample Type'] == tag]
+        sample_names_for_tags = [x for x in sample_names_for_tags if x in self.feature_matrix_header]
+        if sort:
+            sample_names_for_tags.sort()
         matching_column_indices = []
-        for column_index, name in enumerate(self.feature_matrix_header):
-            if name in sample_names_for_tags:
-                matching_column_indices.append(column_index)
+        for sample_name in sample_names_for_tags:
+            for column_index, column_name in enumerate(self.feature_matrix_header):
+                #print(column_name, sample_name, column_name == sample_name)
+                if sample_name == column_name:
+                    print(column_name, sample_name)
+                    matching_column_indices.append(column_index)
+        print(len(matching_column_indices))
         feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
         return feature_matrix_subset.T, sample_names_for_tags
     
@@ -96,7 +106,7 @@ class FeatureTable:
             plt.scatter(X, median_feature_intensity)
             plt.show()
 
-        filtered_feature_vector_matrix = feature_vector_matrix
+        filtered_feature_vector_matrix = feature_vector_matrix.copy()
         filtered_feature_vector_matrix[filtered_feature_vector_matrix == 0] = np.nan
         filtered_mean_feature_intensity = np.nanmean(filtered_feature_vector_matrix, axis=0)
         filtered_median_feature_intensity = np.nanmedian(filtered_feature_vector_matrix, axis=0)
@@ -134,7 +144,7 @@ class FeatureTable:
             "Result": {
                 "SumIntensity": {name: value for name, value in zip(acquisition_names, intensity_sums)},
                 "MeanIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
-                "MedianIntensity": {name: value for name, value in zip(acquisition_names, mean_feature_intensity)},
+                "MedianIntensity": {name: value for name, value in zip(acquisition_names, median_feature_intensity)},
                 "MissingDroppedSumIntensity": {name: value for name, value in zip(acquisition_names, intensity_sums)},
                 "MissingDroppedMeanIntensity": {name: value for name, value in zip(acquisition_names, filtered_mean_feature_intensity)},
                 "MissingDroppedMedianIntensity": {name: value for name, value in zip(acquisition_names, filtered_median_feature_intensity)},
@@ -147,6 +157,7 @@ class FeatureTable:
         
     def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         feature_vector_matrix = feature_vector_matrix.T
+        print(feature_vector_matrix.shape)
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
             feature_vector_matrix = np.log2(feature_vector_matrix)        
@@ -175,6 +186,7 @@ class FeatureTable:
             if log_transform:
                 heatmap_title += " Log2 Transformed"
             plt.title(heatmap_title)
+            #plt.imshow(corr_matrix)
             sns.heatmap(corr_matrix, xticklabels=acquisition_names, yticklabels=acquisition_names)
             plt.show()
         result = {
@@ -202,7 +214,7 @@ class FeatureTable:
         return result
             
     def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
-        tnse_embedded_vector_matrix = TSNE(n_components=2).fit_transform(feature_vector_matrix.T)
+        tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=2).fit_transform(feature_vector_matrix.T)
         if interactive_plot:
             plt.title("TSNE")
             plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
@@ -302,7 +314,7 @@ class FeatureTable:
         }
         return result
     
-    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path):
+    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, annotations=None, interactive_plot=False):
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
         samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         all_sample_names = {acquisition.name for acquisition in self.experiment.acquisitions}
@@ -310,17 +322,26 @@ class FeatureTable:
             if header_field not in all_sample_names:
                 for table in [blanks, samples]:
                     table[header_field] = self.select_feature_column(header_field)
-        
-        # calculate percent of samples where feature is present
+
         samples["percent_inclusion"] = np.sum(samples[sample_names] > 0, axis=1) / len(sample_names)
 
         # calculate TIC values and normalization factors then normalize
         TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
         norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
+        
+        interactive_plot = True
+        if interactive_plot:
+            plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
+            plt.show()
 
         # normalize 
         for sample, norm_factor in norm_factors.items():
             samples[sample] = samples[sample] * norm_factor
+
+        if interactive_plot:
+            normalized_TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+            plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
+            plt.show()
 
         # mark features in blanks
         to_filter = []
@@ -348,7 +369,7 @@ class FeatureTable:
              intensity_analysis=False,
              feature_distribution=False,
              feature_outlier_detection=False):
-        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag)
+        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=True)
         qcqa_result = []
         if pca:
             qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
@@ -358,8 +379,8 @@ class FeatureTable:
             qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive))
         if spearman:
             qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive))
-        if kendall:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
+        #if kendall:
+        #    qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
         if missing_feature_percentiles:
             qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive))
         if missing_feature_distribution:
@@ -376,20 +397,25 @@ class FeatureTable:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         return qcqa_result
     
-    def identify_blank_names(self, blank_filter):
-        pass
-
     def annotate(self, annotation_sources, name):
-        list_peaks = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
-        ECCON = epdsConstructor(list_peaks, mode=self.experiment.ionization_mode)
+        peaklist = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
+        for p in peaklist:
+            p["representative_intensity"] = None
+        ECCON = epdsConstructor(peaklist, self.experiment.ionization_mode)
         dict_empCpds = ECCON.peaks_to_epdDict(
-            seed_search_patterns = ECCON.seed_search_patterns,
-            ext_search_patterns = ECCON.ext_search_patterns,
-            mz_tolerance_ppm=5,
-            coelution_function='distance',
-            check_isotope_ratio=False
+            isotope_search_patterns,
+            adduct_search_patterns,
+            extended_adducts,
+            5
         )
-        EED = ExperimentalEcpdDatabase(mode='pos')
+#        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode)
+#        EED.dict_empCpds = dict_empCpds
+#        EED.index_empCpds()
+
+        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=2)
+        for interim_id, empCpd_dict in dict_empCpds.items():
+            rep_rt = np.mean([x["rtime"] for x in empCpd_dict["MS1_pseudo_Spectra"] if x["ion_relation"] == "anchor"])
+            empCpd_dict["representative_rtime"] = rep_rt
         EED.dict_empCpds = dict_empCpds
         EED.index_empCpds()
         
