@@ -205,6 +205,8 @@ class FeatureTable:
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
             for (x, y), name in zip(pca_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
+            plt.xlabel("PC 1 " + str(round(pca_embedder.explained_variance_ratio_[0] * 100, 1)) + "%", fontsize=14)
+            plt.ylabel("PC 2 " + str(round(pca_embedder.explained_variance_ratio_[1] * 100, 1)) + "%", fontsize=14)
             plt.show()
         result = {
             "Type": "PCA",
@@ -214,19 +216,25 @@ class FeatureTable:
         return result
             
     def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
-        tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=2).fit_transform(feature_vector_matrix.T)
-        if interactive_plot:
-            plt.title("TSNE")
-            plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
-            for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
-                plt.text(x, y, name)
-            plt.show()
-        result = {
-            "Type": "TSNE",
-            "Config": {"n_components": 2},
-            "Result": {"Sample_Coord_Dict": {name: [float(x) for x in coord] for name, coord in zip(acquisition_names, tnse_embedded_vector_matrix)}}
-        }
-        return result
+        try:
+            tnse_embedded_vector_matrix = TSNE(n_components=2).fit_transform(feature_vector_matrix.T)
+            if interactive_plot:
+                plt.title("TSNE")
+                plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
+                i = 0
+                #for x, y in tnse_embedded_vector_matrix:
+                #    i += 1
+                for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
+                    plt.text(x, y, str(i)) #name)
+                plt.show()
+            result = {
+                "Type": "TSNE",
+                "Config": {"n_components": 2},
+                "Result": {"Sample_Coord_Dict": {name: [float(x) for x in coord] for name, coord in zip(acquisition_names, tnse_embedded_vector_matrix)}}
+            }
+            return result
+        except:
+            pass
     
     def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False):
         num_sample_with_feature = np.sum(feature_vector_matrix > 0, axis=1)
@@ -314,7 +322,7 @@ class FeatureTable:
         }
         return result
     
-    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, annotations=None, interactive_plot=False):
+    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, log_transform=False, annotations=None, interactive_plot=False):
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
         samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         all_sample_names = {acquisition.name for acquisition in self.experiment.acquisitions}
@@ -329,7 +337,6 @@ class FeatureTable:
         TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
         norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
         
-        interactive_plot = True
         if interactive_plot:
             plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
             plt.show()
@@ -351,6 +358,17 @@ class FeatureTable:
         
         # drop features in blanks and drop features not in more than drop_percentile
         samples = samples[(samples["blank_filtered"] == False) & (samples["percent_inclusion"] > drop_percentile)]
+
+        # log transform
+        if log_transform:
+            modes = {
+                "log10": np.log10,
+                "log2": np.log2
+            }
+            for sample_name in sample_names:
+                samples[sample_name] = modes[log_transform](samples[sample_name]+1)
+
+        # write the output
         samples.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
             
     def qcqa(self, 
@@ -408,11 +426,8 @@ class FeatureTable:
             extended_adducts,
             5
         )
-#        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode)
-#        EED.dict_empCpds = dict_empCpds
-#        EED.index_empCpds()
 
-        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=2)
+        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=5)
         for interim_id, empCpd_dict in dict_empCpds.items():
             rep_rt = np.mean([x["rtime"] for x in empCpd_dict["MS1_pseudo_Spectra"] if x["ion_relation"] == "anchor"])
             empCpd_dict["representative_rtime"] = rep_rt

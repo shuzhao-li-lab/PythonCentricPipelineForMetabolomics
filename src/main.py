@@ -6,7 +6,7 @@ Usage:
   main.py feature_QCQA <experiment_json> (preferred|full|both|neither) [--other=<other>] [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py asari_full_processing <experiment_json> (pos|neg)
   main.py drop_samples <experiment_json> (preferred|full|both) [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
-  main.py preprocess_features <experiment_json> (preferred|full|both) <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples]
+  main.py preprocess_features <experiment_json> (preferred|full|both) <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
   main.py MS1_annotate <experiment_json> (preferred|full|both) <annotation_source>...
 '''
 
@@ -207,9 +207,6 @@ def main(args):
         experiment = Experiment.load(args['<experiment_json>'])
         blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))
         sample_names = list(experiment.filter_samples(json.loads(args['<sample_filter>'])))
-
-
-
         to_curate = []
         if args['both'] or args['full']:
             full_feature_table = FeatureTable(experiment.full_feature_table_path, experiment)
@@ -218,6 +215,8 @@ def main(args):
             preferred_feature_table = FeatureTable(experiment.preferred_feature_table_path, experiment)
             to_curate.append(('preferred', preferred_feature_table))
         for name, table in to_curate:
+            if args['--log_transform']:
+                log_transform_mode_string = args['--log_transform']
             if args['--drop_samples']:
                 sample_names = [x for x in sample_names if x not in experiment.drop_results[name]['sample_names_to_drop']]
             table.curate(blank_names, 
@@ -225,7 +224,8 @@ def main(args):
                          float(args['<drop_percentile>']), 
                          float(args['<blank_intensity_ratio>']), 
                          float(args['<TIC_inclusion_percentile>']), 
-                         'filtered_' + name + "_Feature_table.tsv",)
+                         'filtered_' + name + "_Feature_table.tsv",
+                         log_transform = log_transform_mode_string)
 
 if __name__ == '__main__':
     args = docopt(__doc__)
