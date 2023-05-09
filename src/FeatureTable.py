@@ -48,9 +48,7 @@ class FeatureTable:
             for column_index, column_name in enumerate(self.feature_matrix_header):
                 #print(column_name, sample_name, column_name == sample_name)
                 if sample_name == column_name:
-                    print(column_name, sample_name)
                     matching_column_indices.append(column_index)
-        print(len(matching_column_indices))
         feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
         return feature_matrix_subset.T, sample_names_for_tags
     
@@ -199,7 +197,8 @@ class FeatureTable:
     def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform(feature_vector_matrix.T))
+        feature_vector_matrix = np.log2(feature_vector_matrix+1)
+        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform((feature_vector_matrix.T)))
         if interactive_plot:
             plt.title("PCA (n_components=2)")
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
@@ -221,11 +220,8 @@ class FeatureTable:
             if interactive_plot:
                 plt.title("TSNE")
                 plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
-                i = 0
-                #for x, y in tnse_embedded_vector_matrix:
-                #    i += 1
                 for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
-                    plt.text(x, y, str(i)) #name)
+                    plt.text(x, y, name)
                 plt.show()
             result = {
                 "Type": "TSNE",
@@ -325,40 +321,65 @@ class FeatureTable:
     def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, log_transform=False, annotations=None, interactive_plot=False):
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
         samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
-        all_sample_names = {acquisition.name for acquisition in self.experiment.acquisitions}
         for header_field in self.feature_matrix_header:
-            if header_field not in all_sample_names:
+            if header_field not in {acquisition.name for acquisition in self.experiment.acquisitions}:
                 for table in [blanks, samples]:
                     table[header_field] = self.select_feature_column(header_field)
 
         samples["percent_inclusion"] = np.sum(samples[sample_names] > 0, axis=1) / len(sample_names)
 
         # calculate TIC values and normalization factors then normalize
-        TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
-        norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
-        
-        if interactive_plot:
-            plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
-            plt.show()
+        log_normalize = False
 
-        # normalize 
-        for sample, norm_factor in norm_factors.items():
-            samples[sample] = samples[sample] * norm_factor
+        if not log_normalize:
+            TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+            norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
+            
+            if interactive_plot:
+                plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
+                plt.show()
 
-        if interactive_plot:
-            normalized_TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
-            plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
-            plt.show()
+            # normalize 
+            for sample, norm_factor in norm_factors.items():
+                samples[sample] = samples[sample] * norm_factor
+
+            if interactive_plot:
+                normalized_TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+                plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
+                plt.show()
+        else:
+            TICs = {sample: np.sum(np.log2(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]+1)) for sample in sample_names}
+            norm_factors = {sample: np.median(list(TICs.values())) - value for sample, value in TICs.items()}
+            
+            if interactive_plot:
+                plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
+                plt.show()
+
+            # normalize 
+            for sample, norm_factor in norm_factors.items():
+                samples[sample] = samples[sample] + norm_factor
+
+            if interactive_plot:
+                normalized_TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+                plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
+                plt.show()
+
 
         # mark features in blanks
         to_filter = []
+        x, y = 0, 0
         for blank_mean, sample_mean in zip(np.mean(blanks[blank_names], axis=1), np.mean(samples[sample_names], axis=1)):
-            to_filter.append(blank_mean > sample_mean * blank_intensity_ratio)
+            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+            if blank_mean * blank_intensity_ratio > sample_mean:
+                x += 1
+            else:
+                y += 1
+        print(x,y)
         samples["blank_filtered"] = to_filter
         
         # drop features in blanks and drop features not in more than drop_percentile
         samples = samples[(samples["blank_filtered"] == False) & (samples["percent_inclusion"] > drop_percentile)]
-
+        print(samples.shape)
         # log transform
         if log_transform:
             modes = {
@@ -369,6 +390,7 @@ class FeatureTable:
                 samples[sample_name] = modes[log_transform](samples[sample_name]+1)
 
         # write the output
+        print(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path))
         samples.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
             
     def qcqa(self, 
@@ -387,7 +409,9 @@ class FeatureTable:
              intensity_analysis=False,
              feature_distribution=False,
              feature_outlier_detection=False):
-        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=True)
+        if sort is None:
+            sort=False
+        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
         qcqa_result = []
         if pca:
             qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
