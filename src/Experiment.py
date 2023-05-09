@@ -28,7 +28,8 @@ class Experiment:
                  drop_results=None,
                  ionization_mode=None,
                  organized_samples=None,
-                 log=None):
+                 log=None,
+                 feature_tables=None):
         # provided parameters
         self.experiment_name = experiment_name
         self.experiment_directory = experiment_directory
@@ -40,6 +41,7 @@ class Experiment:
         self.full_feature_table_path = full_feature_table_path
         self.preferred_feature_table_path = preferred_feature_table_path
         self.log = '' if log is None else log
+        self.feature_tables = {} if feature_tables is None else feature_tables
 
         # generate subdirectories
         if not skip_subdirectory_initialization:
@@ -106,7 +108,8 @@ class Experiment:
                                     qcqa_results=JSON_repr["qcqa_results"],
                                     drop_results=JSON_repr["drop_results"],
                                     ionization_mode=JSON_repr["ionization_mode"],
-                                    organized_samples=JSON_repr["organized_samples"]
+                                    organized_samples=JSON_repr["organized_samples"],
+                                    feature_tables=JSON_repr["feature_tables"]
                                     )
         return experiment
         
@@ -121,7 +124,8 @@ class Experiment:
                 "qcqa_results": self.QCQA_results,
                 "drop_results": self.drop_results,
                 "ionization_mode": self.ionization_mode,
-                "organized_samples": self.organized_samples
+                "organized_samples": self.organized_samples,
+                "feature_tables": self.feature_tables
             }
             JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
             json.dump(JSON_repr, save_filehandle, indent=4)
@@ -150,7 +154,7 @@ class Experiment:
             return [getattr(acquisition, return_field) for acquisition in self.acquisitions if acquisition.filter(filter)]
         return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
-    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, filter=None, name_field='Name', path_field='Filepath'):
+    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath'):
         filter = {} if filter is None else json.loads(filter)
         experiment = Experiment('', experiment_directory)
         with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
@@ -161,5 +165,6 @@ class Experiment:
                 acquisition = Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
+        experiment.ionization_mode = ionization_mode
         return experiment
     
