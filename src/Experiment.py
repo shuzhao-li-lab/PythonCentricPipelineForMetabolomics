@@ -29,7 +29,8 @@ class Experiment:
                  ionization_mode=None,
                  organized_samples=None,
                  log=None,
-                 feature_tables=None):
+                 feature_tables=None,
+                 empCpds=None):
         # provided parameters
         self.experiment_name = experiment_name
         self.experiment_directory = experiment_directory
@@ -42,6 +43,7 @@ class Experiment:
         self.preferred_feature_table_path = preferred_feature_table_path
         self.log = '' if log is None else log
         self.feature_tables = {} if feature_tables is None else feature_tables
+        self.empCpds = {} if empCpds is None else empCpds
 
         # generate subdirectories
         if not skip_subdirectory_initialization:
@@ -99,6 +101,7 @@ class Experiment:
                 acquisition.__min_rt = acquisition_JSON["__min_rt"]
                 acquisition.__max_rt = acquisition_JSON["__max_rt"]
                 acquisitions.append(acquisition)
+            #JSON_repr = defaultdict(JSON_repr, None)
             experiment = Experiment(JSON_repr["experiment_name"], 
                                     JSON_repr["experiment_directory"], 
                                     acquisitions=acquisitions, 
@@ -109,7 +112,8 @@ class Experiment:
                                     drop_results=JSON_repr["drop_results"],
                                     ionization_mode=JSON_repr["ionization_mode"],
                                     organized_samples=JSON_repr["organized_samples"],
-                                    feature_tables=JSON_repr["feature_tables"]
+                                    feature_tables=JSON_repr["feature_tables"] if "feature_tables" in JSON_repr else None,
+                                    empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None
                                     )
         return experiment
         
@@ -125,7 +129,8 @@ class Experiment:
                 "drop_results": self.drop_results,
                 "ionization_mode": self.ionization_mode,
                 "organized_samples": self.organized_samples,
-                "feature_tables": self.feature_tables
+                "feature_tables": self.feature_tables,
+                "empCpds": self.empCpds
             }
             JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
             json.dump(JSON_repr, save_filehandle, indent=4)

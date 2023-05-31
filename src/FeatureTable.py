@@ -44,13 +44,15 @@ class FeatureTable:
         if sort:
             sample_names_for_tags.sort()
         matching_column_indices = []
+        found_samples = []
         for sample_name in sample_names_for_tags:
             for column_index, column_name in enumerate(self.feature_matrix_header):
                 #print(column_name, sample_name, column_name == sample_name)
                 if sample_name == column_name:
                     matching_column_indices.append(column_index)
+                    found_samples.append(sample_name)
         feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
-        return feature_matrix_subset.T, sample_names_for_tags
+        return feature_matrix_subset.T, found_samples
     
     def select_feature_column(self, feature_name):
         for column_index, name in enumerate(self.feature_matrix_header):
@@ -95,14 +97,15 @@ class FeatureTable:
         if interactive_plot:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples")
-            plt.scatter(X, intensity_sums)
+            plt.bar(X, intensity_sums)
             plt.show()
             plt.title("Mean Feature Intensity for Samples")
-            plt.scatter(X, mean_feature_intensity)
+            plt.bar(X, mean_feature_intensity)
             plt.show()
             plt.title("Median Feature Intensity for Samples")
-            plt.scatter(X, median_feature_intensity)
+            plt.bar(X, median_feature_intensity)
             plt.show()
+            
 
         filtered_feature_vector_matrix = feature_vector_matrix.copy()
         filtered_feature_vector_matrix[filtered_feature_vector_matrix == 0] = np.nan
@@ -111,13 +114,13 @@ class FeatureTable:
         if interactive_plot:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples (missing features dropped)")
-            plt.scatter(X, intensity_sums)
+            plt.bar(X, intensity_sums)
             plt.show()
             plt.title("Mean Feature Intensity for Samples (missing features dropped)")
-            plt.scatter(X, filtered_mean_feature_intensity)
+            plt.bar(X, filtered_mean_feature_intensity)
             plt.show()
             plt.title("Median Feature Intensity for Samples (missing features dropped)")
-            plt.scatter(X, filtered_median_feature_intensity)
+            plt.bar(X, filtered_median_feature_intensity)
             plt.show()
 
         log_filtered_feature_vector_matrix = np.log2(filtered_feature_vector_matrix)
@@ -127,13 +130,13 @@ class FeatureTable:
         if interactive_plot:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Log Intensity for Samples (missing features dropped)")
-            plt.scatter(X, log_filtered_intensity_sum)
+            plt.bar(X, log_filtered_intensity_sum)
             plt.show()
             plt.title("Mean Log Feature Intensity for Samples (missing features dropped)")
-            plt.scatter(X, log_filtered_mean_feature_intensity)
+            plt.bar(X, log_filtered_mean_feature_intensity)
             plt.show()
             plt.title("Median Log Feature Intensity for Samples (missing features dropped)")
-            plt.scatter(X, log_filtered_median_feature_intensity)
+            plt.bar(X, log_filtered_median_feature_intensity)
             plt.show()
 
         result = {
@@ -214,9 +217,9 @@ class FeatureTable:
         }
         return result
             
-    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False, perplexity=30):
         try:
-            tnse_embedded_vector_matrix = TSNE(n_components=2).fit_transform(feature_vector_matrix.T)
+            tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(feature_vector_matrix.T)
             if interactive_plot:
                 plt.title("TSNE")
                 plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
@@ -230,7 +233,11 @@ class FeatureTable:
             }
             return result
         except:
-            pass
+            print(perplexity)
+            if perplexity > 0:
+                self.TSNE(feature_vector_matrix, acquisition_names, interactive_plot, perplexity=perplexity-1)
+            else:
+                pass
     
     def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False):
         num_sample_with_feature = np.sum(feature_vector_matrix > 0, axis=1)
@@ -294,6 +301,8 @@ class FeatureTable:
         if interactive_plot:
             plt.title("Num Feature Z-Score")
             plt.scatter(list(range(len(feature_z_scores))), feature_z_scores)
+            for x, y, name in zip(list(range(len(feature_z_scores))), feature_z_scores, acquisition_names):
+                plt.text(x, y, name)
             plt.show()
         result = {
             "Type": "FeatureCountZScores",
@@ -310,6 +319,8 @@ class FeatureTable:
         if interactive_plot:
             plt.title("Num Missing Feature Z-Score")
             plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
+            for x, y, name in zip(list(range(len(missing_feature_z_scores))), missing_feature_z_scores, acquisition_names):
+                plt.text(x, y, name)
             plt.show()
         result = {
             "Type": "MissingFeatureZScores",
@@ -320,6 +331,10 @@ class FeatureTable:
     
     def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, log_transform=False, annotations=None, interactive_plot=False):
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
+        for s in sample_names:
+            print(s, self.select_feature_column(s))
+
+
         samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         for header_field in self.feature_matrix_header:
             if header_field not in {acquisition.name for acquisition in self.experiment.acquisitions}:
@@ -328,9 +343,21 @@ class FeatureTable:
 
         samples["percent_inclusion"] = np.sum(samples[sample_names] > 0, axis=1) / len(sample_names)
 
+        # mark features in blanks
+        to_filter = []
+        x, y = 0, 0
+        for blank_mean, sample_mean in zip(np.mean(blanks[blank_names], axis=1), np.mean(samples[sample_names], axis=1)):
+            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+            if blank_mean * blank_intensity_ratio > sample_mean:
+                x += 1
+            else:
+                y += 1
+        samples["blank_filtered"] = to_filter
+        samples = samples[samples["blank_filtered"] == False].copy()
+
         # calculate TIC values and normalization factors then normalize
         log_normalize = False
-
+        interactive_plot = False
         if not log_normalize:
             TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
             norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
@@ -364,31 +391,7 @@ class FeatureTable:
                 plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
                 plt.show()
 
-
-        # mark features in blanks
-        to_filter = []
-        x, y = 0, 0
-        for blank_mean, sample_mean in zip(np.mean(blanks[blank_names], axis=1), np.mean(samples[sample_names], axis=1)):
-            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
-            if blank_mean * blank_intensity_ratio > sample_mean:
-                x += 1
-            else:
-                y += 1
-        print(x,y)
-        samples["blank_filtered"] = to_filter
-        
-        # drop features in blanks and drop features not in more than drop_percentile
-        samples = samples[(samples["blank_filtered"] == False) & (samples["percent_inclusion"] > drop_percentile)]
-        print(samples.shape)
-        # log transform
-        if log_transform:
-            modes = {
-                "log10": np.log10,
-                "log2": np.log2
-            }
-            for sample_name in sample_names:
-                samples[sample_name] = modes[log_transform](samples[sample_name]+1)
-
+        samples = samples[samples["percent_inclusion"] > drop_percentile].copy()
         # write the output
         print(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path))
         samples.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
