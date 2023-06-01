@@ -10,11 +10,29 @@ import pymzml
 
 class empCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
+        """
+        the empCpds object is a wrapper around dict_empCpds that will associate the dict_empCpds with a moniker and 
+        experiment object. 
+
+        Args:
+            dict_empCpds (dict): dictionary of empCpds
+            experiment (Experiment): the experiment object for the experiment from which these empCpds were generated
+            moniker (str): the moniker for this empCpd, used by experiment to store empCpds
+        """        
         self.dict_empCpds = dict_empCpds
         self.experiment = experiment
         self.moniker = moniker
 
     def save(self, save_as_moniker=None):
+        """
+        This method saves the empirical compound dictionary to the annotation_subdirectory. 
+        The path is determined by the moniker for the empCpds object, however, an alternative moniker can be provided 
+        which effectively saves a new empCpd object. This also updates the empCpds registry in the experiment with the 
+        path to the stored json.
+
+        Args:
+            save_as_moniker (str, optional): an alternative moniker to which to save the table. Defaults to None. 
+        """        
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
@@ -22,11 +40,31 @@ class empCpds:
 
     @staticmethod
     def load(experiment, moniker):
-        dict_empCpds = json.load(open(experiment.empCpds[moniker]))
-        return empCpds(dict_empCpds, experiment, moniker)
+        """
+        This method generates the empCpd object for the provided moniker.
+
+        Args:
+            experiment (Experiment object): the experiment for which the empCpd was generated
+            moniker (string): the empCpd moniker to load
+
+        Returns:
+            empCpds: the empCpds object for the specified moniker
+        """        
+        return empCpds(json.load(open(experiment.empCpds[moniker])), experiment, moniker)
 
     @staticmethod
     def construct_empCpds_from_feature_table(experiment, feature_table_moniker='full', empCpd_moniker='default', add_singletons=True):
+        """_summary_
+
+        Args:
+            experiment (_type_): _description_
+            feature_table_moniker (str, optional): _description_. Defaults to 'full'.
+            empCpd_moniker (str, optional): _description_. Defaults to 'default'.
+            add_singletons (bool, optional): _description_. Defaults to True.
+
+        Returns:
+            _type_: _description_
+        """        
         peaklist = read_table_to_peaks(experiment.feature_tables[feature_table_moniker], has_header=True, mz_col=1, rtime_col=2, feature_id=0)
         for p in peaklist:
             p['id'] = p['id_number']
@@ -42,24 +80,60 @@ class empCpds:
         for empCpd in dict_empCpds.values():
             for peak in empCpd["MS1_pseudo_Spectra"]:
                 all_feature_ids.add(peak['id_number'])
-        for peak in peaklist:
-            if peak['id_number'] not in all_feature_ids:
-                peak['ion_relation'] = None
-                dict_empCpds[len(dict_empCpds)] = {'interim_id': len(dict_empCpds), 'neutral_formula_mass': '', 'neutral_formula': '', 'MS1_pseudo_Spectra': [peak]}
+        if add_singletons:
+            for peak in peaklist:
+                if peak['id_number'] not in all_feature_ids:
+                    peak['ion_relation'] = None
+                    dict_empCpds[len(dict_empCpds)] = {'interim_id': len(dict_empCpds), 'neutral_formula_mass': '', 'neutral_formula': '', 'MS1_pseudo_Spectra': [peak]}
         return empCpds(dict_empCpds, experiment, empCpd_moniker)
     
     def MS1_annotate(self, annotation_sources, rt_tolerance=5):
+        """
+        Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula 
+        match to the annotation sources.
+
+        Args:
+            annotation_sources (list[str]): list of filepaths to annotation sources in JSON format
+            rt_tolerance (int, optional): the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
+        """        
         EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance)
         EED.build_from_list_empCpds(self.dict_empCpds.values())
-
+        formula_entry_lookup = {}
         for source in annotation_sources:
+            for entry in json.load(open(source)):
+                if entry['neutral_formula'] not in formula_entry_lookup:
+                    formula_entry_lookup[entry['neutral_formula']] = []
+                formula_entry_lookup[entry['neutral_formula']].append(entry)
             KCD = knownCompoundDatabase()
             KCD.mass_index_list_compounds(json.load(open(source)))
             KCD.build_emp_cpds_index()
             EED.extend_empCpd_annotation(KCD)
             EED.annotate_singletons(KCD)
 
-    def MS2_annotate(self, DDA_file, msp_files, rt_tolerance=20, mz_tolerance=5, multiplier=10, max_mass=2000):
+        for empCpd in self.dict_empCpds.values():
+            if 'mz_only_db_matches' not in empCpd:
+                empCpd['mz_only_db_matches'] = []
+            if 'list_matches' in empCpd and empCpd['list_matches']:
+                for match in empCpd['list_matches']:
+                    formula_mass, ion_relation, count = match
+                    formula, mass = formula_mass.split("_")
+                    if formula in formula_entry_lookup:
+                        empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
+
+    def MS2_annotate(self, DDA_file, msp_files, rt_tolerance=20, mz_tolerance=5, multiplier=10, max_mass=2000, match_threshold=0.60):
+        """
+        Given the DDA file for the experiment, database entries in MSP format, annotate with MS2 data. 
+
+
+        Args:
+            DDA_file (_type_): _description_
+            msp_files (_type_): _description_
+            rt_tolerance (int, optional): _description_. Defaults to 20.
+            mz_tolerance (int, optional): _description_. Defaults to 5.
+            multiplier (int, optional): _description_. Defaults to 10.
+            max_mass (int, optional): _description_. Defaults to 2000.
+            match_threshold (float, optional): _description_, Defaults to 0.60
+        """        
         msp_ionization_mode = 'P' if self.experiment.ionization_mode == 'pos' else 'N'
         DDA_rt_tree = intervaltree.IntervalTree()
         DDA_mz_tree = intervaltree.IntervalTree()
@@ -154,6 +228,14 @@ class empCpds:
                     empCpd["MS2_Spectra"].append(ms2_entry)
     
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
+        """_summary_
+
+        Args:
+            auth_stds (_type_): _description_
+            mz_tolerance (int, optional): _description_. Defaults to 5.
+            rt_tolerance (int, optional): _description_. Defaults to 30.
+            rtime_permissive (bool, optional): _description_. Defaults to False.
+        """        
         mz_tree = intervaltree.IntervalTree()
         rt_tree = intervaltree.IntervalTree()
 
