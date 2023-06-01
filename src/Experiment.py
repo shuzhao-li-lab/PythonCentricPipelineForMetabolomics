@@ -1,10 +1,7 @@
 from utils.util import *
-import logging
 import csv
-import pickle
 import shutil
 import json
-from collections import defaultdict
 
 from ThermoRawFileConverter import ThermoRawFileConverter
 from Acquisition import Acqusition
@@ -31,6 +28,27 @@ class Experiment:
                  log=None,
                  feature_tables=None,
                  empCpds=None):
+        """
+        The Experiment object represents the set of acquisitions in an experiment and associated metadata.
+
+        Args:
+            experiment_name (str): a moniker for naming the experiment
+            experiment_directory (str): path to the directory to store the experiment data and processing intermediates
+
+            The following are used ONLY when loading an existing experiment
+
+            acquisitions (list[Acquistions], optional): this is a list of Acquisition objects for the experiment. Defaults to None.
+            skip_subdirectory_initialization (bool, optional): if True, do not create subdirectories for experiment. Defaults to False.
+            full_feature_table_path (str, optional): path to full feature table #DEPRECATED - REMOVE. Defaults to None.
+            preferred_feature_table_path (str, optional): path to preferred feature table #DEPRECATED - REMOVE. Defaults to None.
+            qcqa_results (dict, optional): stores QCQA results per feature table. Defaults to None.
+            drop_results (dict, optional): stores information needed to drop acquisitions during processing. Defaults to None.
+            ionization_mode (str, optional): pos or neg, specifies the ionization mode of the MS for the experiment. Defaults to None.
+            organized_samples (dict, optional): dictionary of acquisitions organized into types of samples #DEPRECATED - REMOVE. Defaults to None.
+            log (logging_object, optional): logging instance, #DEPRECATED - REMOVE. Defaults to None.
+            feature_tables (dict, optional): mapping of feature table monikers to feature tables on disk. Defaults to None.
+            empCpds (dict, optional): mapping of empCpd monikers to empCpds on disk. Defaults to None.
+        """        
         # provided parameters
         self.experiment_name = experiment_name
         self.experiment_directory = experiment_directory
@@ -57,35 +75,28 @@ class Experiment:
         self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["filtered_feature_tables"])
 
     def initialize_subdirectories(self):
+        """
+        This function creates the subdirectories for the expriment. 
+
+        The set of subdirectories to create is determiend by the class variable "subdirectories"
+        """        
         to_create = [os.path.abspath(self.experiment_directory)]
         to_create += [os.path.join(to_create[0], subdir) for subdir in Experiment.subdirectories.values()]
         for subdirectory_full_path in to_create:
             if not os.path.isdir(subdirectory_full_path):
                 os.makedirs(subdirectory_full_path)
 
-    def organize_samples(self, 
-                         blank_filter={"Name": {"includes": ["blank"], "lacks": ["_is_"]}, "tag": "analytical_blanks"}, 
-                         sample_filter={"Name": {'includes': [], 'lacks': ["blank", "qstd", "_is_", "dda", "pool", "qc"]}, "tag": "experimental_samples"},
-                         other_filters=[{"Name": {'includes': ["dda"], 'lacks': []}, "tag": "dda"},
-                                        {"Name": {'includes': ["pool"], 'lacks': []}, "tag": "pool"}]):
-        for filter in [blank_filter, sample_filter] + other_filters:
-            self.organized_samples[filter["tag"]] = self.filter_samples({k: v for k, v in filter.items() if k != "tag"}, return_field='name')
-        print(self.organized_samples)
-
-    @property
-    def all_feature_tables(self):
-        return [("full", self.full_feature_table_path), ("preferred", self.preferred_feature_table_path)]
-
-    @property
-    def analytical_blank_names(self):
-        return self.organized_samples["analytical_blanks"]
-
-    @property
-    def experimental_sample_names(self):
-        return self.organized_samples["experimental_samples"]
-
     @staticmethod
     def load(experiment_json_filepath):
+        """
+        Reconstitute the experiment object from a saved JSON file representing the object
+
+        Args:
+            experiment_json_filepath (str): path to the JSON file
+
+        Returns:
+            Experiment: an experiment object
+        """        
         with open(experiment_json_filepath) as experiment_json_filehandle:
             JSON_repr = json.load(experiment_json_filehandle)
             acquisitions = []
@@ -118,6 +129,9 @@ class Experiment:
         return experiment
         
     def save(self):
+        """
+        Serialize the experiment and acquisitions and store it on disk
+        """        
         with open(os.path.join(self.experiment_directory, "experiment.json"), "w") as save_filehandle:
             JSON_repr = {
                 "experiment_directory": self.experiment_directory,
@@ -136,6 +150,15 @@ class Experiment:
             json.dump(JSON_repr, save_filehandle, indent=4)
 
     def add_acquisition(self, acquisition, override=False, mode="link"):
+        """
+        This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
+        and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
+
+        Args:
+            acquisition (Acquisition object): the object representing an acquistiion
+            override (bool, optional): if True, duplicate names or source paths are allowed. Defaults to False.
+            mode (str, optional): if 'link', use symlink, if 'copy' copy the .raw file. Defaults to "link".
+        """        
         used_acquisition_names = {acquisition.name for acquisition in self.acquisitions} 
         used_acquisition_raws = {acquisition.source_filepath for acquisition in self.acquisitions} 
         if (acquisition.name in used_acquisition_names or acquisition.source_filepath in used_acquisition_raws) and override is False:
@@ -149,17 +172,49 @@ class Experiment:
         self.acquisitions.append(acquisition)
             
     def convert_raw_to_mzML(self, mono_path, exe_path):
+        """
+        Convert all raw files to mzML
+
+        Args:
+            mono_path (str): path to mono executable
+            exe_path (str): path to converter executable
+        """        
         converter = ThermoRawFileConverter(mono_path, exe_path)
         converted_filepaths = converter.convert_multi(self.acquisitions, self.converted_subdirectory)
         for acquisition, mzml_filepath in zip(self.acquisitions, converted_filepaths):
             acquisition.mzml_filepath = mzml_filepath
 
     def filter_samples(self, filter, return_field="name"):
+        """
+        Find the set of acquisitions that pass the provided filter and return either the acquisition object or the 
+        specified field of each passing sample
+
+        Args:
+            filter (dict): a filter dict compatable with acquisition.filter
+            return_field (str, optional): if defined, return that field from the acquisition, else the object. Defaults to "name".
+
+        Returns:
+            list: list of passing acquisitions or fields from passing acquisitions
+        """        
         if return_field:
             return [getattr(acquisition, return_field) for acquisition in self.acquisitions if acquisition.filter(filter)]
         return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
     def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath'):
+        """
+        For a given sequence file, create the experiment object, including the addition of acquisitions
+
+        Args:
+            experiment_directory (str): path to the directory with experiment data and intermediates
+            CSV_filepath (str): filepath to the sequence CSV
+            ionization_mode (str): 'pos' or 'neg' specifies the ionization mode for the experiment
+            filter (str, optional): json string representing a dictionary to filter acquistions on. Defaults to None.
+            name_field (str, optional): the field to become the acquisition name. Defaults to 'Name'.
+            path_field (str, optional): the field that specifies the acquisition filepath. Defaults to 'Filepath'.
+
+        Returns:
+            experiment: the experiment object
+        """        
         filter = {} if filter is None else json.loads(filter)
         experiment = Experiment('', experiment_directory)
         with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
@@ -174,6 +229,9 @@ class Experiment:
         return experiment
     
     def summarize(self):
+        """
+        Print the list of empCpds and feature tables in the experiment to the console
+        """        
         print("empCpds:")
         for moniker, path in self.empCpds.items():
             print("\t", moniker, " - ", path)
