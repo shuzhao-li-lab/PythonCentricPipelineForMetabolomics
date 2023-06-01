@@ -124,15 +124,14 @@ class empCpds:
         """
         Given the DDA file for the experiment, database entries in MSP format, annotate with MS2 data. 
 
-
         Args:
-            DDA_file (_type_): _description_
-            msp_files (_type_): _description_
-            rt_tolerance (int, optional): _description_. Defaults to 20.
-            mz_tolerance (int, optional): _description_. Defaults to 5.
-            multiplier (int, optional): _description_. Defaults to 10.
-            max_mass (int, optional): _description_. Defaults to 2000.
-            match_threshold (float, optional): _description_, Defaults to 0.60
+            DDA_file (str): path to .mzML file for DDA
+            msp_files (list[str]): list of filepaths to msp files for annotation
+            rt_tolerance (int, optional): DDA spectrum rtime must be within +/- this value of a peak's rtime. Defaults to 20.
+            mz_tolerance (int, optional): DDA spectrum precursor m/z must be within +/- this value of a peak's mz in ppm. Defaults to 5.
+            multiplier (int, optional): this determines the bin size, must be power of 10. Defaults to 10.
+            max_mass (int, optional): masses above this value will be ignored in DDA and MSP spectra. Defaults to 2000.
+            match_threshold (float, optional): cosine similarities above this value are considered a match, Defaults to 0.60
         """        
         msp_ionization_mode = 'P' if self.experiment.ionization_mode == 'pos' else 'N'
         DDA_rt_tree = intervaltree.IntervalTree()
@@ -214,7 +213,7 @@ class empCpds:
                         possible_db_spectra_matches = [MSP_entries[x]["truncated_spectrum"] for x in possible_db_matches]
                         scores = cosine_similarity([DDA_truncated_spectrum], possible_db_spectra_matches)
                         for MSP_entry_id, score in zip(possible_db_matches, scores[0]):
-                            if score > 0.60:
+                            if score > match_threshold:
                                 MSP_entry_copy = dict(MSP_entries[MSP_entry_id])
                                 del MSP_entry_copy['truncated_spectrum']
                                 MS2_matches.append({'entry': MSP_entry_copy, "score": score})
@@ -228,13 +227,14 @@ class empCpds:
                     empCpd["MS2_Spectra"].append(ms2_entry)
     
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
-        """_summary_
+        """
+        Given a list of authentic standards in JMS compliant format, annotate. 
 
         Args:
-            auth_stds (_type_): _description_
-            mz_tolerance (int, optional): _description_. Defaults to 5.
-            rt_tolerance (int, optional): _description_. Defaults to 30.
-            rtime_permissive (bool, optional): _description_. Defaults to False.
+            auth_stds (list[str]): list of filepaths to auth standard JSON files
+            mz_tolerance (int, optional): mz tolerance in ppm for matches. Defaults to 5.
+            rt_tolerance (int, optional): rt tolerance, in absolute seconds, for matches. Defaults to 30.
+            rtime_permissive (bool, optional): if true, rtime matching is not enforced. Defaults to False.
         """        
         mz_tree = intervaltree.IntervalTree()
         rt_tree = intervaltree.IntervalTree()
