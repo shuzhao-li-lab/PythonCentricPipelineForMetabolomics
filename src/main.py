@@ -1,17 +1,17 @@
 '''
 Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <sequence_csv> (pos|neg) [--filter=<filter>]
-  main.py convert_to_mzML <experiment_json> <mono_path> <ThermoRawFileConverter.exe_path> 
-  main.py spectral_QCQA <experiment_json> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py asari_full_processing <experiment_json>
-  main.py feature_QCQA <experiment_json> [--table=<moniker>] [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
-  main.py drop_samples <experiment_json> [--table=<moniker>] [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
-  main.py preprocess_features <experiment_json> [--table=<moniker>] [--new_table_moniker=<moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
-  main.py build_empCpds <experiment_json> [--empCpd_moniker=<moniker>]
-  main.py MS1_annotate <experiment_json> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <annotation_source>...
-  main.py MS2_annotate <experiment_json> <DDA> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <msp_files>...
-  main.py standards_annotate <experiment_json> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <auth_stds>...
-  main.py summarize <experiment_json>
+  main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
+  main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
+  main.py asari_full_processing <experiment_directory>
+  main.py feature_QCQA <experiment_directory> [--table=<moniker>] [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
+  main.py drop_samples <experiment_directory> [--table=<moniker>] [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
+  main.py preprocess_features <experiment_directory> [--table=<moniker>] [--new_table_moniker=<moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
+  main.py build_empCpds <experiment_directory> [--empCpd_moniker=<moniker>]
+  main.py MS1_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <annotation_source>...
+  main.py MS2_annotate <experiment_directory> <DDA> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <msp_files>...
+  main.py standards_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <auth_stds>...
+  main.py summarize <experiment_directory>
  '''
 
 from docopt import docopt
@@ -23,20 +23,45 @@ import json
 from utils.util import *
 import EmpCpds
 
+# todo - this needs to be moved
 def job_standards_search(job_desc):
+    """
+    The search for standards in the raw spectra is slow, this is a wrapper to enable searching in parallel
+
+    Args:
+        job_desc (list): contains the information needed for running the standards search
+
+    Returns:
+        dict: stores the matches and associated metadata for each standard per acquisition
+    """    
     acquisition, spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory = job_desc
     return acquisition.generate_report(spikeins, mz_ppm, rt_error, null_perc, min_intensity, text_report, output_directory)
 
 def job_TICs(job_desc):
+    """
+    Calculating the TIC on the raw spectra is slow, this is a wrapper to enable doing this in parallel
+
+    Args:
+        job_desc (list): contains the information needed for the TIC calculation
+
+    Returns:
+        tuple(list, list): the rts and intensities representing the histogram of the TIC
+    """    
     acquisition, rt_resolution = job_desc
     return acquisition.TIC(rt_resolution)
 
 def main(args):
+    """
+    This is the main function for the pipeline that implements the CLI using docopt
+
+    Args:
+        args (dict): the args generated from doctopt
+    """    
     if args['assemble_experiment_from_CSV']:
         ionization_mode = "pos" if args['pos'] else "neg"
         experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
     else:
-        experiment = Experiment.load(args['<experiment_json>'])
+        experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
         if args['--empCpd_moniker'] and not args['build_empCpds']:
             empCpds = EmpCpds.empCpds.load(experiment, args['--empCpd_moniker'])
             if args['MS1_annotate']:
@@ -92,42 +117,23 @@ def main(args):
                     plt.text(x,y,name, rotation='vertical')
                 plt.show()
         elif args['feature_QCQA']:
-            tag = args['--tag'] if args['--tag'] is not None else None
-            sort = json.loads(args['--sort']) if args['--sort'] is not None else None
             feature_table = FeatureTable(experiment.feature_tables[args['--table']], experiment)
-            if args['--all']:
-                qcqa_result = feature_table.qcqa(tag=tag, 
-                                        sort=sort, 
+            experiment.QCQA_results[feature_table_moniker] = feature_table.qcqa(
+                                        tag=args['--tag'] if args['--tag'] is not None else None, 
+                                        sort=json.loads(args['--sort']) if args['--sort'] is not None else None, 
                                         interactive=args["--interactive"], 
-                                        pca=True, 
-                                        tsne=True, 
-                                        pearson=True, 
-                                        spearman=True, 
-                                        kendall=True, 
-                                        missing_feature_percentiles=True,
-                                        missing_feature_distribution=True,
-                                        median_correlation_outlier_detection=True,
-                                        missing_feature_outlier_detection=True,
-                                        intensity_analysis=True,
-                                        feature_distribution=True,
-                                        feature_outlier_detection=True)
-            else:
-                qcqa_result = feature_table.qcqa(tag=tag, 
-                                            sort=sort, 
-                                            interactive=args["--interactive"], 
-                                            pca=args["--pca"], 
-                                            tsne=args['--tsne'], 
-                                            pearson=args['--pearson'], 
-                                            spearman=args['--spearman'], 
-                                            kendall=args['--kendall'], 
-                                            missing_feature_percentiles=args['--missing_feature_percentiles'],
-                                            missing_feature_distribution=args['--missing_feature_distribution'],
-                                            median_correlation_outlier_detection=args['--median_correlation_outlier_detection'],
-                                            missing_feature_outlier_detection=args['--missing_feature_outlier_detection'],
-                                            intensity_analysis=args['--intensity_analysis'],
-                                            feature_distribution=args['--feature_distribution'],
-                                            feature_outlier_detection=args['--feature_outlier_detection'])
-            experiment.QCQA_results[feature_table_moniker] = qcqa_result
+                                        pca=args["--pca"] or args["--all"], 
+                                        tsne=args['--tsne'] or args["--all"], 
+                                        pearson=args['--pearson'] or args["--all"], 
+                                        spearman=args['--spearman'] or args["--all"], 
+                                        kendall=args['--kendall'] or args["--all"], 
+                                        missing_feature_percentiles=args['--missing_feature_percentiles'] or args["--all"],
+                                        missing_feature_distribution=args['--missing_feature_distribution'] or args["--all"],
+                                        median_correlation_outlier_detection=args['--median_correlation_outlier_detection'] or args["--all"],
+                                        missing_feature_outlier_detection=args['--missing_feature_outlier_detection'] or args["--all"],
+                                        intensity_analysis=args['--intensity_analysis'] or args["--all"],
+                                        feature_distribution=args['--feature_distribution'] or args["--all"],
+                                        feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"])
         elif args['drop_samples']:
             experiment.drop_results = {}
             auto_drop_config = json.loads(args['--Z_score_drop']) if args['--Z_score_drop'] else None

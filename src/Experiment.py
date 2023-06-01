@@ -173,3 +173,12 @@ class Experiment:
         experiment.ionization_mode = ionization_mode
         return experiment
     
+    def summarize(self):
+        print("empCpds:")
+        for moniker, path in self.empCpds.items():
+            print("\t", moniker, " - ", path)
+        print("feature tables:")
+        for moniker, path in self.feature_tables.items():
+            print("\t", moniker, " - ", path)
+
+    
