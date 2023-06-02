@@ -128,6 +128,20 @@ class Experiment:
                                     )
         return experiment
         
+    def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
+        if delete_feature_table:
+            os.remove(self.feature_tables[moniker])
+            del self.feature_tables[moniker]
+        elif delete_empCpds is not None:
+            os.remove(self.empCpds[moniker])
+            del self.empCpds[moniker]
+
+    def retrieve(self, moniker, feature_table=False, empCpds=False):
+        if feature_table:
+            return self.feature_tables[moniker]
+        elif empCpds:
+            return self.empCpds[moniker]
+
     def save(self):
         """
         Serialize the experiment and acquisitions and store it on disk
