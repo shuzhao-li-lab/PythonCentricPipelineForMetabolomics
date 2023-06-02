@@ -129,10 +129,18 @@ class Experiment:
         return experiment
         
     def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
+        """
+        Given a moniker for a feature table or empCpds, delete the entry on disk and in the object
+
+        Args:
+            moniker (str): the moniker to be deleted
+            delete_feature_table (bool, optional): if True, delete the corresponding feature table. Defaults to False.
+            delete_empCpds (bool, optional): if True, delete the corresponding empCpd. Defaults to False.
+        """        
         if delete_feature_table:
             os.remove(self.feature_tables[moniker])
             del self.feature_tables[moniker]
-        elif delete_empCpds is not None:
+        elif delete_empCpds:
             os.remove(self.empCpds[moniker])
             del self.empCpds[moniker]
 
