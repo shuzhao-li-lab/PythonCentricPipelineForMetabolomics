@@ -12,7 +12,8 @@ Usage:
   main.py MS2_annotate <experiment_directory> <DDA> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <msp_files>...
   main.py standards_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <auth_stds>...
   main.py summarize <experiment_directory>
-  main.py delete <experiment_directory> [--empCpd_moniker=<moniker>] [--table=<moniker>]
+  main.py delete <experiment_directory> (empCpd|table) <moniker>
+  main.py retrieve <experiment_directory> (empCpd|table) <moniker>
  '''
 
 from docopt import docopt
@@ -198,6 +199,10 @@ def main(args):
                             args['--new_table_moniker'] + "_Feature_table.tsv",
                             log_transform = args['--log_transform'] if args['--log_transform'] else False)
             experiment.feature_tables[args['--new_table_moniker']] = os.path.join(experiment.filtered_feature_tables_subdirectory, args['--new_table_moniker'] + "_Feature_table.tsv")
+        elif args['delete']:
+            experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
+        elif args['retrieve']:
+            experiment.retrieve(args['<moniker>'], args['table'], args['empCpd'])
     experiment.save()
 
 if __name__ == '__main__':
