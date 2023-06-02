@@ -1,1 +1,14 @@
+csv
+os
+intervaltree
+pymzmml
+seaborn
+numpy
+scipy
+pandas
+sklearn
+bisect
+shutil
+subprocess
+logging
 docopt
