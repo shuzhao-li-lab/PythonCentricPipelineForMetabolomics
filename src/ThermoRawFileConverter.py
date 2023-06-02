@@ -1,42 +1,48 @@
-import logging
 import subprocess
 import multiprocessing as mp
 import os
-from abc import ABC, abstractmethod
 
-class AbstractThermoRawFileConverter(ABC):
-    log = logging.getLogger(__name__)
-
-    @abstractmethod
-    def convert(self, raw_acquisition, output_directory):
-        return NotImplemented
-    
-    @abstractmethod
-    def convert_multi(self, raw_acquisitions, output_directory):
-        return NotImplemented
-    
-
-class ThermoRawFileConverter(AbstractThermoRawFileConverter):
-    log = logging.getLogger(__name__)
-
+class ThermoRawFileConverter():
     def __init__(self, mono_path, exe_path):
-        self.log.info("Creating ThermoRawFileConverter for local install")
-        self.log.info("\tMono path = " + mono_path)
+        """
+        This class wraps the ThermoRawFileParser for use with the pipeline.
+
+        This really needs to be refactored or removed in the future.
+
+        Args:
+            mono_path (str): path to mono executable 
+            exe_path (str): path to ThermoRawFileParser.exe
+        """        
         self.mono_path = mono_path
-        self.log.info("\tThermoRawFileConverter executable path " + exe_path)
         self.exe_path = exe_path 
 
     def convert(self, raw_acquisition, output_directory):
+        """
+        Convert a raw acquisition and put the resulting .mzML into the output_directory
+
+        This is not used currently, not sure if this fully works. 
+
+        Args:
+            raw_acquisition (Acquisition): Acquisition object to convert
+            output_directory (str): output directory
+        """        
         try:
-            self.log.info("Converting " + raw_acquisition.raw_filepath)
             output_filepath = os.path.join(output_directory, os.path.basename(raw_acquisition.raw_filepath)).replace(".raw", ".mzML")
-            print(output_filepath)
             subprocess.run([self.mono_path, self.exe_path, '-f=1', '-i', raw_acquisition.raw_filepath, '-b', output_filepath])
-            self.log.info("Succesfully converted " + raw_acquisition.raw_filepath)
         except:
-            self.log.exception("Error converting " + raw_acquisition.raw_filepath)
+            pass
 
     def convert_multi(self, raw_acquisitions, output_directory):
+        """
+        Convert multiple acquisitions and put the resulting .mzML into the output directory in parallel
+
+        Args:
+            raw_acquisitions (list[Acquisition]): list of Acquisition objects to convert
+            output_directory (str): path to output directory
+
+        Returns:
+            list[str]: list of resulting .mzML filepaths co-indexed with the acquisitions.
+        """        
         workers = mp.Pool(max(mp.cpu_count()-1, 1))
         jobs = []
         for raw_acquisition in raw_acquisitions:
