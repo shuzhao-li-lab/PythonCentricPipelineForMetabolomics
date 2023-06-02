@@ -1,14 +1,8 @@
-csv
-os
 intervaltree
-pymzmml
+pymzml
 seaborn
 numpy
 scipy
 pandas
 sklearn
-bisect
-shutil
-subprocess
-logging
 docopt
