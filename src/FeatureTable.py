@@ -20,6 +20,13 @@ import json
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
+        """
+        This object wraps a feature table
+
+        Args:
+            feature_table_filepath (str): path to the feature table on disk
+            experiment (Experiment object): the experiment object for this feature table
+        """        
         self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
         self.feature_matrix_header = None
@@ -39,6 +46,16 @@ class FeatureTable:
         self.feature_matrix = np.array(feature_matrix).T
 
     def selected_feature_matrix(self, tag=None, sort=False):
+        """
+        Select columns in the feature table based on metadata, optionally sorted.
+
+        Args:
+            tag (str, optional): Sample type must match this field. Defaults to None.
+            sort (bool, optional): if true, sort the sample names. Defaults to False.
+
+        Returns:
+            selected feature matrix: the feature matrix for the selected acquisitions
+        """        
         sample_names_for_tags = [acquisition.name for acquisition in self.experiment.acquisitions if tag is None or acquisition.metadata_tags['Sample Type'] == tag]
         sample_names_for_tags = [x for x in sample_names_for_tags if x in self.feature_matrix_header]
         if sort:
@@ -55,6 +72,15 @@ class FeatureTable:
         return feature_matrix_subset.T, found_samples
     
     def select_feature_column(self, feature_name):
+        """
+        Select a row in the feature table by column name
+
+        Args:
+            feature_name (str): if the column name matches this field, return that column
+
+        Returns:
+            feature column: numpy array of float64s for that column
+        """        
         for column_index, name in enumerate(self.feature_matrix_header):
             if name == feature_name:
                 try:
@@ -63,6 +89,20 @@ class FeatureTable:
                     return self.feature_matrix[column_index]
 
     def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False):
+        """
+        The median correlation of a sample against all other samples can be expressed as a z-score against the median
+        of ALL correlations in the experiment. A high or low Z-score indicates that the sample was poorly correlated 
+        with other smaples in the experiment. 
+
+        Args:
+            feature_vector_matrix (np.ndarray): a selected feature matrix
+            acquisition_names (list[str]): the names of the acquisitions co-indexed with the selected features matrix
+            correlation_type (str, optional): determines the type of correlatio matric to calculate. Defaults to 'pearson'.
+            interactive_plot (bool, optional): if interacitve, make plot in matlplotlib window. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False)
         all_correlations = []
         median_correlations = {}
@@ -90,7 +130,18 @@ class FeatureTable:
         }
         return result
     
-    def intensity_analysis(self, feature_vector_matrix, acquisition_names, drop_missing, interactive_plot=False):
+    def intensity_analysis(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+        """
+        Analyze mean, median, sum intensity values on the feature table
+
+        Args:
+            feature_vector_matrix (np.ndarray): a selected feature matrix
+            acquisition_names (list[str]): the names of the acquisitions co-indexed with the selected features matrix
+            interactive_plot (bool, optional): if interacitve, make plot in matlplotlib window. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         intensity_sums = np.sum(feature_vector_matrix, axis=0)
         mean_feature_intensity = np.mean(feature_vector_matrix, axis=0)
         median_feature_intensity = np.median(feature_vector_matrix, axis=0)
@@ -198,6 +249,17 @@ class FeatureTable:
         return result
 
     def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+        """
+        Perform PCA on provided feature table
+
+        Args:
+            feature_vector_matrix (np.ndarray): a selected feature matrix
+            acquisition_names (list[str]): the names of the acquisitions co-indexed with the selected features matrix
+            interactive_plot (bool, optional): if interacitve, make plot in matlplotlib window. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
         feature_vector_matrix = np.log2(feature_vector_matrix+1)
@@ -218,6 +280,18 @@ class FeatureTable:
         return result
             
     def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False, perplexity=30):
+        """
+        Perform TSNE on provided feature table
+
+        Args:
+            feature_vector_matrix (np.ndarray): a selected feature matrix
+            acquisition_names (list[str]): the names of the acquisitions co-indexed with the selected features matrix
+            interactive_plot (bool, optional): if interacitve, make plot in matlplotlib window. Defaults to False.
+            perplexity (int, optional): the perplexity of the TSNE plot, reduces by 1 until a solution is found. Defaults to 30.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         try:
             tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(feature_vector_matrix.T)
             if interactive_plot:
@@ -240,6 +314,16 @@ class FeatureTable:
                 pass
     
     def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False):
+        """
+        Calculate the distribution of missing features with respect to percent of smaples with feature
+
+        Args:
+            feature_vector_matrix (np.ndarray): the selected feature matrix
+            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         num_sample_with_feature = np.sum(feature_vector_matrix > 0, axis=1)
         percentile_table = []
         for percentile in range(101):
@@ -260,6 +344,18 @@ class FeatureTable:
         return result
     
     def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        """
+        Count the number of missing features or featuers below the specified intensity cutoff per features
+
+        Args:
+            feature_vector_matrix (np.ndarray): the selected feature matrix
+            acquisition_names (list[str]): list of acquisition names
+            intensity_cutoff (int, optional): values below this intesnity are considered missing. Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """        
         intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
         missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
         for i, a in enumerate(acquisition_names):
@@ -278,6 +374,18 @@ class FeatureTable:
         return result
     
     def feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        """
+        Count the number of features above the specified intensity cutoff per features
+
+        Args:
+            feature_vector_matrix (np.ndarray): the selected feature matrix
+            acquisition_names (list[str]): list of acquisition names
+            intensity_cutoff (int, optional): values above this intensity are considered. Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """   
         intensity_masked_feature_matrix = feature_vector_matrix > intensity_cutoff
         feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
         if interactive_plot:
@@ -294,6 +402,20 @@ class FeatureTable:
         return result
     
     def feature_distribution_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        """
+        Count the number of features above the specified intensity cutoff per features and express as a Z-score based
+        on feature count across all samples. 
+
+        Args:
+            feature_vector_matrix (np.ndarray): the selected feature matrix
+            acquisition_names (list[str]): list of acquisition names
+            intensity_cutoff (int, optional): values above this intensity are considered. Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """   
+
         feature_counts_result = self.feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
         sample_names = [*feature_counts_result["Result"].keys()]
         feature_counts = np.array([*feature_counts_result["Result"].values()])
@@ -312,6 +434,19 @@ class FeatureTable:
         return result
 
     def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+        """
+        Count the number of features below the specified intensity cutoff per features and express as a Z-score based
+        on missing feature count across all samples. 
+
+        Args:
+            feature_vector_matrix (np.ndarray): the selected feature matrix
+            acquisition_names (list[str]): list of acquisition names
+            intensity_cutoff (int, optional): values below this intensity are considered missing. Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+
+        Returns:
+            result: dictionary storing the result of this QCQA operation
+        """   
         missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
         sample_names = [*missing_feature_counts_result["Result"].keys()]
         missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
@@ -329,7 +464,21 @@ class FeatureTable:
         }
         return result
     
-    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, log_transform=False, annotations=None, interactive_plot=False):
+    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, interactive_plot=False):
+        """
+        Performa blank masking, drop missing features, normalize by TIC, and output the curated table to the specififed path.
+
+        # TODO - needs an option for batch correction.
+
+        Args:
+            blank_names (list[str]): list of samples considered to be blanks
+            sample_names (list[str]): list of experimental samples
+            drop_percentile (float): features present in this percent of samples or fewer are dropped
+            blank_intensity_ratio (float): features with a mean intensity in samples / mean intensity in blanks below this value are dropped
+            TIC_normalization_percentile (float): features in this percentile or higher in intenisy are used for normalization
+            output_path (str): path to save feature table to after curation
+            interactive_plot (bool, optional): if True, interactive plots are generated. Defaults to False.
+        """        
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
         for s in sample_names:
             print(s, self.select_feature_column(s))
@@ -412,6 +561,29 @@ class FeatureTable:
              intensity_analysis=False,
              feature_distribution=False,
              feature_outlier_detection=False):
+        """
+        This is the wrapper for all the qcqa functions. 
+
+        Args:
+            tag (str, optional): Sample type must match this field. Defaults to None.
+            sort (bool, optional): if true, sort the sample names. Defaults to False.
+            interactive (bool, optional): if True, interactive plots are generated. Defaults to False.
+            pca (bool, optional): Defaults to False.
+            tsne (bool, optional): Defaults to False.
+            pearson (bool, optional): Defaults to False.
+            spearman (bool, optional): Defaults to False.
+            kendall (bool, optional): Defaults to False.
+            missing_feature_percentiles (bool, optional): Defaults to False.
+            missing_feature_distribution (bool, optional): Defaults to False.
+            median_correlation_outlier_detection (bool, optional): Defaults to False.
+            missing_feature_outlier_detection (bool, optional): Defaults to False.
+            intensity_analysis (bool, optional): Defaults to False.
+            feature_distribution (bool, optional): Defaults to False.
+            feature_outlier_detection (bool, optional): Defaults to False.
+
+        Returns:
+            list: with all qcqa results for the performed QCQA steps
+        """        
         if sort is None:
             sort=False
         selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
@@ -424,8 +596,8 @@ class FeatureTable:
             qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive))
         if spearman:
             qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive))
-        #if kendall:
-        #    qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
+        if kendall:
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
         if missing_feature_percentiles:
             qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive))
         if missing_feature_distribution:
@@ -441,34 +613,3 @@ class FeatureTable:
         if feature_outlier_detection:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
         return qcqa_result
-    
-    def annotate(self, annotation_sources, name):
-        peaklist = read_table_to_peaks(self.feature_table_filepath, has_header=True, mz_col=1, rtime_col=2, feature_id=0)
-        for p in peaklist:
-            p["representative_intensity"] = None
-        ECCON = epdsConstructor(peaklist, self.experiment.ionization_mode)
-        dict_empCpds = ECCON.peaks_to_epdDict(
-            isotope_search_patterns,
-            adduct_search_patterns,
-            extended_adducts,
-            5
-        )
-
-        EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=5)
-        for interim_id, empCpd_dict in dict_empCpds.items():
-            rep_rt = np.mean([x["rtime"] for x in empCpd_dict["MS1_pseudo_Spectra"] if x["ion_relation"] == "anchor"])
-            empCpd_dict["representative_rtime"] = rep_rt
-        EED.dict_empCpds = dict_empCpds
-        EED.index_empCpds()
-        
-        for source in annotation_sources:
-            KCD = knownCompoundDatabase()
-            list_compounds = json.load(open(source))
-            KCD.mass_index_list_compounds(list_compounds)
-            KCD.build_emp_cpds_index()
-            EED.extend_empCpd_annotation(KCD)
-            EED.annotate_singletons(KCD)
-
-        annotation_output = os.path.join(self.experiment.annotation_subdirectory, name + "_feature_table_annotation.json")
-        with open(annotation_output, 'w+') as annotation_output_fh:
-            json.dump(dict_empCpds, annotation_output_fh, indent=4)
