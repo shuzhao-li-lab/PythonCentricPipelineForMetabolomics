@@ -16,12 +16,13 @@ Usage:
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
  '''
 
+import os 
+import json
+import multiprocessing as mp
 from docopt import docopt
-import os
+
 from Experiment import Experiment
 from FeatureTable import FeatureTable
-import multiprocessing as mp
-import json
 from utils.util import *
 import EmpCpds
 
@@ -63,7 +64,7 @@ def main(args):
         ionization_mode = "pos" if args['pos'] else "neg"
         experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
     else:
-        if not args['<experiment_directory'].endswith("experiment.json"):
+        if not args['<experiment_directory>'].endswith("experiment.json"):
             experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
         else:
             experiment = Experiment.load(args['<experiment_directory>'])
@@ -202,7 +203,7 @@ def main(args):
         elif args['delete']:
             experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
         elif args['retrieve']:
-            experiment.retrieve(args['<moniker>'], args['table'], args['empCpd'])
+            print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
     experiment.save()
 
 if __name__ == '__main__':
