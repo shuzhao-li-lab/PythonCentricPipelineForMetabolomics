@@ -7,11 +7,12 @@ Usage:
   main.py feature_QCQA <experiment_directory> [--table=<moniker>] [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py drop_samples <experiment_directory> [--table=<moniker>] [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
   main.py preprocess_features <experiment_directory> [--table=<moniker>] [--new_table_moniker=<moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
-  main.py build_empCpds <experiment_directory> [--empCpd_moniker=<moniker>]
+  main.py build_empCpds <experiment_directory> [--empCpd_moniker=<moniker>] [--table=<moniker>]
   main.py MS1_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <annotation_source>...
   main.py MS2_annotate <experiment_directory> <DDA> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <msp_files>...
   main.py standards_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <auth_stds>...
   main.py summarize <experiment_directory>
+  main.py delete <experiment_directory> [--empCpd_moniker=<moniker>] [--table=<moniker>]
  '''
 
 from docopt import docopt
@@ -61,7 +62,10 @@ def main(args):
         ionization_mode = "pos" if args['pos'] else "neg"
         experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
     else:
-        experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
+        if not args['<experiment_directory'].endswith("experiment.json"):
+            experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
+        else:
+            experiment = Experiment.load(args['<experiment_directory>'])
         if args['--empCpd_moniker'] and not args['build_empCpds']:
             empCpds = EmpCpds.empCpds.load(experiment, args['--empCpd_moniker'])
             if args['MS1_annotate']:
@@ -77,6 +81,7 @@ def main(args):
             os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
             experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
             experiment.feature_tables['preferred'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
+            experiment.empCpds['asari'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
         elif args['spectral_QCQA']:
             import matplotlib.pyplot as plt
             spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
@@ -173,10 +178,11 @@ def main(args):
         elif args['summarize']:
             experiment.summarize()
         elif args['build_empCpds']:
+            feature_table_moniker = args['--table'] if args['--table'] else 'full'
             if args['--empCpd_moniker']:
-                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, empCpd_moniker=args['--empCpd_moniker'])
+                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, empCpd_moniker=args['--empCpd_moniker'], feature_table_moniker=feature_table_moniker)
             else:
-                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment)
+                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, feature_table_moniker=feature_table_moniker)
             empCpd.save()
         elif args['preprocess_features']:
             blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))

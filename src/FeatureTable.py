@@ -3,20 +3,11 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 import scipy.stats
-import math
 import os
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-from khipu.epdsConstructor import epdsConstructor
-from khipu.extended import *
-from khipu.utils import *
-from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
-from jms.io import read_table_to_peaks
-import json
-# need to update the blank dropping. 
-
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
@@ -469,6 +460,7 @@ class FeatureTable:
         Performa blank masking, drop missing features, normalize by TIC, and output the curated table to the specififed path.
 
         # TODO - needs an option for batch correction.
+        # TODO - needs an option for interpolation
 
         Args:
             blank_names (list[str]): list of samples considered to be blanks
@@ -482,7 +474,6 @@ class FeatureTable:
         blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
         for s in sample_names:
             print(s, self.select_feature_column(s))
-
 
         samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         for header_field in self.feature_matrix_header:
