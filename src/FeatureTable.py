@@ -475,7 +475,7 @@ class FeatureTable:
             sample_names (list[str]): list of experimental samples
             drop_percentile (float): features present in this percent of samples or fewer are dropped
             blank_intensity_ratio (float): features with a mean intensity in samples / mean intensity in blanks below this value are dropped
-            TIC_normalization_percentile (float): features in this percentile or higher in intenisy are used for normalization
+            TIC_normalization_percentile (float): features present in at least this percent of samples are used for normalization
             output_path (str): path to save feature table to after curation
             interactive_plot (bool, optional): if True, interactive plots are generated. Defaults to False.
         """        
