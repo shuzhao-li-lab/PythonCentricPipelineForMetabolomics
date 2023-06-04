@@ -53,6 +53,7 @@ def job_TICs(job_desc):
     acquisition, rt_resolution = job_desc
     return acquisition.TIC(rt_resolution)
 
+
 def main(args):
     """
     This is the main function for the pipeline that implements the CLI using docopt
@@ -205,6 +206,10 @@ def main(args):
         elif args['retrieve']:
             print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
     experiment.save()
+
+def CLI():
+    args = docopt(__doc__)
+    main(args)
 
 if __name__ == '__main__':
     args = docopt(__doc__)

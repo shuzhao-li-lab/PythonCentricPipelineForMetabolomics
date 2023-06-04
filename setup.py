@@ -40,7 +40,7 @@ setup(
   #include_package_data=True,
   #zip_safe=True,
   entry_points = {
-        'console_scripts': ['pcpfm=pcpfm.main.py'],
+        'console_scripts': ['pcpfm=pcpfm.main:CLI'],
     },
 
   python_requires='>=3.7',
