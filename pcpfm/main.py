@@ -19,12 +19,61 @@ Usage:
 import os 
 import json
 import multiprocessing as mp
+import csv
+import itertools
 from docopt import docopt
 
-from Experiment import Experiment
-from FeatureTable import FeatureTable
-from utils.util import *
-import EmpCpds
+from pcpfm.Experiment import Experiment
+from pcpfm.FeatureTable import FeatureTable
+from pcpfm.EmpCpds import empCpds
+
+def adductify_standards(standards_csv, adducts_csv):
+    isotope_mass_table = {
+        "12C": 12.0,
+        "13C": 13.00335483507,
+        "1H": 1.00782503223,
+        "2H": 2.01410177812,
+        "16O": 15.99491461957,
+        "14N": 14.00307400443,
+        "15N": 15.00010889888,
+        "32S": 31.9720711744,
+        "31P": 30.97376199842,
+        "23Na": 22.9897692820,
+        "e": 0.00054858
+    }
+    standards = []
+    with open(standards_csv, encoding='utf-8-sig') as standards_fh:
+        for standard in csv.DictReader(standards_fh):
+            standards.append(standard)
+    adducts = []
+    with open(adducts_csv, encoding='utf-8-sig') as adducts_fh:
+        for adduct in csv.DictReader(adducts_fh):
+            adducts.append(adduct)
+    adducted_standards = []
+    for standard, adduct in itertools.product(standards, adducts):
+        new_name = standard["Name"] + '[' + adduct["Name"] + '],z=' + str(adduct["Charge"])
+        new_formula = {}
+        for isotope, count in json.loads(standard['Isotope Dictionary']).items():
+            count = int(count)
+            if isotope not in new_formula:
+                new_formula[isotope] = count
+            else:
+                new_formula[isotope] += count
+        for isotope, count in json.loads(adduct['Isotope Dictionary']).items():
+            count = int(count)
+            if isotope not in new_formula:
+                new_formula[isotope] = count
+            else:
+                new_formula[isotope] += count
+        new_formula['e'] = -1 * int(adduct['Charge'])
+        uncharged_mass = sum([isotope_mass_table[isotope] * isotope_count for isotope, isotope_count in new_formula.items()])
+        mz = uncharged_mass / abs(int(adduct['Charge']))
+        adducted_standards.append({
+            "Name": new_name,
+            "Isotope Formula Dict": new_formula,
+            "Search Mass": mz,
+        })
+    return adducted_standards
 
 # todo - this needs to be moved
 def job_standards_search(job_desc):
@@ -70,7 +119,7 @@ def main(args):
         else:
             experiment = Experiment.load(args['<experiment_directory>'])
         if args['--empCpd_moniker'] and not args['build_empCpds']:
-            empCpds = EmpCpds.empCpds.load(experiment, args['--empCpd_moniker'])
+            empCpds = empCpds.load(experiment, args['--empCpd_moniker'])
             if args['MS1_annotate']:
                 empCpds.MS1_annotate(args['<annotation_source>'])
             elif args['standards_annotate']:
@@ -183,9 +232,9 @@ def main(args):
         elif args['build_empCpds']:
             feature_table_moniker = args['--table'] if args['--table'] else 'full'
             if args['--empCpd_moniker']:
-                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, empCpd_moniker=args['--empCpd_moniker'], feature_table_moniker=feature_table_moniker)
+                empCpd = empCpds.construct_empCpds_from_feature_table(experiment, empCpd_moniker=args['--empCpd_moniker'], feature_table_moniker=feature_table_moniker)
             else:
-                empCpd = EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, feature_table_moniker=feature_table_moniker)
+                empCpd = empCpds.construct_empCpds_from_feature_table(experiment, feature_table_moniker=feature_table_moniker)
             empCpd.save()
         elif args['preprocess_features']:
             blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))
