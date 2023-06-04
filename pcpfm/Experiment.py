@@ -1,10 +1,10 @@
 import csv
 import shutil
 import json
+import os
 
-from utils.util import *
-from ThermoRawFileConverter import ThermoRawFileConverter
-from Acquisition import Acqusition
+from pcpfm.ThermoRawFileConverter import ThermoRawFileConverter
+from pcpfm.Acquisition import Acqusition
 
 class Experiment:
     subdirectories = {
