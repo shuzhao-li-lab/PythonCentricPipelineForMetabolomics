@@ -1,4 +1,3 @@
-from utils.util import *
 from collections import namedtuple
 import pymzml
 import numpy as np
