@@ -5,10 +5,12 @@ import matplotlib.pyplot as plt
 import scipy.stats
 import os
 import pandas as pd
-import pycombat
+from combat.pycombat import pycombat 
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+
+
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
@@ -482,49 +484,114 @@ class FeatureTable:
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in selected_columns]).T, columns=selected_columns)
         self.save(table, new_moniker)
 
-    def blank_mask(self, new_moniker, by_batch=True, blank_intensity_ratio=3, drop_now=True, blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
+    def blank_mask(self, new_moniker, by_batch=True, blank_intensity_ratio=3, logic_mode="and", blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
+        def __any_logical(row, columns):
+            return np.any(row[columns] == True)
+
+        def __all_logical(row, columns):
+            return np.all(row[columns] == True)
+        
         blank_names = self.experiment.filter_samples({type_field: {"includes": [blank_type]}})
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names + blank_names]).T, columns=sample_names + blank_names)
+        blank_mask_columns = []
+        for batch_name, batch_name_list in self.experiment.batches(skip_batch=by_batch).items():
+            batch_blanks = [x for x in batch_name_list if x in blank_names]
+            batch_samples = [x for x in batch_name_list if x in sample_names]
+            to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(np.mean(table[batch_blanks], axis=1), np.mean(table[batch_samples], axis=1))]
+            mask_column_name = "masked" + batch_name
+            blank_mask_columns.append(mask_column_name)
+            table[mask_column_name] = to_filter
+
+        if logic_mode == "and":
+            table["mask_feature"] = table.apply(__all_logical, axis=1, args=(blank_mask_columns,))
+        elif logic_mode == "or":
+            table["mask_feature"] = table.apply(__any_logical, axis=1, args=(blank_mask_columns,))
+
+        for blank_mask_column in blank_mask_columns:
+            table.drop(columns=blank_mask_column, inplace=True)
+
         for header_field in self.feature_matrix_header:
             if header_field not in {acquisition.name for acquisition in self.experiment.acquisitions}:
                 table[header_field] = self.select_feature_column(header_field)
-        to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(np.mean(table[blank_names], axis=1), np.mean(table[sample_names], axis=1))]
-        table["masked"] = to_filter
-        if drop_now:
-            table = table[table["masked"] == False]
+        table = table[table["mask_feature"] == False]
         self.save(table, new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.80, by_batch=True, sample_type="Unknown", type_field="Sample Type"):
+    def interpolate_missing_features(self, new_moniker, ratio=0.2):
+        def calc_interpolated_value(row, sample_names):
+            values = [x for x in row[sample_names] if x > 0]
+            if values:
+                return min(values) * ratio
+            else:
+                return 0
+        sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_matrix_header]
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in self.feature_matrix_header]).T, columns=self.feature_matrix_header)
+        for _, batch_name_list in self.experiment.batches.items():
+            filtered_batch_name_list = [x for x in batch_name_list if x not in sample_names]
+            table["feature_interpolate_value"] = table.apply(calc_interpolated_value, axis=1, args=(filtered_batch_name_list,))
+            for sample_name in filtered_batch_name_list:
+                table[sample_name] = table[[sample_name, "feature_interpolate_value"]].max(axis=1)
+            table.drop(columns="feature_interpolate_value", inplace=True)
+        for header in self.feature_matrix_header:
+            if header not in sample_names:
+                table[header] = self.select_feature_column(header)
+        self.save(table, new_moniker)
+
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.80, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median'):
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in self.feature_matrix_header]).T, columns=self.feature_matrix_header)
-        table["percent_inclusion"] = np.sum(table[sample_names] > 0, axis=1) / len(sample_names)
-        TICs = {sample: np.sum(table[table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
-        norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
-        for sample, norm_factor in norm_factors.items():
-            table[sample] = table[sample] * norm_factor
+        for batch_name, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
+            filtered_batch_name_list = [x for x in batch_name_list if x not in sample_names]
+            table["percent_inclusion"] = np.sum(table[filtered_batch_name_list] > 0, axis=1) / len(filtered_batch_name_list)
+            TICs = {sample: np.sum(table[table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in filtered_batch_name_list}
+            function_map = {
+                "median": np.median,
+                "mean": np.mean,
+            }
+            norm_factors = {sample: function_map[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
+            for sample, norm_factor in norm_factors.items():
+                table[sample] = table[sample] * norm_factor
         self.save(table, new_moniker)
 
-    def batch_correct(self, new_moniker, batch_field="Batch"):
+    def batch_correct(self, new_moniker, batch_field="Position"):
+        batch_idx_map = {}
+        for batch_idx, (_, acquisition_name_list) in enumerate(self.experiment.batches.items()):
+            for acquisition_name in acquisition_name_list:
+                batch_idx_map[acquisition_name] = batch_idx
         sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_matrix_header]
-        batch_map = {}
-        for a in self.experiment.acquisitions:
-            batch_name = a.metadata_tags[batch_field] 
-            if batch_name not in batch_map:
-                batch_map[batch_name] = len(batch_map)
-        batches = [batch_map[a.metadata_tags[batch_field]] for a in self.experiment.acquisitions if a.name in sample_names]
+        batches = [batch_idx_map[a.name] for a in self.experiment.acquisitions if a.name in self.feature_matrix_header]
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
-        batch_corrected = pycombat.pycombat(table, batches)
+        batch_corrected = pycombat(table, batches)
         for header_field in self.feature_matrix_header:
             if header_field not in batch_corrected.columns:
                 batch_corrected[header_field] = self.select_feature_column(header_field)
-        self.save(table, new_moniker)
+        self.save(batch_corrected, new_moniker)
 
-    def drop_missing_features(self, new_moniker, drop_percentile, by_batch=True, sample_type="Unknown", type_field="Sample Type"):
+    def drop_missing_features(self, new_moniker, by_batch=True drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
+        def __any(row, columns, drop_percentile):
+            return not np.any(row[columns] > drop_percentile)
+
+        def __all(row, columns, drop_percentile):
+            return not np.all(row[columns] > drop_percentile)
+
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
-        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in self.feature_matrix_header]).T, columns=self.feature_matrix_header)
-        table["percent_inclusion"] = np.sum(table[sample_names] > 0, axis=1) / len(sample_names)
-        table = table[table["percent_inclusion"] > drop_percentile].copy()
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
+        batch_columns = []
+        for batch_name, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
+            batch_column = "percent_inclusion" + batch_name
+            filtered_batch_name_list = [x for x in batch_name_list if x in sample_names]
+            table[batch_column] = np.sum(table[filtered_batch_name_list] > 0, axis=1) / len(filtered_batch_name_list)
+            batch_columns.append(batch_column)
+
+        if logic_mode == "and":
+            table["drop_feature"] = table.apply(__all, axis=1, args=(batch_columns, drop_percentile))
+        elif logic_mode == "or":
+            table["drop_feature"] = table.apply(__any, axis=1, args=(batch_columns, drop_percentile))
+        
+        for header_field in self.feature_matrix_header:
+            if header_field not in table.columns:
+                table[header_field] = self.select_feature_column(header_field)
+        table = table[table["drop_feature"] == False].copy()
         self.save(table, new_moniker)
 
     def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, interactive_plot=False):
