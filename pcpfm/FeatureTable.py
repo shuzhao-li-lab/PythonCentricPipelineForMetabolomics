@@ -567,7 +567,7 @@ class FeatureTable:
                 batch_corrected[header_field] = self.select_feature_column(header_field)
         self.save(batch_corrected, new_moniker)
 
-    def drop_missing_features(self, new_moniker, by_batch=True drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
+    def drop_missing_features(self, new_moniker, by_batch=True, drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
         def __any(row, columns, drop_percentile):
             return not np.any(row[columns] > drop_percentile)
 
