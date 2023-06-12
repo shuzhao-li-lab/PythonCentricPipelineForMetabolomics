@@ -19,6 +19,8 @@ Usage:
   main.py drop_samples2 <experiment_directory> <moniker> <new_moniker> <type>
   main.py drop_blanks <experiment_directory> <moniker> <new_moniker>
   main.py batch_correct <experiment_directory> <moniker> <new_moniker>
+  main.py drop_missing_features <experiment_directory> <moniker> <new_moniker>
+  main.py interpolate_missing_features <experiment_directory> <moniker> <new_moniker>
   main.py help
  '''
 

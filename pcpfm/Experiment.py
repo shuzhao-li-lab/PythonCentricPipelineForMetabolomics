@@ -271,4 +271,24 @@ class Experiment:
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
 
+    @property
+    def batches(self, field="name", debug=False, skip_batch=False):
+        batches = {}
+        for acquisition in self.acquisitions:
+            if skip_batch:
+                batch_name = "no_batch"
+            elif debug:
+                batch_name = acquisition.metadata_tags['Position'].split(":")[0]
+            else:
+                if 'Batch' in acquisition.metadata_tags:
+                    batch_name = acquisition.metadata_tags['Batch']
+                else:
+                    batch_name = "no_batch"
+            if batch_name not in batches:
+                batches[batch_name] = []
+            if field:
+                batches[batch_name].append(getattr(acquisition, field))
+            else:
+                batches[batch_name].append(acquisition)
+        return batches
     
