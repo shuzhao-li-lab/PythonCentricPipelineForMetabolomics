@@ -6,3 +6,4 @@ scipy
 pandas
 sklearn
 docopt
+pycombat
