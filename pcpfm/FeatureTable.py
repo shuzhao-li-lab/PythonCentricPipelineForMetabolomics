@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.stats
 import os
 import pandas as pd
+import pycombat
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -36,6 +37,11 @@ class FeatureTable:
                         feature_matrix_row.append(feature[column_name])
                 feature_matrix.append(feature_matrix_row)
         self.feature_matrix = np.array(feature_matrix).T
+
+    def save(self, table, new_moniker):
+        output_path = os.path.join(self.experiment.filtered_feature_tables_subdirectory, new_moniker + "_Feature_table.tsv")
+        self.experiment.feature_tables[new_moniker] = output_path
+        table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
 
     def selected_feature_matrix(self, tag=None, sort=False):
         """
@@ -457,6 +463,70 @@ class FeatureTable:
         }
         return result
     
+    def drop_blanks(self, new_moniker):
+        self.drop_samples(new_moniker, drop_others=False, keep_types=[], drop_types=["Blank"])
+
+    def drop_samples(self, new_moniker, drop_others=True, keep_types=[], drop_types=[], type_field="Sample Type"):
+        retain, drop = [], []
+        for keep_type in keep_types:
+            retain += list(self.experiment.filter_samples({type_field: {"includes": [keep_type]}}))
+        for drop_type in drop_types:
+            drop += list(self.experiment.filter_samples({type_field: {"includes": [drop_type]}}))
+        for name in {a.name for a in self.experiment.acquisitions}:
+            if name not in drop and name not in retain:
+                if drop_others:
+                    drop.append(name)
+                else:
+                    retain.append(name)
+        selected_columns = [header_field for header_field in self.feature_matrix_header if header_field not in drop]
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in selected_columns]).T, columns=selected_columns)
+        self.save(table, new_moniker)
+
+    def blank_mask(self, new_moniker, by_batch=True, blank_intensity_ratio=3, drop_now=True, blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
+        blank_names = self.experiment.filter_samples({type_field: {"includes": [blank_type]}})
+        sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names + blank_names]).T, columns=sample_names + blank_names)
+        for header_field in self.feature_matrix_header:
+            if header_field not in {acquisition.name for acquisition in self.experiment.acquisitions}:
+                table[header_field] = self.select_feature_column(header_field)
+        to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(np.mean(table[blank_names], axis=1), np.mean(table[sample_names], axis=1))]
+        table["masked"] = to_filter
+        if drop_now:
+            table = table[table["masked"] == False]
+        self.save(table, new_moniker)
+
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.80, by_batch=True, sample_type="Unknown", type_field="Sample Type"):
+        sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in self.feature_matrix_header]).T, columns=self.feature_matrix_header)
+        table["percent_inclusion"] = np.sum(table[sample_names] > 0, axis=1) / len(sample_names)
+        TICs = {sample: np.sum(table[table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
+        norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
+        for sample, norm_factor in norm_factors.items():
+            table[sample] = table[sample] * norm_factor
+        self.save(table, new_moniker)
+
+    def batch_correct(self, new_moniker, batch_field="Batch"):
+        sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_matrix_header]
+        batch_map = {}
+        for a in self.experiment.acquisitions:
+            batch_name = a.metadata_tags[batch_field] 
+            if batch_name not in batch_map:
+                batch_map[batch_name] = len(batch_map)
+        batches = [batch_map[a.metadata_tags[batch_field]] for a in self.experiment.acquisitions if a.name in sample_names]
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
+        batch_corrected = pycombat.pycombat(table, batches)
+        for header_field in self.feature_matrix_header:
+            if header_field not in batch_corrected.columns:
+                batch_corrected[header_field] = self.select_feature_column(header_field)
+        self.save(table, new_moniker)
+
+    def drop_missing_features(self, new_moniker, drop_percentile, by_batch=True, sample_type="Unknown", type_field="Sample Type"):
+        sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in self.feature_matrix_header]).T, columns=self.feature_matrix_header)
+        table["percent_inclusion"] = np.sum(table[sample_names] > 0, axis=1) / len(sample_names)
+        table = table[table["percent_inclusion"] > drop_percentile].copy()
+        self.save(table, new_moniker)
+
     def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, interactive_plot=False):
         """
         Performa blank masking, drop missing features, normalize by TIC, and output the curated table to the specififed path.

@@ -5,6 +5,8 @@ import os
 
 from pcpfm.ThermoRawFileConverter import ThermoRawFileConverter
 from pcpfm.Acquisition import Acqusition
+from pcpfm.FeatureTable import FeatureTable
+import pcpfm.EmpCpds as EmpCpds
 
 class Experiment:
     subdirectories = {
@@ -51,7 +53,7 @@ class Experiment:
         """        
         # provided parameters
         self.experiment_name = experiment_name
-        self.experiment_directory = experiment_directory
+        self.experiment_directory = os.path.abspath(experiment_directory)
         self.acquisitions = [] if acquisitions is None else acquisitions
         self.QCQA_results = {} if qcqa_results is None else qcqa_results
         self.organized_samples = {} if organized_samples is None else organized_samples
@@ -144,11 +146,19 @@ class Experiment:
             os.remove(self.empCpds[moniker])
             del self.empCpds[moniker]
 
-    def retrieve(self, moniker, feature_table=False, empCpds=False):
+    def retrieve(self, moniker, feature_table=False, empCpds=False, as_object=False):
         if feature_table:
-            return self.feature_tables[moniker]
+            feature_table_path = self.feature_tables[moniker]
+            if as_object:
+                return FeatureTable(feature_table_path, self)
+            else:
+                return feature_table_path
         elif empCpds:
-            return self.empCpds[moniker]
+            empCpd_path = self.empCpds[moniker]
+            if as_object:
+                return EmpCpds.empCpds.load(empCpd_path, self)
+            else:
+                return empCpd_path
 
     def save(self):
         """

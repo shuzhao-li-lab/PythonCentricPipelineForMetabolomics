@@ -14,6 +14,11 @@ Usage:
   main.py summarize <experiment_directory>
   main.py delete <experiment_directory> (empCpd|table) <moniker>
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
+  main.py blank_masking <experiment_directory> <moniker> <new_moniker>
+  main.py TIC_normalize <expeirment_directory> <moniker> <new_moniker>
+  main.py drop_samples2 <experiment_directory> <moniker> <new_moniker> <type>
+  main.py drop_blanks <experiment_directory> <moniker> <new_moniker>
+  main.py batch_correct <experiment_directory> <moniker> <new_moniker>
   main.py help
  '''
 
@@ -118,6 +123,8 @@ def main(args):
         if args['assemble_experiment_from_CSV']:
             ionization_mode = "pos" if args['pos'] else "neg"
             experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
+            #experiment.save()
+            #print(os.path.join(experiment.experiment_directory, "experiment.json"))
         else:
             if not args['<experiment_directory>'].endswith("experiment.json"):
                 experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
@@ -241,26 +248,39 @@ def main(args):
                 else:
                     empCpd = pcpfm.EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, feature_table_moniker=feature_table_moniker)
                 empCpd.save()
+            elif args['blank_masking']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).blank_mask(args['<new_moniker>'])
+            elif args['drop_blanks']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_blanks(args['<new_moniker>'])
+            elif args['drop_samples2']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_samples(args['<new_moniker>'], drop_others=False, keep_types=[], drop_types=[args["<type>"]])
+            elif args['TIC_normalize']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).TIC_normalize(args['<new_moniker>'])
+            elif args['drop_missing_features']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_missing_features(args['<new_moniker>'])
+            elif args['batch_correct']:
+                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).batch_correct(args['<new_moniker>'])
             elif args['preprocess_features']:
                 blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))
                 sample_names = list(experiment.filter_samples(json.loads(args['<sample_filter>'])))
                 feature_table_path = experiment.feature_tables[args['--table']]
-                if args['--drop_samples']:
-                    sample_names = [x for x in sample_names if x not in experiment.drop_results[feature_table_moniker]['sample_names_to_drop']]
+                #if args['--drop_samples']:
+                #    sample_names = [x for x in sample_names if x not in experiment.drop_results[args['--table']]['sample_names_to_drop']]
                 FeatureTable(feature_table_path, experiment).curate(blank_names, 
                                 sample_names, 
                                 float(args['<drop_percentile>']), 
                                 float(args['<blank_intensity_ratio>']), 
                                 float(args['<TIC_inclusion_percentile>']), 
-                                args['--new_table_moniker'] + "_Feature_table.tsv",
-                                log_transform = args['--log_transform'] if args['--log_transform'] else False)
+                                args['--new_table_moniker'] + "_Feature_table.tsv")
+                                #log_transform = args['--log_transform'] if args['--log_transform'] else False)
                 experiment.feature_tables[args['--new_table_moniker']] = os.path.join(experiment.filtered_feature_tables_subdirectory, args['--new_table_moniker'] + "_Feature_table.tsv")
             elif args['delete']:
                 experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
             elif args['retrieve']:
                 print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
-        print(experiment.experiment_directory + "experiment.json")
         experiment.save()
+        print(os.path.join(experiment.experiment_directory, "experiment.json"))
+
 
 def CLI():
     args = docopt(__doc__)
