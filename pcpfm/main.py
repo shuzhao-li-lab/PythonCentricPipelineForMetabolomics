@@ -4,23 +4,21 @@ Usage:
   main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py asari_full_processing <experiment_directory>
-  main.py feature_QCQA <experiment_directory> [--table=<moniker>] [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
-  main.py drop_samples <experiment_directory> [--table=<moniker>] [--Z_score_drop=<auto_drop_config>] [--names_to_drop=<sample_names_list>] [--substring_name_drop=<substrings_to_drop>]
-  main.py preprocess_features <experiment_directory> [--table=<moniker>] [--new_table_moniker=<moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
-  main.py build_empCpds <experiment_directory> [--empCpd_moniker=<moniker>] [--table=<moniker>]
-  main.py MS1_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <annotation_source>...
-  main.py MS2_annotate <experiment_directory> <DDA> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <msp_files>...
-  main.py standards_annotate <experiment_directory> [--empCpd_moniker=<moniker>] [--new_empCpd_moniker=<moniker>] <auth_stds>...
+  main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
+  main.py preprocess_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
+  main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--default_charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
+  main.py MS1_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <annotation_source>...
+  main.py MS2_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] [--DDA=<DDA>] <msp_files>...
+  main.py standards_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <auth_stds>...
   main.py summarize <experiment_directory>
   main.py delete <experiment_directory> (empCpd|table) <moniker>
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
-  main.py blank_masking <experiment_directory> <moniker> <new_moniker>
-  main.py TIC_normalize <expeirment_directory> <moniker> <new_moniker>
-  main.py drop_samples2 <experiment_directory> <moniker> <new_moniker> <type>
-  main.py drop_blanks <experiment_directory> <moniker> <new_moniker>
-  main.py batch_correct <experiment_directory> <moniker> <new_moniker>
-  main.py drop_missing_features <experiment_directory> <moniker> <new_moniker>
-  main.py interpolate_missing_features <experiment_directory> <moniker> <new_moniker>
+  main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>]
+  main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
+  main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <type>...
+  main.py batch_correct <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>]
+  main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
+  main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>]
   main.py help
  '''
 
@@ -119,170 +117,175 @@ def main(args):
     Args:
         args (dict): the args generated from doctopt
     """    
+    if args['<experiment_directory>'] and not args['assemble_experiment_from_CSV']:
+        if args['<experiment_directory>'].endswith("experiment.json"):
+            experiment = Experiment.load(os.path.join(args['<experiment_directory>']))
+        else:
+            experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
+    if args["<empCpd_moniker>"]:
+        empCpd_moniker = args["<empCpd_moniker>"]
+        if not args['build_empCpds']:
+            empCpds = experiment.retrieve(args["<empCpd_moniker>"], empCpds=True, as_object=True)
+            if args['--new_empCpd_moniker']:
+                new_empCpd_moniker = args['--new_empCpd_moniker']
+            else:
+                new_empCpd_moniker = args["<empCpd_moniker>"]
+    if args["<table_moniker>"]:
+        feature_table_moniker = args["<table_moniker>"]
+        feature_table = experiment.retrieve(args["<table_moniker>"], feature_table=True, as_object=True)
+        if args['--new_table_moniker']:
+            new_table_moniker = args['--new_table_moniker']
+        else:
+            new_table_moniker = args["<table_moniker>"]
+    elif args["--table_moniker"]:
+        feature_table_moniker = args["--table_moniker"]
+    else:
+        feature_table_moniker = 'full'
+
     if args["help"]:
         print(__doc__)
-    else:
-        if args['assemble_experiment_from_CSV']:
-            ionization_mode = "pos" if args['pos'] else "neg"
-            experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
-            #experiment.save()
-            #print(os.path.join(experiment.experiment_directory, "experiment.json"))
+    if args['assemble_experiment_from_CSV']:
+        ionization_mode = "pos" if args['pos'] else "neg"
+        experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
+    if args['MS1_annotate']:
+        empCpds.MS1_annotate(args['<annotation_source>'])
+        empCpds.save(new_empCpd_moniker)
+    elif args['standards_annotate']:
+        empCpds.auth_std_annotate(args['<auth_stds>'])
+        empCpds.save(new_empCpd_moniker)
+    elif args['MS2_annotate']:
+        if args['--DDA']:
+            DDA_paths = [args['--DDA']]
         else:
-            if not args['<experiment_directory>'].endswith("experiment.json"):
-                experiment = Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
-            else:
-                experiment = Experiment.load(args['<experiment_directory>'])
-            if args['--empCpd_moniker'] and not args['build_empCpds']:
-                empCpds = pcpfm.EmpCpds.empCpds.load(experiment, args['--empCpd_moniker'])
-                if args['MS1_annotate']:
-                    empCpds.MS1_annotate(args['<annotation_source>'])
-                elif args['standards_annotate']:
-                    empCpds.auth_std_annotate(args['<auth_stds>'])
-                elif args['MS2_annotate']:
-                    empCpds.MS2_annotate(args['<DDA>'], args['<msp_files>'])
-                empCpds.save(args['--new_empCpd_moniker'])
-            elif args['convert_to_mzML']:
-                experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'])
-            elif args['asari_full_processing']:
-                os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
-                experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
-                experiment.feature_tables['preferred'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
-                experiment.empCpds['asari'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
-            elif args['spectral_QCQA']:
-                import matplotlib.pyplot as plt
-                spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
-                if args['--multi']:
-                    job_descs = [(
-                        acquisition, 
-                        spikeins, 
-                        float(args["<mz_search_tolerance_ppm>"]), 
-                        float(args["<rt_search_tolerance>"]), 
-                        int(args["<null_cutoff_percentile>"]), 
-                        int(args["<min_intensity>"]), 
-                        True, 
-                        os.path.join(experiment.experiment_directory, "reports")) for acquisition in experiment.acquisitions if "dda" not in acquisition.lower()]
-                    pool = mp.Pool(mp.cpu_count())
-                    standards_search_results = pool.map(job_standards_search, job_descs)
-                else:
-                    standards_search_results = []
-                    for acquisition in experiment.acquisitions:
-                        standards_search_result = acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
-                        standards_search_results.append(standards_search_result)
-                print(standards_search_results)
-                sample_names = [a.name for a in experiment.acquisitions]
-                for spikein in spikeins:
-                    spikein_name = spikein['Name']
-                    Y = []
-                    colors = []
-                    for result in standards_search_results:
-                        for result_for_standard in result["standards"]:
-                            if result_for_standard['name'] == spikein_name:
-                                Y.append(result_for_standard['matching_peaks'])
-                                if result_for_standard['detected']:
-                                    colors.append('green')
-                                else:
-                                    colors.append('red')
-                    plt.title(spikein_name)
-                    plt.scatter(list(range(len(Y))), Y, c=colors)
-                    for x,y,name in zip(range(len(Y)), Y, sample_names):
-                        plt.text(x,y,name, rotation='vertical')
-                    plt.show()
-            elif args['feature_QCQA']:
-                feature_table = FeatureTable(experiment.feature_tables[args['--table']], experiment)
-                experiment.QCQA_results[feature_table_moniker] = feature_table.qcqa(
-                                            tag=args['--tag'] if args['--tag'] is not None else None, 
-                                            sort=json.loads(args['--sort']) if args['--sort'] is not None else None, 
-                                            interactive=args["--interactive"], 
-                                            pca=args["--pca"] or args["--all"], 
-                                            tsne=args['--tsne'] or args["--all"], 
-                                            pearson=args['--pearson'] or args["--all"], 
-                                            spearman=args['--spearman'] or args["--all"], 
-                                            kendall=args['--kendall'] or args["--all"], 
-                                            missing_feature_percentiles=args['--missing_feature_percentiles'] or args["--all"],
-                                            missing_feature_distribution=args['--missing_feature_distribution'] or args["--all"],
-                                            median_correlation_outlier_detection=args['--median_correlation_outlier_detection'] or args["--all"],
-                                            missing_feature_outlier_detection=args['--missing_feature_outlier_detection'] or args["--all"],
-                                            intensity_analysis=args['--intensity_analysis'] or args["--all"],
-                                            feature_distribution=args['--feature_distribution'] or args["--all"],
-                                            feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"])
-            elif args['drop_samples']:
-                experiment.drop_results = {}
-                auto_drop_config = json.loads(args['--Z_score_drop']) if args['--Z_score_drop'] else None
-                feature_table_moniker = args['--table']
-                config = {}
-                to_drop = set()
-                if auto_drop_config:
-                    config.update(auto_drop_config)
-                    for key, cutoff in auto_drop_config.items():
-                        key_found = False
-                        for qcqa_result in experiment.QCQA_results[feature_table_moniker]:
-                            if qcqa_result['Type'] == key:
-                                key_found = True
-                                for sample_name, Z_score in qcqa_result['Result'].items():
-                                    if abs(float(Z_score)) > cutoff:
-                                        to_drop.add(sample_name) 
-                        if not key_found:
-                            raise Exception()
-                if args['--names_to_drop']:
-                    sample_names = json.loads(args['--names_to_drop'])
-                    config["manual_name_drop"] = list(sample_names)
-                    for sample_name in sample_names:
-                        if sample_name not in {acquisition.name for acquisition in experiment.acquisitions}:
-                            raise Exception()
-                        to_drop.add(sample_name)
-                if args['--substring_name_drop']:
-                    substrings = json.loads(args['--substring_name_drop'])
-                    config["manual_substring_drop"] = list(substrings)
-                    for substring in substrings:
-                        for sample_name in {acquisition.name for acquisition in experiment.acquisitions}:
-                            if substring in sample_name.lower():
-                                to_drop.add(sample_name)
-                experiment.drop_results[feature_table_moniker] = {
-                    "sample_names_to_drop": list(to_drop),
-                    "config": config
-                }
-            elif args['summarize']:
-                experiment.summarize()
-            elif args['build_empCpds']:
-                feature_table_moniker = args['--table'] if args['--table'] else 'full'
-                if args['--empCpd_moniker']:
-                    empCpd = pcpfm.EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, empCpd_moniker=args['--empCpd_moniker'], feature_table_moniker=feature_table_moniker)
-                else:
-                    empCpd = pcpfm.EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, feature_table_moniker=feature_table_moniker)
-                empCpd.save()
-            elif args['blank_masking']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).blank_mask(args['<new_moniker>'])
-            elif args['drop_blanks']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_blanks(args['<new_moniker>'])
-            elif args['drop_samples2']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_samples(args['<new_moniker>'], drop_others=False, keep_types=[], drop_types=[args["<type>"]])
-            elif args['TIC_normalize']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).TIC_normalize(args['<new_moniker>'])
-            elif args['drop_missing_features']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).drop_missing_features(args['<new_moniker>'])
-            elif args['batch_correct']:
-                experiment.retrieve(args['<moniker>'], feature_table=True, as_object=True).batch_correct(args['<new_moniker>'])
-            elif args['preprocess_features']:
-                blank_names = list(experiment.filter_samples(json.loads(args['<blank_filter>'])))
-                sample_names = list(experiment.filter_samples(json.loads(args['<sample_filter>'])))
-                feature_table_path = experiment.feature_tables[args['--table']]
-                #if args['--drop_samples']:
-                #    sample_names = [x for x in sample_names if x not in experiment.drop_results[args['--table']]['sample_names_to_drop']]
-                FeatureTable(feature_table_path, experiment).curate(blank_names, 
-                                sample_names, 
-                                float(args['<drop_percentile>']), 
-                                float(args['<blank_intensity_ratio>']), 
-                                float(args['<TIC_inclusion_percentile>']), 
-                                args['--new_table_moniker'] + "_Feature_table.tsv")
-                                #log_transform = args['--log_transform'] if args['--log_transform'] else False)
-                experiment.feature_tables[args['--new_table_moniker']] = os.path.join(experiment.filtered_feature_tables_subdirectory, args['--new_table_moniker'] + "_Feature_table.tsv")
-            elif args['delete']:
-                experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
-            elif args['retrieve']:
-                print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
-        experiment.save()
-        print(os.path.join(experiment.experiment_directory, "experiment.json"))
+            DDA_paths = [x.mzml_filepath for x in experiment.filter_samples({"Sample Type": {'includes': ['dda']}}, return_field=None)]
+        for DDA_path in DDA_paths:
+            empCpds.MS2_annotate(DDA_path, args['<msp_files>'])
+        empCpds.save(new_empCpd_moniker)
+    elif args['convert_to_mzML']:
+        experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'])
+    elif args['asari_full_processing']:
+        os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
+        experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
+        experiment.feature_tables['preferred'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
+        experiment.empCpds['asari'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
+    elif args['spectral_QCQA']:
+        import matplotlib.pyplot as plt
+        spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
+        if args['--multi']:
+            job_descs = [(
+                acquisition, 
+                spikeins, 
+                float(args["<mz_search_tolerance_ppm>"]), 
+                float(args["<rt_search_tolerance>"]), 
+                int(args["<null_cutoff_percentile>"]), 
+                int(args["<min_intensity>"]), 
+                True, 
+                os.path.join(experiment.experiment_directory, "reports")) for acquisition in experiment.acquisitions if "dda" not in acquisition.lower()]
+            pool = mp.Pool(mp.cpu_count())
+            standards_search_results = pool.map(job_standards_search, job_descs)
+        else:
+            standards_search_results = []
+            for acquisition in experiment.acquisitions:
+                standards_search_result = acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
+                standards_search_results.append(standards_search_result)
+        print(standards_search_results)
+        sample_names = [a.name for a in experiment.acquisitions]
+        for spikein in spikeins:
+            spikein_name = spikein['Name']
+            Y = []
+            colors = []
+            for result in standards_search_results:
+                for result_for_standard in result["standards"]:
+                    if result_for_standard['name'] == spikein_name:
+                        Y.append(result_for_standard['matching_peaks'])
+                        if result_for_standard['detected']:
+                            colors.append('green')
+                        else:
+                            colors.append('red')
+            plt.title(spikein_name)
+            plt.scatter(list(range(len(Y))), Y, c=colors)
+            for x,y,name in zip(range(len(Y)), Y, sample_names):
+                plt.text(x,y,name, rotation='vertical')
+            plt.show()
+    elif args['feature_QCQA']:
+        experiment.QCQA_results[feature_table_moniker] = feature_table.qcqa(
+                                    tag=args['--tag'] if args['--tag'] is not None else None, 
+                                    sort=json.loads(args['--sort']) if args['--sort'] is not None else None, 
+                                    interactive=args["--interactive"], 
+                                    pca=args["--pca"] or args["--all"], 
+                                    tsne=args['--tsne'] or args["--all"], 
+                                    pearson=args['--pearson'] or args["--all"], 
+                                    spearman=args['--spearman'] or args["--all"], 
+                                    kendall=args['--kendall'], # or args["--all"], 
+                                    missing_feature_percentiles=args['--missing_feature_percentiles'] or args["--all"],
+                                    missing_feature_distribution=args['--missing_feature_distribution'] or args["--all"],
+                                    median_correlation_outlier_detection=args['--median_correlation_outlier_detection'] or args["--all"],
+                                    missing_feature_outlier_detection=args['--missing_feature_outlier_detection'] or args["--all"],
+                                    intensity_analysis=args['--intensity_analysis'] or args["--all"],
+                                    feature_distribution=args['--feature_distribution'] or args["--all"],
+                                    feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"])
+    elif args['summarize']:
+        experiment.summarize()
+    elif args['build_empCpds']:
+        if args['--isotopes']:
+            isotopes = json.load(open(args['--isotopes']))
+        else:
+            isotopes = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_isotopes.json")))
 
+        if args['--adducts']:
+            adducts = json.load(open(args['--adducts']))
+        elif experiment.ionization_mode == "pos":
+            adducts = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_adducts_pos.json")))
+        elif experiment.ionization_mode == "neg":
+            adducts = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_adducts_neg.json")))
+
+        if args['--extended_adducts']:
+            extended_adducts = json.load(open(args['--extended_adducts']))
+        else:
+            extended_adducts = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_extended_adducts.json")))
+
+        if args['--default_charges']:
+            charges = json.load(open(args['--default_charges']))
+        else:
+            charges = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_charges.json")))
+
+
+        rt_tolerance = float(args['--rt_tolerance']) if args['--rt_tolerance'] else 2
+        mz_tolerance = float(args['--mz_tolerance']) if args['--mz_tolerance'] else 5
+        add_singletons = not args['--skip_singletons']
+        
+        pcpfm.EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment, 
+                                                                   isotopes,
+                                                                   adducts,
+                                                                   extended_adducts,
+                                                                   empCpd_moniker=empCpd_moniker, 
+                                                                   feature_table_moniker=feature_table_moniker,
+                                                                   add_singletons=add_singletons,
+                                                                   rt_search_window=rt_tolerance,
+                                                                   mz_tolerance=mz_tolerance,
+                                                                   charges=charges)
+    elif args['blank_masking']:
+        blank_intensity_ratio = 3 if not args['--blank_intensity_ratio'] else float(args['--blank_intensity_ratio'])
+        feature_table.blank_mask(new_table_moniker, blank_intensity_ratio=blank_intensity_ratio)
+    elif args['drop_samples']:
+        feature_table.drop_samples(new_table_moniker, drop_others=False, keep_types=[], drop_types=args["<type>"])
+    elif args['TIC_normalize']:
+        TIC_normalization_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
+        feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile)
+    elif args['drop_missing_features']:
+        drop_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
+        feature_table.drop_missing_features(new_table_moniker, drop_percentile=drop_percentile)
+    elif args['interpolate_missing_features']:
+        ratio = float(args['--ratio']) if args['--ratio'] else 0.5
+        feature_table.interpolate_missing_features(new_table_moniker, ratio=ratio)
+    elif args['batch_correct']:
+        feature_table.batch_correct(new_table_moniker)
+    elif args['delete']:
+        experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
+    elif args['retrieve']:
+        print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
+    experiment.save()
+    print(os.path.join(experiment.experiment_directory, "experiment.json"))
 
 def CLI():
     args = docopt(__doc__)

@@ -156,7 +156,7 @@ class Experiment:
         elif empCpds:
             empCpd_path = self.empCpds[moniker]
             if as_object:
-                return EmpCpds.empCpds.load(empCpd_path, self)
+                return EmpCpds.empCpds.load(moniker, self)
             else:
                 return empCpd_path
 
@@ -271,7 +271,6 @@ class Experiment:
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
 
-    @property
     def batches(self, field="name", debug=False, skip_batch=False):
         batches = {}
         for acquisition in self.acquisitions:
