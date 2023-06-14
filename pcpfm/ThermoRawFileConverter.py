@@ -28,7 +28,7 @@ class ThermoRawFileConverter():
         """        
         try:
             output_filepath = os.path.join(output_directory, os.path.basename(raw_acquisition.raw_filepath)).replace(".raw", ".mzML")
-            subprocess.run([self.mono_path, self.exe_path, '-f=1', '-i', raw_acquisition.raw_filepath, '-b', output_filepath])
+            subprocess.run([self.mono_path, self.exe_path, '-f=1', '-i', raw_acquisition.raw_filepath, '-b', output_filepath, ' >/dev/null'])
         except:
             pass
 

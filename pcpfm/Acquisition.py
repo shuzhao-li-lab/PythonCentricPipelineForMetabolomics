@@ -17,7 +17,7 @@ class Acqusition(object):
         self.name = name
         self.metadata_tags = metadata_dict
         self.source_filepath = source_filepath
-        
+
         self.raw_filepath = None
         self.mzml_filepath = None
         self.spectra = {}
@@ -135,10 +135,10 @@ class Acqusition(object):
             values_to_filter = self.metadata_tags[key].lower()
             if "includes" in rules:
                 for must_include in rules["includes"]:
-                    passed_filter = passed_filter and must_include in values_to_filter
+                    passed_filter = passed_filter and must_include.lower() in values_to_filter
             if "lacks" in rules:
                 for not_include in rules["lacks"]:
-                    passed_filter = passed_filter and not_include not in values_to_filter
+                    passed_filter = passed_filter and not_include.lower() not in values_to_filter
         return passed_filter
             
     def __extract_mzml(self, ms_level=None):
@@ -332,25 +332,3 @@ class Acqusition(object):
                 report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(standard["matching_peaks"]) + " - Detected: " + str(standard["detected"])  + "\n")
             report_fh.close()
         return search_results
-
-    @staticmethod
-    def construct_acquisition_from_sequence_and_metadata_dict(sequence_dict, metadata_dict):
-        """
-        This constructs the acquisition from a sequence dict and metadata dicts. These come from the 
-        sequence and metadata file respectively. 
-
-        I believe this is no longer used and can be deprecated. 
-
-        Args:
-            sequence_dict (dict): all fields for the acquisition in the sequence file
-            metadata_dict (dict): all fields for the acquisition in the metadata file
-
-        Returns:
-            Acquisition: the Acquisition object for this MS acquistiion
-        """        
-        acquisition_source_filepath = sequence_dict["Filepath"]
-        if validate_path(acquisition_source_filepath, fatal=True):
-            acquisition_source_filepath = retrieve_abs_path(acquisition_source_filepath)
-        acquisition_name = sequence_dict["Name"]
-        return Acqusition(acquisition_name, acquisition_source_filepath, metadata_dict)
-

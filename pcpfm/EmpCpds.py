@@ -32,14 +32,15 @@ class empCpds:
 
         Args:
             save_as_moniker (str, optional): an alternative moniker to which to save the table. Defaults to None. 
-        """        
+        """
+        print(save_as_moniker)
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
             json.dump(self.dict_empCpds, out_fh, indent=4)
 
     @staticmethod
-    def load(experiment, moniker):
+    def load(moniker, experiment):
         """
         This method generates the empCpd object for the provided moniker.
 
@@ -53,7 +54,7 @@ class empCpds:
         return empCpds(json.load(open(experiment.empCpds[moniker])), experiment, moniker)
 
     @staticmethod
-    def construct_empCpds_from_feature_table(experiment, feature_table_moniker='full', empCpd_moniker='default', add_singletons=True):
+    def construct_empCpds_from_feature_table(experiment, isotopes=isotope_search_patterns, adducts=None, extended_adducts=extended_adducts, feature_table_moniker='full', empCpd_moniker='default', add_singletons=True, rt_search_window=2, mz_tolerance=5, charges=[1,2,3]):
         """_summary_
 
         Args:
@@ -64,17 +65,23 @@ class empCpds:
 
         Returns:
             _type_: _description_
-        """        
+        """
+        if experiment.ionization_mode == 'pos' and adducts is None:
+            adducts = adduct_search_patterns
+        elif experiment.ionization_mode == 'neg' and adducts is None:
+            adducts = adduct_search_patterns_neg
         peaklist = read_table_to_peaks(experiment.feature_tables[feature_table_moniker], has_header=True, mz_col=1, rtime_col=2, feature_id=0)
         for p in peaklist:
             p['id'] = p['id_number']
             p['representative_intensity'] = None
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empCpds = ECCON.peaks_to_epdDict(
-            [(1.003355, '13C/12C', (0, 0.8)), (1.003355*2, '13C/12C*2', (0, 0.8)), (1.003355*3, '13C/12C*3', (0, 0.8))],
+            isotopes,
             adduct_search_patterns,
             extended_adducts,
-            5,
+            mz_tolerance_ppm=mz_tolerance,
+            rt_tolerance=rt_search_window,
+            charges=charges
         )
         all_feature_ids = set()
         for empCpd in dict_empCpds.values():
@@ -85,8 +92,10 @@ class empCpds:
                 if peak['id_number'] not in all_feature_ids:
                     peak['ion_relation'] = None
                     dict_empCpds[len(dict_empCpds)] = {'interim_id': len(dict_empCpds), 'neutral_formula_mass': '', 'neutral_formula': '', 'MS1_pseudo_Spectra': [peak]}
-        return empCpds(dict_empCpds, experiment, empCpd_moniker)
-    
+        empCpd = empCpds(dict_empCpds, experiment, empCpd_moniker)
+        empCpd.save()
+        return empCpd
+
     def MS1_annotate(self, annotation_sources, rt_tolerance=5):
         """
         Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula 
