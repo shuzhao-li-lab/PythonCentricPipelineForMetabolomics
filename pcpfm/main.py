@@ -6,7 +6,7 @@ Usage:
   main.py asari_full_processing <experiment_directory>
   main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py preprocess_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
-  main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--default_charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
+  main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
   main.py MS1_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <annotation_source>...
   main.py MS2_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] [--DDA=<DDA>] <msp_files>...
   main.py standards_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <auth_stds>...
@@ -144,6 +144,7 @@ def main(args):
 
     if args["help"]:
         print(__doc__)
+        exit()
     if args['assemble_experiment_from_CSV']:
         ionization_mode = "pos" if args['pos'] else "neg"
         experiment = Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
@@ -244,8 +245,8 @@ def main(args):
         else:
             extended_adducts = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_extended_adducts.json")))
 
-        if args['--default_charges']:
-            charges = json.load(open(args['--default_charges']))
+        if args['--charges']:
+            charges = json.load(open(args['--charges']))
         else:
             charges = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_charges.json")))
 

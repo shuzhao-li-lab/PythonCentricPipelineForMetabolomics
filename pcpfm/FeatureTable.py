@@ -488,6 +488,9 @@ class FeatureTable:
         def __all_logical(row, columns):
             return np.all(row[columns] == True)
         
+        def __non_zero_mean(row, columns):
+            return np.mean([x for x in row[columns] if x > 0])
+        
         blank_names = self.experiment.filter_samples({type_field: {"includes": [blank_type]}})
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names + blank_names]).T, columns=sample_names + blank_names)
@@ -495,7 +498,9 @@ class FeatureTable:
         for batch_name, batch_name_list in self.experiment.batches(skip_batch=by_batch).items():
             batch_blanks = [x for x in batch_name_list if x in blank_names]
             batch_samples = [x for x in batch_name_list if x in sample_names]
-            to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(np.mean(table[batch_blanks], axis=1), np.mean(table[batch_samples], axis=1))]
+            blank_means = table.apply(__non_zero_mean, axis=1, args=(batch_blanks,))
+            sample_means = table.apply(__non_zero_mean, axis=1, args=(batch_samples,))
+            to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(blank_means, sample_means)]
             mask_column_name = "masked" + batch_name
             blank_mask_columns.append(mask_column_name)
             table[mask_column_name] = to_filter
