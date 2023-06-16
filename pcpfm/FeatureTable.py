@@ -10,8 +10,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-
-
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment):
         """
@@ -489,10 +487,14 @@ class FeatureTable:
             return np.all(row[columns] == True)
         
         def __non_zero_mean(row, columns):
-            return np.mean([x for x in row[columns] if x > 0])
+            non_zero_columns = [x for x in row[columns] if x > 0]
+            if non_zero_columns:
+                return np.mean(non_zero_columns)
+            else:
+                0
         
-        blank_names = self.experiment.filter_samples({type_field: {"includes": [blank_type]}})
-        sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
+        blank_names = [x for x in self.experiment.filter_samples({type_field: {"includes": [blank_type]}}) if x in self.feature_matrix_header]
+        sample_names = [x for x in self.experiment.filter_samples({type_field: {"includes": [sample_type]}}) if x in self.feature_matrix_header]
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names + blank_names]).T, columns=sample_names + blank_names)
         blank_mask_columns = []
         for batch_name, batch_name_list in self.experiment.batches(skip_batch=by_batch).items():
@@ -517,6 +519,7 @@ class FeatureTable:
             if header_field not in blank_names + sample_names:
                 table[header_field] = self.select_feature_column(header_field)
         table = table[table["mask_feature"] == False]
+        table.drop(columns="mask_feature", inplace=True)
         self.save(table, new_moniker)
 
     def interpolate_missing_features(self, new_moniker, ratio=0.5, by_batch=True):
@@ -534,13 +537,12 @@ class FeatureTable:
             for sample_name in filtered_batch_name_list:
                 table[sample_name] = table[[sample_name, "feature_interpolate_value"]].max(axis=1)
             table.drop(columns="feature_interpolate_value", inplace=True)
-        for header in self.feature_matrix_header:
-            if header not in sample_names:
-                table[header] = self.select_feature_column(header)
-        print("HERE")
+        for header_field in self.feature_matrix_header:
+            if header_field not in sample_names and header_field:
+                table[header_field] = self.select_feature_column(header_field)
         self.save(table, new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive=True):
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive=False):
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         for _, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
@@ -572,10 +574,9 @@ class FeatureTable:
                 plt.bar(list(corr_selected_TICs.keys()), list(corr_selected_TICs.values()))
                 plt.show()
 
-        for header in self.feature_matrix_header:
-            print(header)
-            if header not in sample_names:
-                table[header] = self.select_feature_column(header)
+        for header_field in self.feature_matrix_header:
+            if header_field not in sample_names and header_field:
+                table[header_field] = self.select_feature_column(header_field)
         self.save(table, new_moniker)
 
     def batch_correct(self, new_moniker):
@@ -592,12 +593,26 @@ class FeatureTable:
                 batch_corrected[header_field] = self.select_feature_column(header_field)
         self.save(batch_corrected, new_moniker)
 
+    def log_transform(self, new_moniker, log_mode="log10"):
+        log_types = {
+            "log10": np.log10,
+            "log2": np.log2
+        }
+
+        sample_names = [x.name for x in self.experiment.acquisitions if x.name in self.feature_matrix_header]
+        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
+        table = log_types[log_mode](table + 1)
+        for header_field in self.feature_matrix_header:
+            if header_field not in table.columns and header_field:
+                table[header_field] = self.select_feature_column(header_field) 
+        self.save(table, new_moniker)
+
     def drop_missing_features(self, new_moniker, by_batch=True, drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
         def __any(row, columns, drop_percentile):
-            return not np.any(row[columns] > drop_percentile)
+            return not np.any(row[columns] >= drop_percentile)
 
         def __all(row, columns, drop_percentile):
-            return not np.all(row[columns] > drop_percentile)
+            return not np.all(row[columns] >= drop_percentile)
 
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)

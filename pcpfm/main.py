@@ -3,7 +3,7 @@ Usage:
   main.py assemble_experiment_from_CSV <experiment_directory> <sequence_csv> (pos|neg) [--filter=<filter>]
   main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
-  main.py asari_full_processing <experiment_directory>
+  main.py asari_full_processing <experiment_directory> [--extra_args=<extra_args>]
   main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
   main.py preprocess_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
   main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
@@ -13,12 +13,13 @@ Usage:
   main.py summarize <experiment_directory>
   main.py delete <experiment_directory> (empCpd|table) <moniker>
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
-  main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>]
+  main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>] [--blank_type=<type>] [--sample_type=<type>]
   main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
   main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <type>...
   main.py batch_correct <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>]
   main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
   main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>]
+  main.py log_transform <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--log_mode=<log_mode>]
   main.py help
  '''
 
@@ -165,7 +166,10 @@ def main(args):
     elif args['convert_to_mzML']:
         experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'])
     elif args['asari_full_processing']:
-        os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory)
+        extra_args = ''
+        if args['--extra_args'] is not None:
+            extra_args = " " + args['--extra_args']
+        os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory + extra_args)
         experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
         experiment.feature_tables['preferred'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
         experiment.empCpds['asari'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
@@ -267,7 +271,9 @@ def main(args):
                                                                    charges=charges)
     elif args['blank_masking']:
         blank_intensity_ratio = 3 if not args['--blank_intensity_ratio'] else float(args['--blank_intensity_ratio'])
-        feature_table.blank_mask(new_table_moniker, blank_intensity_ratio=blank_intensity_ratio)
+        blank_type = "Blank" if not args['--blank_type'] else args['--blank_type']
+        sample_type = "Unknown" if not args['--sample_type'] else args['--sample_type']
+        feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio)
     elif args['drop_samples']:
         feature_table.drop_samples(new_table_moniker, drop_others=False, keep_types=[], drop_types=args["<type>"])
     elif args['TIC_normalize']:
@@ -283,6 +289,9 @@ def main(args):
         feature_table.batch_correct(new_table_moniker)
     elif args['delete']:
         experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
+    elif args['log_transform']:
+        log_mode = "log2" if not args['--log_mode'] else args['--log_mode']
+        feature_table.log_transform(new_table_moniker, log_mode)
     elif args['retrieve']:
         print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
     experiment.save()
