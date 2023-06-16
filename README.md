@@ -1,5 +1,13 @@
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
+NOTE - documentation below is out of date and will be updated in the next week or so 06/16
+
+to-implement:
+  - new nextflow wrappers
+  - sample name drop feature
+  - direct annotation of feature tables
+
+
 ## Overview
 
 The PythonCentricPipelineForMetabolomics (PCPMF) is an all-in-one pipeline for processing LC-MS based metabolomics datasets. Currently supported is limited to datasets collected on Thermo instruments; however, this will be expanded in the future. 
