@@ -6,6 +6,8 @@ to-implement:
   - new nextflow wrappers
   - sample name drop feature
   - direct annotation of feature tables
+  - auto drop samples based on QC metrics
+  - auto drop features based on QC metrics
 
 
 ## Overview
