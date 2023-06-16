@@ -252,6 +252,10 @@ class Experiment:
         with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
             for acquisition_info in csv.DictReader(CSV_fh):
                 #print(acquisition_info)
+                if path_field not in acquisition_info:
+                    path_field = "Path"
+                if name_field not in acquisition_info:
+                    name_field = "File Name"
                 if name_field not in acquisition_info or path_field not in acquisition_info:
                     raise Exception()
                 acquisition = Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
