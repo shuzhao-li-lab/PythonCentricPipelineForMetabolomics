@@ -463,12 +463,17 @@ class FeatureTable:
         }
         return result
 
-    def drop_samples(self, new_moniker, drop_others=True, keep_types=[], drop_types=[], type_field="Sample Type"):
+    def drop_samples(self, new_moniker, drop_others=True, keep_types=[], drop_types=[], type_field="Sample Type", drop_name=None):
         retain, drop = [], []
-        for keep_type in keep_types:
-            retain += list(self.experiment.filter_samples({type_field: {"includes": [keep_type]}}))
-        for drop_type in drop_types:
-            drop += list(self.experiment.filter_samples({type_field: {"includes": [drop_type]}}))
+        if not drop_name:
+            for keep_type in keep_types:
+                retain += list(self.experiment.filter_samples({type_field: {"includes": [keep_type]}}))
+            for drop_type in drop_types:
+                drop += list(self.experiment.filter_samples({type_field: {"includes": [drop_type]}}))
+        elif drop_name:
+            drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
+        else:
+            pass
         for name in {a.name for a in self.experiment.acquisitions}:
             if name not in drop and name not in retain:
                 if drop_others:
@@ -506,6 +511,7 @@ class FeatureTable:
             mask_column_name = "masked" + batch_name
             blank_mask_columns.append(mask_column_name)
             table[mask_column_name] = to_filter
+        print(np.sum(to_filter))
 
         if logic_mode == "and":
             table["mask_feature"] = table.apply(__all_logical, axis=1, args=(blank_mask_columns,))

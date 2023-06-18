@@ -15,7 +15,7 @@ Usage:
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
   main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>] [--blank_type=<type>] [--sample_type=<type>]
   main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
-  main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <type>...
+  main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>]
   main.py batch_correct <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>]
   main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
   main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>]
@@ -275,7 +275,13 @@ def main(args):
         sample_type = "Unknown" if not args['--sample_type'] else args['--sample_type']
         feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio)
     elif args['drop_samples']:
-        feature_table.drop_samples(new_table_moniker, drop_others=False, keep_types=[], drop_types=args["<type>"])
+        drop_field_values = args['--field_value'] if args['--field_value'] else None 
+        drop_field_type = args['--field_type'] if args['--field_type'] else "Sample Type"
+        drop_name = args['--name'] if args['--name'] else None
+        if drop_field_values:
+            feature_table.drop_samples(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
+        elif drop_name:
+            feature_table.drop_samples(new_table_moniker, drop_name=drop_name)
     elif args['TIC_normalize']:
         TIC_normalization_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
         feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile)
