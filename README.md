@@ -1,6 +1,6 @@
 # Disclaimer
 
-Thanks for your interest in the PCPFM! If you talked to me at the Metabolomics2023 conference thanks for giving this project a try. 
+Thanks for your interest in the PCPFM! If you talked to me at the Metabolomics2023 conference thanks for giving this project a try. This project is still an alpha. While I'm not aware of any issues that could cause data quality issues, use at your at your own risk!
 
 I just did a major refactor and the Nextflow implementation is out of date along with some of the documentation. I will be working on fixing these things by the end of June. If there is a feature or change you think would make a good addition, feel free to contact me and/or open an issue on the repo. 
 
