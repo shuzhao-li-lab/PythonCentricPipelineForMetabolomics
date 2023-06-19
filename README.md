@@ -1,13 +1,19 @@
+# Disclaimer
+
+Thanks for your interest in the PCPFM! If you talked to me at the Metabolomics2023 conference thanks for giving this project a try. 
+
+I just did a major refactor and the Nextflow implementation is out of date along with some of the documentation. I will be working on fixing these things by the end of June. If there is a feature or change you think would make a good addition, feel free to contact me and/or open an issue on the repo. 
+
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 NOTE - documentation below is out of date and will be updated in the next week or so 06/16
 
 to-implement:
   - new nextflow wrappers
-  - sample name drop feature
   - direct annotation of feature tables
   - auto drop samples based on QC metrics
   - auto drop features based on QC metrics
+  - mzML experiment construction
 
 
 ## Overview
