@@ -278,10 +278,13 @@ def main(args):
         drop_field_values = args['--field_value'] if args['--field_value'] else None 
         drop_field_type = args['--field_type'] if args['--field_type'] else "Sample Type"
         drop_name = args['--name'] if args['--name'] else None
+        auto_drop_config = json.load(open(args['--auto_drop'])) if args['--auto_drop'] else None
         if drop_field_values:
             feature_table.drop_samples(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
         elif drop_name:
             feature_table.drop_samples(new_table_moniker, drop_name=drop_name)
+        elif auto_drop_config:
+            feature_table.drop_samples(new_table_moniker, auto_drop=auto_drop_config)
     elif args['TIC_normalize']:
         TIC_normalization_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
         feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile)
