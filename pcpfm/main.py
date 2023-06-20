@@ -28,11 +28,9 @@ import json
 import multiprocessing as mp
 import csv
 import itertools
-import sys
 from docopt import docopt
 
 from pcpfm.Experiment import Experiment
-from pcpfm.FeatureTable import FeatureTable
 import pcpfm.EmpCpds
 
 def adductify_standards(standards_csv, adducts_csv):
