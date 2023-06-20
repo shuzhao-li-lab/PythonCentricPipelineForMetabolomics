@@ -13,18 +13,30 @@ to-implement:
   - direct annotation of feature tables
   - auto drop samples based on QC metrics
   - auto drop features based on QC metrics
-  - mzML experiment construction
-
 
 ## Overview
 
-The PythonCentricPipelineForMetabolomics (PCPMF) is an all-in-one pipeline for processing LC-MS based metabolomics datasets. Currently supported is limited to datasets collected on Thermo instruments; however, this will be expanded in the future. 
+The PythonCentricPipelineForMetabolomics (PCPFM) - better name pending - aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our feature detection software Asari. 
 
-The pipeline includes ingesting and converting .raw files to their .mzML representations with the ThermoRawFileParser, feature extraction and pre-annotation with Asari and Khipu respectively, optional manual and/or automated QA/QC, feature normalization, blank masking and (soon) batch correction. 
+### Inputs
 
-The input to the pipeline is a .csv file that minimally has 'Name' and 'Filepath' field storing each Acquisition's name and raw filepath respectively. This csv file is intended to be the sequence file used during acquisition on the LC-MS. An Experiment object, which encaptulates all acquisitions from an experiment (should be the same ionization, chromatography, and mass spectrometry method), is used to move data and intermediates between steps. All information is stored in a user-defined experiment directory 
+PCPFM requires a csv file as an input that minimally has fields "Name" and "Filepath" where "Name" is the arbitrary user-defined name for a sample and the Filepath is the path, absolute or relative to your working directory, to a ".raw" or ".mzML" file representing an acquisition. 
+
+Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
+
+### Outputs
+
+The output from PCPFM is intended to be immediately usable by existing tools such as MetaboAnalyst. This includes feature tables that are optionally blank masked, normalized, batch corrected, annotated or otherwise curated by PCPFM and empirical compounds as a JSON file representing putative metabolites that can be annotated with MS1, MS2, or authentic standards. 
 
 ## Installation
+
+The preferred installation mechanism is pip:
+
+`pip install pcpfm`
+
+or download the source and install manually:
+
+`pip install -e .`
 
 ## Basic Usage
 
