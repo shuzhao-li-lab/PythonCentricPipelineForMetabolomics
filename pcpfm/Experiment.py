@@ -192,15 +192,21 @@ class Experiment:
             mode (str, optional): if 'link', use symlink, if 'copy' copy the .raw file. Defaults to "link".
         """        
         used_acquisition_names = {acquisition.name for acquisition in self.acquisitions} 
-        used_acquisition_raws = {acquisition.source_filepath for acquisition in self.acquisitions} 
-        if (acquisition.name in used_acquisition_names or acquisition.source_filepath in used_acquisition_raws) and override is False:
+        used_acquisition_sources = {acquisition.source_filepath for acquisition in self.acquisitions} 
+        if (acquisition.name in used_acquisition_names or acquisition.source_filepath in used_acquisition_sources) and override is False:
             raise Exception("here")
-        acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
         addition_modes = {
             "copy": shutil.copy,
             "link": os.link,
         }
-        addition_modes[mode](acquisition.source_filepath, self.raw_subdirectory + os.path.basename(acquisition.source_filepath))
+        if acquisition.source_filepath.endswith(".mzML"):
+            acquisition.mzml_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+            acquisition.raw_filepath = None
+            addition_modes[mode](acquisition.source_filepath, self.converted_subdirectory + os.path.basename(acquisition.source_filepath))
+        elif acquisition.source_filepath.endswith(".raw"):
+            acquisition.mzml_filepath = None
+            acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
+            addition_modes[mode](acquisition.source_filepath, self.raw_subdirectory + os.path.basename(acquisition.source_filepath))
         self.acquisitions.append(acquisition)
             
     def convert_raw_to_mzML(self, mono_path, exe_path):
