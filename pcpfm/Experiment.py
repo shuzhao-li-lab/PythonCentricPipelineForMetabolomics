@@ -150,7 +150,7 @@ class Experiment:
         if feature_table:
             feature_table_path = self.feature_tables[moniker]
             if as_object:
-                return FeatureTable(feature_table_path, self)
+                return FeatureTable(feature_table_path, self, moniker)
             else:
                 return feature_table_path
         elif empCpds:
@@ -230,7 +230,8 @@ class Experiment:
         """        
         if return_field:
             return [getattr(acquisition, return_field) for acquisition in self.acquisitions if acquisition.filter(filter)]
-        return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
+        else:
+            return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
     def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath'):
         """
@@ -275,7 +276,7 @@ class Experiment:
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
 
-    def batches(self, field="name", debug=False, skip_batch=False):
+    def batches(self, field="name", batch_field="Batch", debug=False, skip_batch=False):
         batches = {}
         for acquisition in self.acquisitions:
             if skip_batch:
@@ -283,8 +284,8 @@ class Experiment:
             elif debug:
                 batch_name = acquisition.metadata_tags['Position'].split(":")[0]
             else:
-                if 'Batch' in acquisition.metadata_tags:
-                    batch_name = acquisition.metadata_tags['Batch']
+                if batch_field in acquisition.metadata_tags:
+                    batch_name = acquisition.metadata_tags[batch_field]
                 else:
                     batch_name = "no_batch"
             if batch_name not in batches:

@@ -11,7 +11,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 class FeatureTable:
-    def __init__(self, feature_table_filepath, experiment):
+    def __init__(self, feature_table_filepath, experiment, moniker):
         """
         This object wraps a feature table
 
