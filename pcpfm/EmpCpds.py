@@ -1,9 +1,9 @@
 from khipu.epdsConstructor import epdsConstructor
-from khipu.extended import *
-from khipu.utils import *
+from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
 from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
 from jms.io import read_table_to_peaks
 from sklearn.metrics.pairwise import cosine_similarity
+import json
 import intervaltree
 import os
 import pymzml
@@ -33,7 +33,6 @@ class empCpds:
         Args:
             save_as_moniker (str, optional): an alternative moniker to which to save the table. Defaults to None. 
         """
-        print(save_as_moniker)
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
