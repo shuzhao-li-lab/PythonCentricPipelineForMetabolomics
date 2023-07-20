@@ -28,25 +28,14 @@ import json
 import multiprocessing as mp
 import csv
 import itertools
+from mass2chem.formula import atom_mass_dict
+
 from docopt import docopt
 
 from . import Experiment
 from . import EmpCpds
 
 def adductify_standards(standards_csv, adducts_csv):
-    isotope_mass_table = {
-        "12C": 12.0,
-        "13C": 13.00335483507,
-        "1H": 1.00782503223,
-        "2H": 2.01410177812,
-        "16O": 15.99491461957,
-        "14N": 14.00307400443,
-        "15N": 15.00010889888,
-        "32S": 31.9720711744,
-        "31P": 30.97376199842,
-        "23Na": 22.9897692820,
-        "e": 0.00054858
-    }
     standards = []
     with open(standards_csv, encoding='utf-8-sig') as standards_fh:
         for standard in csv.DictReader(standards_fh):
@@ -72,7 +61,7 @@ def adductify_standards(standards_csv, adducts_csv):
             else:
                 new_formula[isotope] += count
         new_formula['e'] = -1 * int(adduct['Charge'])
-        uncharged_mass = sum([isotope_mass_table[isotope] * isotope_count for isotope, isotope_count in new_formula.items()])
+        uncharged_mass = sum([atom_mass_dict[isotope] * isotope_count for isotope, isotope_count in new_formula.items()])
         mz = uncharged_mass / abs(int(adduct['Charge']))
         adducted_standards.append({
             "Name": new_name,
