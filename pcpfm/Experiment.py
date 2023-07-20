@@ -3,10 +3,11 @@ import shutil
 import json
 import os
 
-from pcpfm.ThermoRawFileConverter import ThermoRawFileConverter
-from pcpfm.Acquisition import Acqusition
-from pcpfm.FeatureTable import FeatureTable
-import pcpfm.EmpCpds as EmpCpds
+from . import ThermoRawFileConverter
+from . import Acquisition
+from . import FeatureTable
+from . import EmpCpds
+
 
 class Experiment:
     subdirectories = {
@@ -103,7 +104,7 @@ class Experiment:
             JSON_repr = json.load(experiment_json_filehandle)
             acquisitions = []
             for acquisition_JSON in JSON_repr["acquisitions"]:
-                acquisition = Acqusition(acquisition_JSON["name"], 
+                acquisition = Acquisition.Acqusition(acquisition_JSON["name"], 
                                          acquisition_JSON["source_filepath"], 
                                          acquisition_JSON["metadata"])
                 acquisition.mzml_filepath = acquisition_JSON["mzml_filepath"]
@@ -150,7 +151,7 @@ class Experiment:
         if feature_table:
             feature_table_path = self.feature_tables[moniker]
             if as_object:
-                return FeatureTable(feature_table_path, self, moniker)
+                return FeatureTable.FeatureTable(feature_table_path, self, moniker)
             else:
                 return feature_table_path
         elif empCpds:
@@ -217,7 +218,7 @@ class Experiment:
             mono_path (str): path to mono executable
             exe_path (str): path to converter executable
         """        
-        converter = ThermoRawFileConverter(mono_path, exe_path)
+        converter = ThermoRawFileConverter.ThermoRawFileConverter(mono_path, exe_path)
         converted_filepaths = converter.convert_multi(self.acquisitions, self.converted_subdirectory)
         for acquisition, mzml_filepath in zip(self.acquisitions, converted_filepaths):
             acquisition.mzml_filepath = mzml_filepath
@@ -265,7 +266,7 @@ class Experiment:
                     name_field = "File Name"
                 if name_field not in acquisition_info or path_field not in acquisition_info:
                     raise Exception()
-                acquisition = Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
+                acquisition = Acquisition.Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
         experiment.ionization_mode = ionization_mode

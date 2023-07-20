@@ -2,6 +2,7 @@ from collections import namedtuple
 import pymzml
 import numpy as np
 import bisect
+import os
 
 class Acqusition(object):
     Peak = namedtuple('Peak', ['level', 'rt', 'mz', 'intensity', 'id'])
