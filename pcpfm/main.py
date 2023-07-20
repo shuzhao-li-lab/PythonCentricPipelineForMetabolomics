@@ -273,10 +273,12 @@ def main(args):
         sample_type = "Unknown" if not args['--sample_type'] else args['--sample_type']
         feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio)
     elif args['drop_samples']:
-        drop_field_values = args['--field_value'] if args['--field_value'] else None 
+        drop_field_values = [args['--field_value']] if args['--field_value'] else None 
         drop_field_type = args['--field_type'] if args['--field_type'] else "Sample Type"
         drop_name = args['--name'] if args['--name'] else None
-        auto_drop_config = json.load(open(args['--auto_drop'])) if args['--auto_drop'] else None
+        auto_drop_config = None
+        if '--auto_drop' in args and args['--auto_drop']:
+            auto_drop_config = json.load(open(args['--auto_drop']))
         if drop_field_values:
             feature_table.drop_samples(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
         elif drop_name:
