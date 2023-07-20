@@ -27,6 +27,7 @@ class Acqusition(object):
         self.__max_mz = None
         self.__min_rt = None
         self.__max_rt = None
+        self.__ionization_mode = None
 
     @property
     def min_rt(self):
@@ -85,6 +86,18 @@ class Acqusition(object):
         return self.__max_mz
     
     @property
+    def ionization_mode(self):
+        if self.__ionization_mode is None:
+            for spec in pymzml.run.Reader(self.mzml_filepath):
+                if spec["positive scan"]:
+                    self.__ionization_mode = "pos"
+                    break
+                else:
+                    self.__ionization_mode = "neg"
+                    break
+        return self.__ionization_mode
+    
+    @property
     def JSON_repr(self):
         """
         This generates the dict representation of the acquisition, this is used when the experiment is saved or loaded.
@@ -102,7 +115,8 @@ class Acqusition(object):
             "__min_mz": self.__min_mz,
             "__max_mz": self.__max_mz,
             "__min_rt": self.__min_rt,
-            "__max_rt": self.__max_rt
+            "__max_rt": self.__max_rt,
+            "__ionization_mode": self.__ionization_mode
         }
     
     def filter(self, filter):
@@ -131,7 +145,7 @@ class Acqusition(object):
         Returns:
             bool: True if the acquistion matches or False if the acquisition fails the filter 
         """        
-        passed_filter = True
+        passed_filter  = True
         for key, rules in filter.items():
             values_to_filter = self.metadata_tags[key].lower()
             if "includes" in rules:
@@ -153,8 +167,10 @@ class Acqusition(object):
 
         Args:
             ms_level (int, optional): The MS level to extract. Defaults to None. If None, all ms_levels are extracted
-        """        
+        """
         for spec in pymzml.run.Reader(self.mzml_filepath):
+            if self.__ionization_mode is None:
+                self.__ionization_mode = "pos" if spec["positive scan"] else "neg"
             if spec.ms_level == ms_level or ms_level is None:
                 if (spec.ms_level, "peaks") not in self.spectra:
                     self.spectra[(spec.ms_level, "spectra")] = []
