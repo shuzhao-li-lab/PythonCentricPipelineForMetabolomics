@@ -3,6 +3,8 @@ from khipu.extended import isotope_search_patterns, extended_adducts, adduct_sea
 from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
 from jms.io import read_table_to_peaks
 from sklearn.metrics.pairwise import cosine_similarity
+from mass2chem.formula import PROTON
+
 import json
 import intervaltree
 import os
@@ -250,9 +252,9 @@ class empCpds:
         for empCpd_id, empCpd in self.dict_empCpds.items():
             if empCpd['neutral_formula_mass'] == "":
                 if self.experiment.ionization_mode == 'pos':
-                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] - 1.00727647
+                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] - PROTON
                 elif self.experiment.ioinzation_mode == 'neg':
-                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] + 1.00727647
+                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] + PROTON
             else:
                 neutral_formula_mass = empCpd["neutral_formula_mass"]
             mass_error = neutral_formula_mass / 1e6 * mz_tolerance
