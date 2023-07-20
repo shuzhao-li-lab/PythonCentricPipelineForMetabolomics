@@ -59,12 +59,13 @@ class Experiment:
         self.QCQA_results = {} if qcqa_results is None else qcqa_results
         self.organized_samples = {} if organized_samples is None else organized_samples
         self.drop_results = drop_results
-        self.ionization_mode = ionization_mode
         self.full_feature_table_path = full_feature_table_path
         self.preferred_feature_table_path = preferred_feature_table_path
         self.log = '' if log is None else log
         self.feature_tables = {} if feature_tables is None else feature_tables
         self.empCpds = {} if empCpds is None else empCpds
+
+        self.__ionization_mode = ionization_mode
 
         # generate subdirectories
         if not skip_subdirectory_initialization:
@@ -76,6 +77,12 @@ class Experiment:
         self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["raw"])
         self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["annotations"])
         self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["filtered_feature_tables"])
+
+    @property
+    def ionization_mode(self):
+        if self.__ionization_mode is None:
+            self.__ionization_mode = self.determine_ionization_mode()
+        return self.__ionization_mode
 
     def initialize_subdirectories(self):
         """
@@ -124,7 +131,7 @@ class Experiment:
                                     preferred_feature_table_path=JSON_repr["preferred_feature_table_path"],
                                     qcqa_results=JSON_repr["qcqa_results"],
                                     drop_results=JSON_repr["drop_results"],
-                                    ionization_mode=JSON_repr["ionization_mode"],
+                                    ionization_mode=JSON_repr["__ionization_mode"],
                                     organized_samples=JSON_repr["organized_samples"],
                                     feature_tables=JSON_repr["feature_tables"] if "feature_tables" in JSON_repr else None,
                                     empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None
@@ -174,7 +181,7 @@ class Experiment:
                 "preferred_feature_table_path": self.preferred_feature_table_path,
                 "qcqa_results": self.QCQA_results,
                 "drop_results": self.drop_results,
-                "ionization_mode": self.ionization_mode,
+                "__ionization_mode": self.__ionization_mode,
                 "organized_samples": self.organized_samples,
                 "feature_tables": self.feature_tables,
                 "empCpds": self.empCpds
@@ -269,9 +276,18 @@ class Experiment:
                 acquisition = Acquisition.Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
-        experiment.ionization_mode = ionization_mode
+        experiment.__ionization_mode = ionization_mode
         return experiment
     
+    def determine_ionization_mode(self, num_files_to_check=5):
+        if self.__ionization_mode is None:
+            num_files_to_check = len(self.acquisitions) if num_files_to_check is None else num_files_to_check
+            ionization_modes = list(set([acquisition.ionization_mode for acquisition in self.acquisitions[:num_files_to_check]]))
+            if len(ionization_modes) == 1:
+                self.__ionization_mode = ionization_modes[0]
+        return self.__ionization_mode
+
+
     def summarize(self):
         """
         Print the list of empCpds and feature tables in the experiment to the console

@@ -1,6 +1,6 @@
 '''
 Usage:
-  main.py assemble_experiment_from_CSV <experiment_directory> <sequence_csv> (pos|neg) [--filter=<filter>]
+  main.py assemble_experiment_from_CSV <experiment_directory> <sequence_csv> (pos|neg|auto) [--filter=<filter>]
   main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py asari_full_processing <experiment_directory> [--extra_args=<extra_args>]
@@ -145,7 +145,12 @@ def main(args):
         print(__doc__)
         exit()
     if args['assemble_experiment_from_CSV']:
-        ionization_mode = "pos" if args['pos'] else "neg"
+        if args['pos']:
+            ionization_mode = "pos"
+        elif args['neg']:
+            ionization_mode = "neg"
+        elif args["auto"]:
+            ionization_mode = None
         experiment = Experiment.Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
     if args['MS1_annotate']:
         empCpds.MS1_annotate(args['<annotation_source>'])
