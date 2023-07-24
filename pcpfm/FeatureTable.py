@@ -21,6 +21,7 @@ class FeatureTable:
         """        
         self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
+        self.moniker = moniker
         self.feature_matrix_header = None
         feature_matrix = []
         #todo - replace this with pandas?
@@ -37,6 +38,14 @@ class FeatureTable:
                         feature_matrix_row.append(feature[column_name])
                 feature_matrix.append(feature_matrix_row)
         self.feature_matrix = np.array(feature_matrix).T
+
+    
+    def save_fig_path(self, name):
+        fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "QAQC_figs/" + self.moniker + "/")
+        if not os.path.exists(fig_path):
+            os.makedirs(fig_path)
+        return os.path.join(fig_path, name + ".png") 
+
 
     def save(self, table, new_moniker):
         output_path = os.path.join(self.experiment.filtered_feature_tables_subdirectory, new_moniker + "_Feature_table.tsv")
@@ -86,7 +95,7 @@ class FeatureTable:
                 except:
                     return self.feature_matrix[column_index]
 
-    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False):
+    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False, save_figs=False):
         """
         The median correlation of a sample against all other samples can be expressed as a z-score against the median
         of ALL correlations in the experiment. A high or low Z-score indicates that the sample was poorly correlated 
@@ -101,7 +110,7 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
-        correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False)
+        correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False, save_figs=False)
         all_correlations = []
         median_correlations = {}
         for sample_name_1, corr_dict in correlation_result["Result"].items():
@@ -114,13 +123,23 @@ class FeatureTable:
         all_correlations_std = np.std(all_correlations)
         all_correlations_median = np.median(all_correlations)
         z_score_correlations = {name: (median_correlation - all_correlations_median)/all_correlations_std for name, median_correlation in median_correlations.items()}
-        if interactive_plot:
+        if save_figs or interactive_plot:
             plt.title("Median Correlation Values for Samples")
             plt.scatter(list(range(len(median_correlations))), list(median_correlations.values()))
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("median_correlation"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
+
             plt.title("Median Correlation Z-Scores for Samples")
             plt.scatter(list(range(len(z_score_correlations))), list(z_score_correlations.values()))
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("median_correlation_Z_scores"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
+
         result = {
             "Type": "MedianCorrelationZScores",
             "Config": {},
@@ -128,7 +147,7 @@ class FeatureTable:
         }
         return result
     
-    def intensity_analysis(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+    def intensity_analysis(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
         """
         Analyze mean, median, sum intensity values on the feature table
 
@@ -143,50 +162,96 @@ class FeatureTable:
         intensity_sums = np.sum(feature_vector_matrix, axis=0)
         mean_feature_intensity = np.mean(feature_vector_matrix, axis=0)
         median_feature_intensity = np.median(feature_vector_matrix, axis=0)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples")
             plt.bar(X, intensity_sums)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("sum_feature_intensities"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Mean Feature Intensity for Samples")
             plt.bar(X, mean_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("mean_feature_intensities"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Median Feature Intensity for Samples")
             plt.bar(X, median_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("median_feature_intensities"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             
 
         filtered_feature_vector_matrix = feature_vector_matrix.copy()
         filtered_feature_vector_matrix[filtered_feature_vector_matrix == 0] = np.nan
         filtered_mean_feature_intensity = np.nanmean(filtered_feature_vector_matrix, axis=0)
         filtered_median_feature_intensity = np.nanmedian(filtered_feature_vector_matrix, axis=0)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples (missing features dropped)")
             plt.bar(X, intensity_sums)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("sum_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Mean Feature Intensity for Samples (missing features dropped)")
             plt.bar(X, filtered_mean_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("mean_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Median Feature Intensity for Samples (missing features dropped)")
             plt.bar(X, filtered_median_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("median_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
+
+        TICs = np.nansum(feature_vector_matrix, axis=0)
+        log_TICs = np.log2(TICs)
+        if interactive_plot or save_figs:
+            plt.bar(list(range(len(log_TICs))), log_TICs)
+            if save_figs:
+                plt.savefig(self.save_fig_path("log_TICs"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
 
         log_filtered_feature_vector_matrix = np.log2(filtered_feature_vector_matrix)
         log_filtered_intensity_sum = np.nansum(log_filtered_feature_vector_matrix, axis=0)
         log_filtered_mean_feature_intensity = np.nanmean(log_filtered_feature_vector_matrix, axis=0)
         log_filtered_median_feature_intensity = np.nanmedian(log_filtered_feature_vector_matrix, axis=0)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Log Intensity for Samples (missing features dropped)")
             plt.bar(X, log_filtered_intensity_sum)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("sum_log_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Mean Log Feature Intensity for Samples (missing features dropped)")
             plt.bar(X, log_filtered_mean_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("mean_log_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
             plt.title("Median Log Feature Intensity for Samples (missing features dropped)")
             plt.bar(X, log_filtered_median_feature_intensity)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("median_log_feature_intensities_no_missing"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
 
         result = {
             "Type": "IntensitySummary",
@@ -205,9 +270,8 @@ class FeatureTable:
         }
         return result
         
-    def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
+    def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         feature_vector_matrix = feature_vector_matrix.T
-        print(feature_vector_matrix.shape)
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
             feature_vector_matrix = np.log2(feature_vector_matrix)        
@@ -227,7 +291,7 @@ class FeatureTable:
                     spearmanr = scipy.stats.spearmanr(feature_vector_matrix[i], feature_vector_matrix[j]).statistic
                     corr_matrix[i][j] = spearmanr
                     corr_matrix[j][i] = spearmanr
-        if interactive_plot:
+        if interactive_plot or save_figs:
             if tag:
                 heatmap_title = "Correlation Heatmap for Samples of Type: " + tag + "\n"
             else:
@@ -238,7 +302,11 @@ class FeatureTable:
             plt.title(heatmap_title)
             #plt.imshow(corr_matrix)
             sns.heatmap(corr_matrix, xticklabels=acquisition_names, yticklabels=acquisition_names)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path(heatmap_title))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "Correlation",
             "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
@@ -246,7 +314,7 @@ class FeatureTable:
             }
         return result
 
-    def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False):
+    def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
         """
         Perform PCA on provided feature table
 
@@ -262,14 +330,19 @@ class FeatureTable:
         pca_embedder = PCA(n_components=2)
         feature_vector_matrix = np.log2(feature_vector_matrix+1)
         pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform((feature_vector_matrix.T)))
-        if interactive_plot:
+        if interactive_plot or save_figs:
             plt.title("PCA (n_components=2)")
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
             for (x, y), name in zip(pca_embedded_vector_matrix, acquisition_names):
                 plt.text(x, y, name)
             plt.xlabel("PC 1 " + str(round(pca_embedder.explained_variance_ratio_[0] * 100, 1)) + "%", fontsize=14)
             plt.ylabel("PC 2 " + str(round(pca_embedder.explained_variance_ratio_[1] * 100, 1)) + "%", fontsize=14)
-            plt.show()
+            if save_figs:
+                print("saving")
+                plt.savefig(self.save_fig_path("pca_two_components"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "PCA",
             "Config": {"n_components": 2, "scaler": "StandardScaler"},
@@ -277,7 +350,7 @@ class FeatureTable:
         }
         return result
             
-    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False, perplexity=30):
+    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False, perplexity=30, save_figs=False):
         """
         Perform TSNE on provided feature table
 
@@ -292,12 +365,16 @@ class FeatureTable:
         """        
         try:
             tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(feature_vector_matrix.T)
-            if interactive_plot:
+            if interactive_plot or save_figs:
                 plt.title("TSNE")
                 plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
                 for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
                     plt.text(x, y, name)
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("tsne_two_components"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
             result = {
                 "Type": "TSNE",
                 "Config": {"n_components": 2},
@@ -305,13 +382,12 @@ class FeatureTable:
             }
             return result
         except:
-            print(perplexity)
             if perplexity > 0:
                 self.TSNE(feature_vector_matrix, acquisition_names, interactive_plot, perplexity=perplexity-1)
             else:
                 pass
     
-    def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False):
+    def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False, save_figs=False):
         """
         Calculate the distribution of missing features with respect to percent of smaples with feature
 
@@ -327,13 +403,17 @@ class FeatureTable:
         for percentile in range(101):
             num_samples_threshold = feature_vector_matrix.shape[1] * percentile/100
             percentile_table.append([percentile, num_samples_threshold, int(np.sum(num_sample_with_feature <= num_samples_threshold))])
-        if interactive_plot:
+        if interactive_plot or save_figs:
             plt.title("Missing Feature Percentiles")
             plt.xlabel("Percentile")
             plt.ylabel("Num. Dropped Features")
             plt.scatter([x[0] for x in percentile_table], [x[2] for x in percentile_table])
             plt.axhline(feature_vector_matrix.shape[0], color='r', linestyle='-')
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("missing_feature_percentiles"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "MissingFeaturePercentiles",
             "Config": {},
@@ -341,7 +421,7 @@ class FeatureTable:
         }
         return result
     
-    def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+    def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
         """
         Count the number of missing features or featuers below the specified intensity cutoff per features
 
@@ -356,14 +436,18 @@ class FeatureTable:
         """        
         intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
         missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
-        for i, a in enumerate(acquisition_names):
-            print(i, a)
-        if interactive_plot:
+        #for i, a in enumerate(acquisition_names):
+        #    print(i, a)
+        if interactive_plot or save_figs:
             plt.title("Missing Feature Counts")
             plt.ylabel("Num. Missing Features")
             plt.bar(acquisition_names, missing_feature_count)
             plt.xticks(rotation='vertical')
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("missing_feature_counts"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "MissingFeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -371,7 +455,7 @@ class FeatureTable:
         }
         return result
     
-    def feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+    def feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
         """
         Count the number of features above the specified intensity cutoff per features
 
@@ -386,12 +470,16 @@ class FeatureTable:
         """   
         intensity_masked_feature_matrix = feature_vector_matrix > intensity_cutoff
         feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             plt.title("Feature Counts")
             plt.ylabel("Num. Features")
             plt.bar(acquisition_names, feature_count)
             plt.xticks(rotation='vertical')
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("feature_counts"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "FeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -399,7 +487,7 @@ class FeatureTable:
         }
         return result
     
-    def feature_distribution_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+    def feature_distribution_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
         """
         Count the number of features above the specified intensity cutoff per features and express as a Z-score based
         on feature count across all samples. 
@@ -414,16 +502,20 @@ class FeatureTable:
             result: dictionary storing the result of this QCQA operation
         """   
 
-        feature_counts_result = self.feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)
+        feature_counts_result = self.feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)
         sample_names = [*feature_counts_result["Result"].keys()]
         feature_counts = np.array([*feature_counts_result["Result"].values()])
         feature_z_scores = (feature_counts - np.mean(feature_counts)) / np.std(feature_counts)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             plt.title("Num Feature Z-Score")
             plt.scatter(list(range(len(feature_z_scores))), feature_z_scores)
             for x, y, name in zip(list(range(len(feature_z_scores))), feature_z_scores, acquisition_names):
                 plt.text(x, y, name)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("num_feature_z_score"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "FeatureCountZScores",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -431,7 +523,7 @@ class FeatureTable:
         }
         return result
 
-    def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False):
+    def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
         """
         Count the number of features below the specified intensity cutoff per features and express as a Z-score based
         on missing feature count across all samples. 
@@ -445,17 +537,21 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """   
-        missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False)        
+        missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)        
         # this relies upon the sorted order of the dictionary, may not be safe in all Python versions        
         sample_names = [*missing_feature_counts_result["Result"].keys()]
         missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
         missing_feature_z_scores = (missing_feature_counts - np.mean(missing_feature_counts)) / np.std(missing_feature_counts)
-        if interactive_plot:
+        if interactive_plot or save_figs:
             plt.title("Num Missing Feature Z-Score")
             plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
             for x, y, name in zip(list(range(len(missing_feature_z_scores))), missing_feature_z_scores, acquisition_names):
                 plt.text(x, y, name)
-            plt.show()
+            if save_figs:
+                plt.savefig(self.save_fig_path("missing_feature_z_score"))
+            if interactive_plot:
+                plt.show()
+            plt.clf()
         result = {
             "Type": "MissingFeatureZScores",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -463,7 +559,7 @@ class FeatureTable:
         }
         return result
 
-    def drop_samples(self, new_moniker, drop_others=True, keep_types=[], drop_types=[], type_field="Sample Type", drop_name=None):
+    def drop_samples(self, new_moniker, drop_others=False, keep_types=[], drop_types=[], type_field="Sample Type", drop_name=None):
         retain, drop = [], []
         if not drop_name:
             for keep_type in keep_types:
@@ -474,7 +570,7 @@ class FeatureTable:
             drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
         else:
             pass
-        for name in {a.name for a in self.experiment.acquisitions}:
+        for name in {a.name for a in self.experiment.acquisitions if a.name in self.feature_matrix_header}:
             if name not in drop and name not in retain:
                 if drop_others:
                     drop.append(name)
@@ -511,7 +607,7 @@ class FeatureTable:
             mask_column_name = "masked" + batch_name
             blank_mask_columns.append(mask_column_name)
             table[mask_column_name] = to_filter
-        print(np.sum(to_filter))
+        #print(np.sum(to_filter))
 
         if logic_mode == "and":
             table["mask_feature"] = table.apply(__all_logical, axis=1, args=(blank_mask_columns,))
@@ -548,19 +644,27 @@ class FeatureTable:
                 table[header_field] = self.select_feature_column(header_field)
         self.save(table, new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive=False):
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive_plot=False, save_figs=False):
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         for _, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
             filtered_batch_name_list = [x for x in batch_name_list if x in sample_names]
             table["percent_inclusion"] = np.sum(table[filtered_batch_name_list] > 0, axis=1) / len(filtered_batch_name_list)
             TICs = {sample: np.sum(table[table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in filtered_batch_name_list}
-            if interactive:
+            if interactive_plot or save_figs:
                 uncorr_TICs = {sample: np.sum(table[sample]) for sample in filtered_batch_name_list}
                 plt.bar(list(uncorr_TICs.keys()), list(uncorr_TICs.values()))
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("uncorrected_TICs"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
                 plt.bar(list(TICs.keys()), list(TICs.values()))
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("raw_TICs"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
 
             function_map = {
                 "median": np.median,
@@ -570,15 +674,27 @@ class FeatureTable:
             norm_factors = {sample: function_map[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
             for sample, norm_factor in norm_factors.items():
                 table[sample] = table[sample] * norm_factor
-            if interactive:
+            if interactive_plot or save_figs:
                 corr_TICs = {sample: np.sum(table[sample]) for sample in filtered_batch_name_list}
                 plt.bar(list(norm_factors.keys()), list(norm_factors.values()))
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("uncorrected_TICs"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
                 plt.bar(list(corr_TICs.keys()), list(corr_TICs.values()))
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("uncorrected_TICs"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
                 corr_selected_TICs = {sample: np.sum(table[table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in filtered_batch_name_list}
                 plt.bar(list(corr_selected_TICs.keys()), list(corr_selected_TICs.values()))
-                plt.show()
+                if save_figs:
+                    plt.savefig(self.save_fig_path("corrected_TICs"))
+                if interactive_plot:
+                    plt.show()
+                plt.clf()
 
         for header_field in self.feature_matrix_header:
             if header_field not in sample_names and header_field:
@@ -619,7 +735,6 @@ class FeatureTable:
 
         def __all(row, columns, drop_percentile):
             return not np.all(row[columns] >= drop_percentile)
-
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         batch_columns = []
@@ -640,67 +755,6 @@ class FeatureTable:
         table = table[table["drop_feature"] == False].copy()
         self.save(table, new_moniker)
 
-    def curate(self, blank_names, sample_names, drop_percentile, blank_intensity_ratio, TIC_normalization_percentile, output_path, interactive_plot=True):
-        """
-        Performa blank masking, drop missing features, normalize by TIC, and output the curated table to the specififed path.
-
-        # TODO - needs an option for batch correction.
-        # TODO - needs an option for interpolation
-        # TODO - add support to normalize on top N features
-
-        Args:
-            blank_names (list[str]): list of samples considered to be blanks
-            sample_names (list[str]): list of experimental samples
-            drop_percentile (float): features present in this percent of samples or fewer are dropped
-            blank_intensity_ratio (float): features with a mean intensity in samples / mean intensity in blanks below this value are dropped
-            TIC_normalization_percentile (float): features present in at least this percent of samples are used for normalization
-            output_path (str): path to save feature table to after curation
-            interactive_plot (bool, optional): if True, interactive plots are generated. Defaults to False.
-        """        
-        blanks = pd.DataFrame(np.array([self.select_feature_column(x) for x in blank_names]).T, columns=blank_names)
-        samples = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
-        for header_field in self.feature_matrix_header:
-            if header_field not in {acquisition.name for acquisition in self.experiment.acquisitions}:
-                for table in [blanks, samples]:
-                    table[header_field] = self.select_feature_column(header_field)
-
-        samples["percent_inclusion"] = np.sum(samples[sample_names] > 0, axis=1) / len(sample_names)
-
-        # mark features in blanks
-        to_filter = []
-        x, y = 0, 0
-        for blank_mean, sample_mean in zip(np.mean(blanks[blank_names], axis=1), np.mean(samples[sample_names], axis=1)):
-            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
-            if blank_mean * blank_intensity_ratio > sample_mean:
-                x += 1
-            else:
-                y += 1
-        samples["blank_filtered"] = to_filter
-        samples = samples[samples["blank_filtered"] == False].copy()
-
-        # calculate TIC values and normalization factors then normalize
-        log_normalize = False
-        interactive_plot = False
-
-        TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
-        norm_factors = {sample: np.median(list(TICs.values()))/value for sample, value in TICs.items()}
-        
-        if interactive_plot:
-            plt.bar(sorted(TICs), [TICs[x] for x in sorted(TICs)])
-            plt.show()
-
-        # normalize 
-        for sample, norm_factor in norm_factors.items():
-            samples[sample] = samples[sample] * norm_factor
-
-        if interactive_plot:
-            normalized_TICs = {sample: np.sum(samples[samples["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}
-            plt.bar(sorted(normalized_TICs), [normalized_TICs[x] for x in sorted(normalized_TICs)])
-            plt.show()
-
-        samples = samples[samples["percent_inclusion"] > drop_percentile].copy()
-        samples.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
-            
     def qcqa(self, 
              tag=None, 
              sort=None, 
@@ -716,7 +770,8 @@ class FeatureTable:
              missing_feature_outlier_detection=False,
              intensity_analysis=False,
              feature_distribution=False,
-             feature_outlier_detection=False):
+             feature_outlier_detection=False,
+             save_figs=False):
         """
         This is the wrapper for all the qcqa functions. 
 
@@ -748,27 +803,27 @@ class FeatureTable:
         selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
         qcqa_result = []
         if pca:
-            qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if tsne:
-            qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if pearson:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive))
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
         if spearman:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive))
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
         if kendall:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive))
+            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
         if missing_feature_percentiles:
-            qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive))
+            qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive, save_figs=save_figs))
         if missing_feature_distribution:
-            qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if missing_feature_outlier_detection:
-            qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if median_correlation_outlier_detection:
-            qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if intensity_analysis:
-            qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if feature_distribution:
-            qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if feature_outlier_detection:
-            qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive))
+            qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         return qcqa_result

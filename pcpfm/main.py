@@ -4,7 +4,7 @@ Usage:
   main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py asari_full_processing <experiment_directory> [--extra_args=<extra_args>]
-  main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis]
+  main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis] [--save_figs]
   main.py preprocess_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
   main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
   main.py MS1_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <annotation_source>...
@@ -220,7 +220,8 @@ def main(args):
                                     missing_feature_outlier_detection=args['--missing_feature_outlier_detection'] or args["--all"],
                                     intensity_analysis=args['--intensity_analysis'] or args["--all"],
                                     feature_distribution=args['--feature_distribution'] or args["--all"],
-                                    feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"])
+                                    feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"],
+                                    save_figs=args["--save_figs"])
     elif args['summarize']:
         experiment.summarize()
     elif args['build_empCpds']:

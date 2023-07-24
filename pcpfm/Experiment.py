@@ -15,7 +15,8 @@ class Experiment:
         "converted": "converted_acquisitions/",
         "raw": "raw_acquisitions/",
         "annotations": "annotations/",
-        "filtered_feature_tables": "filtered_feature_tables/"
+        "filtered_feature_tables": "filtered_feature_tables/",
+        "qaqc_figs": "QAQC_figs/"
     }
     def __init__(self, 
                  experiment_name, 
