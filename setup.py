@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 with open("pcpfm/__init__.py") as f:
     exec([x for x in f.readlines() if '__version__' in x][0])
 
-with open("README.md", "r") as fh:
-    long_description = fh.read()
+with open("README.md", "r") as f:
+    long_description = f.read()
 
 with open("requirements.txt", "r") as f:
     requirements = f.read()
@@ -36,7 +36,6 @@ setup(
   packages=find_packages(
     include=['*', '']
   ),
-  #data_files=[ ('asari/db', ['asari/db/mass_indexed_compounds.pickle', 'asari/db/emp_cpds_trees.pickle']) ],
   #include_package_data=True,
   #zip_safe=True,
   entry_points = {
