@@ -208,14 +208,17 @@ class Experiment:
             "copy": shutil.copy,
             "link": os.link,
         }
-        if acquisition.source_filepath.endswith(".mzML"):
-            acquisition.mzml_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
-            acquisition.raw_filepath = None
-            addition_modes[mode](acquisition.source_filepath, self.converted_subdirectory + os.path.basename(acquisition.source_filepath))
-        elif acquisition.source_filepath.endswith(".raw"):
-            acquisition.mzml_filepath = None
-            acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
-            addition_modes[mode](acquisition.source_filepath, self.raw_subdirectory + os.path.basename(acquisition.source_filepath))
+        try:
+            if acquisition.source_filepath.endswith(".mzML"):
+                acquisition.mzml_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+                acquisition.raw_filepath = None
+                addition_modes[mode](acquisition.source_filepath, self.converted_subdirectory + os.path.basename(acquisition.source_filepath))
+            elif acquisition.source_filepath.endswith(".raw"):
+                acquisition.mzml_filepath = None
+                acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
+                addition_modes[mode](acquisition.source_filepath, self.raw_subdirectory + os.path.basename(acquisition.source_filepath))
+        except FileNotFoundError:
+            raise Warning("File Not Found: ", acquisition.name)
         self.acquisitions.append(acquisition)
             
     def convert_raw_to_mzML(self, mono_path, exe_path):
