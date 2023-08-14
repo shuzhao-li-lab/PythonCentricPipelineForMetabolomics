@@ -39,6 +39,10 @@ class FeatureTable:
                 feature_matrix.append(feature_matrix_row)
         self.feature_matrix = np.array(feature_matrix).T
 
+    @staticmethod
+    def load(moniker, experiment):
+        return FeatureTable(pd.read_csv(open(experiment.feature_tables[moniker])), experiment, moniker)
+
     
     def save_fig_path(self, name):
         fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "QAQC_figs/" + self.moniker + "/")
