@@ -229,9 +229,10 @@ class Experiment:
             mono_path (str): path to mono executable
             exe_path (str): path to converter executable
         """        
+        raw_acquisitions = [acquisition for acquisition in self.acquisitions if acquisition.mzml_filepath is None]
         converter = ThermoRawFileConverter.ThermoRawFileConverter(mono_path, exe_path)
-        converted_filepaths = converter.convert_multi(self.acquisitions, self.converted_subdirectory)
-        for acquisition, mzml_filepath in zip(self.acquisitions, converted_filepaths):
+        converted_filepaths = converter.convert_multi(raw_acquisitions, self.converted_subdirectory)
+        for acquisition, mzml_filepath in zip(raw_acquisitions, converted_filepaths):
             acquisition.mzml_filepath = mzml_filepath
 
     def filter_samples(self, filter, return_field="name"):
