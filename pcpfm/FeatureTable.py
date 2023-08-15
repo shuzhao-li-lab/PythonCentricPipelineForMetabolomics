@@ -798,21 +798,8 @@ class FeatureTable:
         import matplotlib.colors as mcolors
         import random
 
-        banned_colors = {'snow', 'beige', 'honeydew', 'azure', 'aliceblue', 'lightcyan', 'lightyellow', 'white', 'oldlace', 'antiquewhite', 'ivory'}
-        allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
-        colors, texts, markers = None, None, None
-        if colorby:
-            colors = [x.metadata_tags[colorby] for x in self.experiment.acquisitions]
-            colormap = {b: c for b, c in zip(set(colors), random.sample(allowed_colors, len(set(colors))))}
-            colors = [colormap[x] for x in colors]
-        if textby:
-            texts = [x.metadata_tags[textby] for x in self.experiment.acquisitions]
-        if markerby:
-            marker_list = [".", "o", "v", "^", ">", "<"] + [str(x) for x in [1,2,3,4,8]] + ["s", "P"]
-            markers = [x.metadata_tags[markerby] for x in self.experiment.acquisitions]
-            markermap = {m: s for m,s in zip(set(markers), random.sample(marker_list, len(set(markers))))}
-            markers = [markermap[x] for x in markers]
-            print(markers)
+
+        colors, markers, texts = self.generate_cosmetic(colorby, markerby, textby)
         selected_acquisition_names = [x.name for x in self.experiment.acquisitions]
         print(set(colors))
 
