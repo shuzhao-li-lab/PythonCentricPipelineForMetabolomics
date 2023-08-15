@@ -22,25 +22,15 @@ class FeatureTable:
         self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
         self.moniker = moniker
-        self.feature_matrix_header = None
-        feature_matrix = []
-        #todo - replace this with pandas?
-        with open(feature_table_filepath) as feature_table_fh:
-            for feature in csv.DictReader(feature_table_fh, delimiter="\t"):
-                if self.feature_matrix_header is None:
-                    self.feature_matrix_header = list(feature.keys())
-                feature_matrix_row = []
-                for column_name in self.feature_matrix_header:
-                    #if column_name != 'id_number':
-                    try:
-                        feature_matrix_row.append(np.float64(feature[column_name]))
-                    except:
-                        feature_matrix_row.append(feature[column_name])
-                feature_matrix.append(feature_matrix_row)
-        self.feature_matrix = np.array(feature_matrix).T
+
+        self.feature_table = pd.read_csv(feature_table_filepath, delimiter="\t")
+        self.sample_columns = [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
+        self.non_sample_columns = [x for x in self.feature_table.columns if x not in self.sample_columns]
+
 
     @staticmethod
     def load(moniker, experiment):
+        # todo - fix
         return FeatureTable(pd.read_csv(open(experiment.feature_tables[moniker])), experiment, moniker)
 
     
@@ -56,48 +46,6 @@ class FeatureTable:
         self.experiment.feature_tables[new_moniker] = output_path
         table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
 
-    def selected_feature_matrix(self, tag=None, sort=False):
-        """
-        Select columns in the feature table based on metadata, optionally sorted.
-
-        Args:
-            tag (str, optional): Sample type must match this field. Defaults to None.
-            sort (bool, optional): if true, sort the sample names. Defaults to False.
-
-        Returns:
-            selected feature matrix: the feature matrix for the selected acquisitions
-        """        
-        sample_names_for_tags = [acquisition.name for acquisition in self.experiment.acquisitions if tag is None or acquisition.metadata_tags['Sample Type'] == tag]
-        sample_names_for_tags = [x for x in sample_names_for_tags if x in self.feature_matrix_header]
-        if sort:
-            sample_names_for_tags.sort()
-        matching_column_indices = []
-        found_samples = []
-        for sample_name in sample_names_for_tags:
-            for column_index, column_name in enumerate(self.feature_matrix_header):
-                #print(column_name, sample_name, column_name == sample_name)
-                if sample_name == column_name:
-                    matching_column_indices.append(column_index)
-                    found_samples.append(sample_name)
-        feature_matrix_subset = np.array(self.feature_matrix[matching_column_indices], dtype=np.float64)
-        return feature_matrix_subset.T, found_samples
-    
-    def select_feature_column(self, feature_name):
-        """
-        Select a row in the feature table by column name
-
-        Args:
-            feature_name (str): if the column name matches this field, return that column
-
-        Returns:
-            feature column: numpy array of float64s for that column
-        """        
-        for column_index, name in enumerate(self.feature_matrix_header):
-            if name == feature_name:
-                try:
-                    return np.array([float(x) for x in self.feature_matrix[column_index]], dtype=np.float64)
-                except:
-                    return self.feature_matrix[column_index]
 
     def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False, save_figs=False):
         """
@@ -114,7 +62,8 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
-        correlation_result = self.correlation_heatmap(feature_vector_matrix, acquisition_names, correlation_type=correlation_type, interactive_plot=False, save_figs=False)
+
+        correlation_result = self.correlation_heatmap(None, acquisition_names, correlation_type=correlation_type, interactive_plot=False, save_figs=False)
         all_correlations = []
         median_correlations = {}
         for sample_name_1, corr_dict in correlation_result["Result"].items():
@@ -151,6 +100,7 @@ class FeatureTable:
         }
         return result
     
+    
     def intensity_analysis(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
         """
         Analyze mean, median, sum intensity values on the feature table
@@ -163,9 +113,10 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
-        intensity_sums = np.sum(feature_vector_matrix, axis=0)
-        mean_feature_intensity = np.mean(feature_vector_matrix, axis=0)
-        median_feature_intensity = np.median(feature_vector_matrix, axis=0)
+        selected_ftable = self.feature_table[acquisition_names].copy()
+        intensity_sums = np.sum(selected_ftable, axis=0)
+        mean_feature_intensity = np.mean(selected_ftable, axis=0)
+        median_feature_intensity = np.median(selected_ftable, axis=0)
         if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples")
@@ -191,10 +142,10 @@ class FeatureTable:
             plt.clf()
             
 
-        filtered_feature_vector_matrix = feature_vector_matrix.copy()
-        filtered_feature_vector_matrix[filtered_feature_vector_matrix == 0] = np.nan
-        filtered_mean_feature_intensity = np.nanmean(filtered_feature_vector_matrix, axis=0)
-        filtered_median_feature_intensity = np.nanmedian(filtered_feature_vector_matrix, axis=0)
+        selected_ftable = selected_ftable.copy()
+        selected_ftable[selected_ftable == 0] = np.nan
+        filtered_mean_feature_intensity = np.nanmean(selected_ftable, axis=0)
+        filtered_median_feature_intensity = np.nanmedian(selected_ftable, axis=0)
         if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Feature Intensities for Samples (missing features dropped)")
@@ -219,7 +170,7 @@ class FeatureTable:
                 plt.show()
             plt.clf()
 
-        TICs = np.nansum(feature_vector_matrix, axis=0)
+        TICs = np.nansum(selected_ftable, axis=0)
         log_TICs = np.log2(TICs)
         if interactive_plot or save_figs:
             plt.bar(list(range(len(log_TICs))), log_TICs)
@@ -229,10 +180,10 @@ class FeatureTable:
                 plt.show()
             plt.clf()
 
-        log_filtered_feature_vector_matrix = np.log2(filtered_feature_vector_matrix)
-        log_filtered_intensity_sum = np.nansum(log_filtered_feature_vector_matrix, axis=0)
-        log_filtered_mean_feature_intensity = np.nanmean(log_filtered_feature_vector_matrix, axis=0)
-        log_filtered_median_feature_intensity = np.nanmedian(log_filtered_feature_vector_matrix, axis=0)
+        log_selected_ftable = np.log2(selected_ftable)
+        log_filtered_intensity_sum = np.nansum(log_selected_ftable, axis=0)
+        log_filtered_mean_feature_intensity = np.nanmean(log_selected_ftable, axis=0)
+        log_filtered_median_feature_intensity = np.nanmedian(log_selected_ftable, axis=0)
         if interactive_plot or save_figs:
             X = list(range(len(intensity_sums)))
             plt.title("Sum Log Intensity for Samples (missing features dropped)")
@@ -273,9 +224,14 @@ class FeatureTable:
             }
         }
         return result
-        
+    
+    def clustermap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False):
+        import seaborn as sns
+        sns.clustermap(np.log2(self.feature_table[acquisition_names]+1).T)
+        plt.show()
+
     def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
-        feature_vector_matrix = feature_vector_matrix.T
+        feature_vector_matrix = self.feature_table[acquisition_names].T
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
             feature_vector_matrix = np.log2(feature_vector_matrix)        
@@ -330,10 +286,11 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
+        sample_ftable = self.feature_table[acquisition_names].T
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        feature_vector_matrix = np.log2(feature_vector_matrix+1)
-        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform((feature_vector_matrix.T)))
+        feature_vector_matrix = np.log2(sample_ftable+1)
+        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform((feature_vector_matrix)))
         if interactive_plot or save_figs:
             plt.title("PCA (n_components=2)")
             plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
@@ -368,7 +325,7 @@ class FeatureTable:
             result: dictionary storing the result of this QCQA operation
         """        
         try:
-            tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(feature_vector_matrix.T)
+            tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(self.feature_table[acquisition_names].T)
             if interactive_plot or save_figs:
                 plt.title("TSNE")
                 plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
@@ -391,7 +348,7 @@ class FeatureTable:
             else:
                 pass
     
-    def missing_feature_percentiles(self, feature_vector_matrix, interactive_plot=False, save_figs=False):
+    def missing_feature_percentiles(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
         """
         Calculate the distribution of missing features with respect to percent of smaples with feature
 
@@ -402,17 +359,20 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
-        num_sample_with_feature = np.sum(feature_vector_matrix > 0, axis=1)
+        def __count_feature(row, columns):
+            return np.sum([1 for x in row[columns] if x > 0])
+
+        num_sample_with_feature = self.feature_table.apply(__count_feature, axis=1, args=(acquisition_names,))
         percentile_table = []
         for percentile in range(101):
-            num_samples_threshold = feature_vector_matrix.shape[1] * percentile/100
+            num_samples_threshold = len(acquisition_names) * percentile/100
             percentile_table.append([percentile, num_samples_threshold, int(np.sum(num_sample_with_feature <= num_samples_threshold))])
         if interactive_plot or save_figs:
             plt.title("Missing Feature Percentiles")
             plt.xlabel("Percentile")
             plt.ylabel("Num. Dropped Features")
             plt.scatter([x[0] for x in percentile_table], [x[2] for x in percentile_table])
-            plt.axhline(feature_vector_matrix.shape[0], color='r', linestyle='-')
+            plt.axhline(len(num_sample_with_feature), color='r', linestyle='-')
             if save_figs:
                 plt.savefig(self.save_fig_path("missing_feature_percentiles"))
             if interactive_plot:
@@ -424,7 +384,7 @@ class FeatureTable:
             "Result": {"PercentileTable": percentile_table}
         }
         return result
-    
+
     def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
         """
         Count the number of missing features or featuers below the specified intensity cutoff per features
@@ -438,14 +398,17 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """        
-        intensity_masked_feature_matrix = feature_vector_matrix <= intensity_cutoff
-        missing_feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
-        #for i, a in enumerate(acquisition_names):
-        #    print(i, a)
+
+        masked_ftables = self.feature_table[acquisition_names] <= intensity_cutoff
+        missing_feature_counts = dict(zip(acquisition_names, [0 for _ in acquisition_names]))
+        for name in acquisition_names:
+            for value in masked_ftables[name]:
+                if value is True:
+                    missing_feature_counts[name] += 1
         if interactive_plot or save_figs:
             plt.title("Missing Feature Counts")
             plt.ylabel("Num. Missing Features")
-            plt.bar(acquisition_names, missing_feature_count)
+            plt.bar(acquisition_names, [missing_feature_counts[name] for name in acquisition_names])
             plt.xticks(rotation='vertical')
             if save_figs:
                 plt.savefig(self.save_fig_path("missing_feature_counts"))
@@ -455,7 +418,7 @@ class FeatureTable:
         result = {
             "Type": "MissingFeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
-            "Result": {name: int(num_missing) for name, num_missing in zip(acquisition_names, missing_feature_count)}
+            "Result": {name: int(num_missing) for name, num_missing in missing_feature_counts.items()}
         }
         return result
     
@@ -472,12 +435,16 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """   
-        intensity_masked_feature_matrix = feature_vector_matrix > intensity_cutoff
-        feature_count = np.sum(intensity_masked_feature_matrix, axis=0)
+        masked_ftables = self.feature_table[acquisition_names] > intensity_cutoff
+        feature_counts = dict(zip(acquisition_names, [0 for _ in acquisition_names]))
+        for name in acquisition_names:
+            for value in masked_ftables[name]:
+                if value is True:
+                    feature_counts[name] += 1
         if interactive_plot or save_figs:
             plt.title("Feature Counts")
             plt.ylabel("Num. Features")
-            plt.bar(acquisition_names, feature_count)
+            plt.bar(acquisition_names, [feature_counts[name] for name in acquisition_names])
             plt.xticks(rotation='vertical')
             if save_figs:
                 plt.savefig(self.save_fig_path("feature_counts"))
@@ -487,7 +454,7 @@ class FeatureTable:
         result = {
             "Type": "FeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
-            "Result": {name: int(num_missing) for name, num_missing in zip(acquisition_names, feature_count)}
+            "Result": {name: int(num_missing) for name, num_missing in feature_counts.items()}
         }
         return result
     
@@ -549,7 +516,7 @@ class FeatureTable:
         if interactive_plot or save_figs:
             plt.title("Num Missing Feature Z-Score")
             plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
-            for x, y, name in zip(list(range(len(missing_feature_z_scores))), missing_feature_z_scores, acquisition_names):
+            for x, y, name in zip(list(range(len(missing_feature_z_scores))), missing_feature_z_scores, sample_names):
                 plt.text(x, y, name)
             if save_figs:
                 plt.savefig(self.save_fig_path("missing_feature_z_score"))
@@ -559,7 +526,7 @@ class FeatureTable:
         result = {
             "Type": "MissingFeatureZScores",
             "Config": {"intensity_cutoff": intensity_cutoff},
-            "Result": {name: float(z_score) for name, z_score in zip(acquisition_names, missing_feature_z_scores)}
+            "Result": {name: float(z_score) for name, z_score in zip(sample_names, missing_feature_z_scores)}
         }
         return result
 
@@ -585,50 +552,51 @@ class FeatureTable:
         self.save(table, new_moniker)
 
     def blank_mask(self, new_moniker, by_batch=True, blank_intensity_ratio=3, logic_mode="and", blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
+        def __non_zero_mean(row, columns):
+            non_zero_columns = [x for x in row[columns] if x > 0]
+            return np.mean(non_zero_columns) if len(non_zero_columns) > 0 else 0
+        
         def __any_logical(row, columns):
             return np.any(row[columns] == True)
 
         def __all_logical(row, columns):
             return np.all(row[columns] == True)
         
-        def __non_zero_mean(row, columns):
-            non_zero_columns = [x for x in row[columns] if x > 0]
-            if non_zero_columns:
-                return np.mean(non_zero_columns)
-            else:
-                0
-        
-        blank_names = [x for x in self.experiment.filter_samples({type_field: {"includes": [blank_type]}}) if x in self.feature_matrix_header]
-        sample_names = [x for x in self.experiment.filter_samples({type_field: {"includes": [sample_type]}}) if x in self.feature_matrix_header]
-        table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names + blank_names]).T, columns=sample_names + blank_names)
+        blank_names = {x for x in self.experiment.filter_samples({type_field: {"includes": [blank_type]}}) if x in self.sample_columns}
+        sample_names = {x for x in self.experiment.filter_samples({type_field: {"includes": [sample_type]}}) if x in self.sample_columns}
         blank_mask_columns = []
-        for batch_name, batch_name_list in self.experiment.batches(skip_batch=by_batch).items():
-            batch_blanks = [x for x in batch_name_list if x in blank_names]
-            batch_samples = [x for x in batch_name_list if x in sample_names]
-            blank_means = table.apply(__non_zero_mean, axis=1, args=(batch_blanks,))
-            sample_means = table.apply(__non_zero_mean, axis=1, args=(batch_samples,))
-            to_filter = [blank_mean * blank_intensity_ratio > sample_mean for blank_mean, sample_mean in zip(blank_means, sample_means)]
-            mask_column_name = "masked" + batch_name
-            blank_mask_columns.append(mask_column_name)
-            table[mask_column_name] = to_filter
-        #print(np.sum(to_filter))
+        if by_batch:
+            for batch_name, batch_name_list in self.experiment.batches().items():
+                batch_blanks = [x for x in batch_name_list if x in blank_names]
+                batch_samples = [x for x in batch_name_list if x in sample_names]
+                blank_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(batch_blanks,))
+                sample_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(batch_samples,))
+                to_filter = []
+                for blank_mean, sample_mean in zip(blank_means, sample_means):
+                    to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+                blank_mask_column = "blank_masked_" + batch_name
+                blank_mask_columns.append(blank_mask_column)
+                self.feature_table[blank_mask_column] = to_filter
+        to_filter = []
+        for blank_mean, sample_mean in zip(blank_means, sample_means):
+            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+        blank_mask_column = "blank_masked_ALL"
+        blank_mask_columns.append(blank_mask_column)
+        self.feature_table[blank_mask_column] = to_filter
 
         if logic_mode == "and":
-            table["mask_feature"] = table.apply(__all_logical, axis=1, args=(blank_mask_columns,))
+            self.feature_table["mask_feature"] = self.feature_table.apply(__all_logical, axis=1, args=(blank_mask_columns,))
         elif logic_mode == "or":
-            table["mask_feature"] = table.apply(__any_logical, axis=1, args=(blank_mask_columns,))
+            self.feature_table["mask_feature"] = self.feature_table.apply(__any_logical, axis=1, args=(blank_mask_columns,))
 
         for blank_mask_column in blank_mask_columns:
-            table.drop(columns=blank_mask_column, inplace=True)
+            self.feature_table.drop(columns=blank_mask_column, inplace=True)
 
-        for header_field in self.feature_matrix_header:
-            if header_field not in blank_names + sample_names:
-                table[header_field] = self.select_feature_column(header_field)
-        table = table[table["mask_feature"] == False]
-        table.drop(columns="mask_feature", inplace=True)
-        self.save(table, new_moniker)
+        self.feature_table = self.feature_table[self.feature_table["mask_feature"] == False]
+        self.feature_table.drop(columns="mask_feature", inplace=True)
+        self.save(self.feature_table, new_moniker)
 
-    def interpolate_missing_features(self, new_moniker, ratio=0.5, by_batch=True):
+    def interpolate_missing_features(self, new_moniker, ratio=0.5, by_batch=False):
         def calc_interpolated_value(row, sample_names):
             values = [x for x in row[sample_names] if x > 0]
             if values:
@@ -648,7 +616,7 @@ class FeatureTable:
                 table[header_field] = self.select_feature_column(header_field)
         self.save(table, new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive_plot=False, save_figs=False):
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=False, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive_plot=False, save_figs=False):
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         for _, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
@@ -733,12 +701,12 @@ class FeatureTable:
                 table[header_field] = self.select_feature_column(header_field) 
         self.save(table, new_moniker)
 
-    def drop_missing_features(self, new_moniker, by_batch=True, drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
+    def drop_missing_features(self, new_moniker, by_batch=False, drop_percentile=0.8, logic_mode="and", sample_type="Unknown", type_field="Sample Type"):
         def __any(row, columns, drop_percentile):
             return not np.any(row[columns] >= drop_percentile)
-
         def __all(row, columns, drop_percentile):
             return not np.all(row[columns] >= drop_percentile)
+        
         sample_names = self.experiment.filter_samples({type_field: {"includes": [sample_type]}})
         table = pd.DataFrame(np.array([self.select_feature_column(x) for x in sample_names]).T, columns=sample_names)
         batch_columns = []
@@ -804,30 +772,29 @@ class FeatureTable:
         """        
         if sort is None:
             sort=False
-        selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
+        selected_acquisition_names = list(self.sample_columns)
+        selected_feature_matrix = None
+        #selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
         qcqa_result = []
-        if pca:
-            qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if tsne:
-            qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if pearson:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
-        if spearman:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='spearman', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
-        if kendall:
-            qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='kendall', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
-        if missing_feature_percentiles:
-            qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, interactive_plot=interactive, save_figs=save_figs))
-        if missing_feature_distribution:
-            qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if missing_feature_outlier_detection:
-            qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if median_correlation_outlier_detection:
-            qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if intensity_analysis:
-            qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        if feature_distribution:
-            qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if pca:
+        #    qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if tsne:
+        #    qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if pearson:
+        #    qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
+        #if missing_feature_percentiles:
+        #    qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if missing_feature_distribution:
+        #    qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if missing_feature_outlier_detection:
+        #    qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if median_correlation_outlier_detection:
+        #    qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if intensity_analysis:
+        #    qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        #if feature_distribution:
+        #    qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
         if feature_outlier_detection:
             qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        exit()
         return qcqa_result
