@@ -304,13 +304,12 @@ class Experiment:
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
 
-    def batches(self, field="name", batch_field="Batch", debug=False, skip_batch=False):
+    def batches(self, field="name", batch_field="batch", debug=False, skip_batch=False):
+        #batches = {"ALL": [a.name for a in self.acquisitions]}
         batches = {}
         for acquisition in self.acquisitions:
             if skip_batch:
                 batch_name = "no_batch"
-            elif debug:
-                batch_name = acquisition.metadata_tags['Position'].split(":")[0]
             else:
                 if batch_field in acquisition.metadata_tags:
                     batch_name = acquisition.metadata_tags[batch_field]
