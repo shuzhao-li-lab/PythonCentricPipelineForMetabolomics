@@ -46,8 +46,61 @@ class FeatureTable:
         self.experiment.feature_tables[new_moniker] = output_path
         table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t")
 
+    @staticmethod
+    def gen_figure(figure_type, data, title='', x_label=None, y_label=None, colors=None, text=None, markers=None, interactive=False, save_fig=False, legend=None, colors2=None):
+        if interactive or save_fig:
+            if figure_type == "scatter":
+                if type(data) is dict:
+                    X = data.keys()
+                    Y = data.values()
+                else:
+                    X = data[:, 0]
+                    Y = data[:, 1]
+                plt.title(title)
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+                if colors and markers:
+                    for x,y,c,m in zip(X,Y,colors,markers):
+                        plt.scatter(x, y, c=c, marker=m)
+                elif colors:
+                    plt.scatter(X, Y, c=colors)
+                elif markers:
+                    plt.scatter(X, Y, marker=markers)
+                else:
+                    plt.scatter(X, Y)
+                if text:
+                    for x, y, t in zip(X, Y, text):
+                        plt.text(x,y,t)
+            elif figure_type == "heatmap":
+                if colors and not colors2:
+                    sns.clustermap(data, col_colors=[colors], xticklabels=text)
+                if colors and colors2:
+                    sns.clustermap(data, col_colors=[colors, colors2])
+                if legend:
+                    from matplotlib.patches import Patch
+                    plt.legend(
+                        [Patch(facecolor=color) for color in legend.values()],
+                        list(legend.keys()),
+                        bbox_to_anchor=(1,1),
+                        bbox_transform=plt.gcf().transFigure,
+                        title='Batch',
+                        loc='upper right'
+                    )
 
-    def median_correlation_outlier_detection(self, feature_vector_matrix, acquisition_names, correlation_type='pearson', interactive_plot=False, save_figs=False):
+            elif figure_type == "bar":
+                if colors:
+                    plt.bar(data[0], data[1], color=colors)
+                else:
+                    plt.bar(data[0], data[1])
+                plt.title(title)
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+            if interactive:
+                plt.show()
+            plt.clf()
+
+
+    def median_correlation_outlier_detection(self, acquisition_names, correlation_type='pearson', interactive_plot=False, save_figs=False, colors=None, texts=None, markers=None):
         """
         The median correlation of a sample against all other samples can be expressed as a z-score against the median
         of ALL correlations in the experiment. A high or low Z-score indicates that the sample was poorly correlated 
@@ -63,7 +116,7 @@ class FeatureTable:
             result: dictionary storing the result of this QCQA operation
         """        
 
-        correlation_result = self.correlation_heatmap(None, acquisition_names, correlation_type=correlation_type, interactive_plot=False, save_figs=False)
+        correlation_result = self.correlation_heatmap(acquisition_names, correlation_type=correlation_type, interactive_plot=False, save_figs=False, colors=None, texts=None, markers=None)
         all_correlations = []
         median_correlations = {}
         for sample_name_1, corr_dict in correlation_result["Result"].items():
@@ -76,22 +129,31 @@ class FeatureTable:
         all_correlations_std = np.std(all_correlations)
         all_correlations_median = np.median(all_correlations)
         z_score_correlations = {name: (median_correlation - all_correlations_median)/all_correlations_std for name, median_correlation in median_correlations.items()}
-        if save_figs or interactive_plot:
-            plt.title("Median Correlation Values for Samples")
-            plt.scatter(list(range(len(median_correlations))), list(median_correlations.values()))
-            if save_figs:
-                plt.savefig(self.save_fig_path("median_correlation"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
 
-            plt.title("Median Correlation Z-Scores for Samples")
-            plt.scatter(list(range(len(z_score_correlations))), list(z_score_correlations.values()))
-            if save_figs:
-                plt.savefig(self.save_fig_path("median_correlation_Z_scores"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "scatter",
+            {i: v for i, v in enumerate(median_correlations.values())},
+            title="Median Correlation Values for Samples",
+            x_label="Sample",
+            y_label="Median Correlation Value",
+            save_fig="median_correlation" if save_figs else False,
+            interactive=interactive_plot,
+            colors=colors,
+            text=texts,
+            markers=markers,
+        )
+        FeatureTable.gen_figure(
+            "scatter",
+            {i: v for i, v in enumerate(z_score_correlations.values())},
+            title="Median Correlation Z-Scores for Samples",
+            x_label="Sample",
+            y_label="Median Correlation Z-Score",
+            save_fig="median_correlation_z_score" if save_figs else False,
+            interactive=interactive_plot,
+            colors=colors,
+            text=texts,
+            markers=markers
+        )
 
         result = {
             "Type": "MedianCorrelationZScores",
@@ -101,7 +163,7 @@ class FeatureTable:
         return result
     
     
-    def intensity_analysis(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
+    def intensity_analysis(self, acquisition_names, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Analyze mean, median, sum intensity values on the feature table
 
@@ -117,96 +179,40 @@ class FeatureTable:
         intensity_sums = np.sum(selected_ftable, axis=0)
         mean_feature_intensity = np.mean(selected_ftable, axis=0)
         median_feature_intensity = np.median(selected_ftable, axis=0)
-        if interactive_plot or save_figs:
-            X = list(range(len(intensity_sums)))
-            plt.title("Sum Feature Intensities for Samples")
-            plt.bar(X, intensity_sums)
-            if save_figs:
-                plt.savefig(self.save_fig_path("sum_feature_intensities"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Mean Feature Intensity for Samples")
-            plt.bar(X, mean_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("mean_feature_intensities"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Median Feature Intensity for Samples")
-            plt.bar(X, median_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("median_feature_intensities"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            
-
+        
         selected_ftable = selected_ftable.copy()
         selected_ftable[selected_ftable == 0] = np.nan
         filtered_mean_feature_intensity = np.nanmean(selected_ftable, axis=0)
         filtered_median_feature_intensity = np.nanmedian(selected_ftable, axis=0)
-        if interactive_plot or save_figs:
-            X = list(range(len(intensity_sums)))
-            plt.title("Sum Feature Intensities for Samples (missing features dropped)")
-            plt.bar(X, intensity_sums)
-            if save_figs:
-                plt.savefig(self.save_fig_path("sum_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Mean Feature Intensity for Samples (missing features dropped)")
-            plt.bar(X, filtered_mean_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("mean_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Median Feature Intensity for Samples (missing features dropped)")
-            plt.bar(X, filtered_median_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("median_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-
-        TICs = np.nansum(selected_ftable, axis=0)
-        log_TICs = np.log2(TICs)
-        if interactive_plot or save_figs:
-            plt.bar(list(range(len(log_TICs))), log_TICs)
-            if save_figs:
-                plt.savefig(self.save_fig_path("log_TICs"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
 
         log_selected_ftable = np.log2(selected_ftable)
         log_filtered_intensity_sum = np.nansum(log_selected_ftable, axis=0)
         log_filtered_mean_feature_intensity = np.nanmean(log_selected_ftable, axis=0)
         log_filtered_median_feature_intensity = np.nanmedian(log_selected_ftable, axis=0)
-        if interactive_plot or save_figs:
-            X = list(range(len(intensity_sums)))
-            plt.title("Sum Log Intensity for Samples (missing features dropped)")
-            plt.bar(X, log_filtered_intensity_sum)
-            if save_figs:
-                plt.savefig(self.save_fig_path("sum_log_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Mean Log Feature Intensity for Samples (missing features dropped)")
-            plt.bar(X, log_filtered_mean_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("mean_log_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
-            plt.title("Median Log Feature Intensity for Samples (missing features dropped)")
-            plt.bar(X, log_filtered_median_feature_intensity)
-            if save_figs:
-                plt.savefig(self.save_fig_path("median_log_feature_intensities_no_missing"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+
+        TICs = np.nansum(selected_ftable, axis=0)
+        log_TICs = np.log2(TICs)
+
+        tables = [intensity_sums, mean_feature_intensity, median_feature_intensity, filtered_mean_feature_intensity, filtered_mean_feature_intensity, log_filtered_intensity_sum, log_filtered_mean_feature_intensity, log_filtered_median_feature_intensity, log_TICs]
+        titles = ["Sum Feature Intensity", "Mean Feature Intensity", "Median Feature Intensity",
+                  "Mean Feature Intensity (dropped 0s)", "Median Feature Intensity (dropped 0s)",
+                  "Log Sum Feature Intensities", "Log Mean Feature Intensity", "Log Median Feature Intensity", 
+                  "Log TICs"]
+        paths = [x.lower().replace(" ", "_") for x in titles]
+
+        for table, title, path in zip(tables, titles, paths):
+            FeatureTable.gen_figure(
+                "bar",
+                (acquisition_names, table),
+                title,
+                x_label="title",
+                y_label="sample",
+                interactive=interactive_plot,
+                save_fig=path if save_figs else False,
+                colors=colors,
+                text=texts,
+                markers=markers
+            )
 
         result = {
             "Type": "IntensitySummary",
@@ -224,13 +230,9 @@ class FeatureTable:
             }
         }
         return result
-    
-    def clustermap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False):
-        import seaborn as sns
-        sns.clustermap(np.log2(self.feature_table[acquisition_names]+1).T)
-        plt.show()
 
-    def correlation_heatmap(self, feature_vector_matrix, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
+
+    def correlation_heatmap(self, acquisition_names, correlation_type, tag=None, log_transform=True, interactive_plot=False, result=None, save_figs=False, texts=None, colors=None, markers=None):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         feature_vector_matrix = self.feature_table[acquisition_names].T
         if log_transform:
             feature_vector_matrix = feature_vector_matrix + 1
@@ -242,31 +244,44 @@ class FeatureTable:
             for i in range(feature_vector_matrix.shape[0]):
                 for j in range(i, feature_vector_matrix.shape[0]):
                     tau = scipy.stats.kendalltau(feature_vector_matrix[i], feature_vector_matrix[j]).statistic
-                    corr_matrix[i][j] = tau
-                    corr_matrix[j][i] = tau
+                    corr_matrix[i][j] = corr_matrix[j][i] = tau
         elif correlation_type == "spearman":
             corr_matrix = np.zeros((feature_vector_matrix.shape[0], feature_vector_matrix.shape[0]))
             for i in range(feature_vector_matrix.shape[0]):
                 for j in range(i, feature_vector_matrix.shape[0]):
                     spearmanr = scipy.stats.spearmanr(feature_vector_matrix[i], feature_vector_matrix[j]).statistic
-                    corr_matrix[i][j] = spearmanr
-                    corr_matrix[j][i] = spearmanr
-        if interactive_plot or save_figs:
-            if tag:
-                heatmap_title = "Correlation Heatmap for Samples of Type: " + tag + "\n"
-            else:
-                heatmap_title = "Correlation Heatmap for All Samples\n" 
-            heatmap_title += " Method=" + correlation_type
-            if log_transform:
-                heatmap_title += " Log2 Transformed"
-            plt.title(heatmap_title)
-            #plt.imshow(corr_matrix)
-            sns.heatmap(corr_matrix, xticklabels=acquisition_names, yticklabels=acquisition_names)
-            if save_figs:
-                plt.savefig(self.save_fig_path(heatmap_title))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+                    corr_matrix[i][j] = corr_matrix[j][i] = spearmanr
+        
+        legend = {}
+        for batch, color in zip([a.metadata_tags["batch"] for a in self.experiment.acquisitions if a.name in acquisition_names], colors):
+            legend[batch] = color
+        import matplotlib.colors as mcolors
+        import random
+        banned_colors = {'snow', 'beige', 'honeydew', 'azure', 'aliceblue', 'lightcyan', 'lightyellow', 'white', 'oldlace', 'antiquewhite', 'ivory'}
+        allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors and x not in colors]
+
+        types = set([a.metadata_tags["Sample Type"] for a in self.experiment.acquisitions if a.name in acquisition_names])
+
+        mapping = {}
+        color2 = random.sample(allowed_colors, len(types))
+        for type_x, color in zip(types, color2):
+            mapping[type_x] = color
+            legend[type_x] = color
+        types = [mapping[x] for x in [a.metadata_tags["Sample Type"] for a in self.experiment.acquisitions if a.name in acquisition_names]]
+        
+        FeatureTable.gen_figure(
+            "heatmap",
+            corr_matrix,
+            x_label=texts,
+            y_label=texts,
+            interactive=interactive_plot,
+            save_fig=correlation_type if save_figs else False,
+            colors=colors,
+            markers=markers,
+            text=texts,
+            legend=legend,
+            colors2=types
+        )
         result = {
             "Type": "Correlation",
             "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
@@ -274,7 +289,7 @@ class FeatureTable:
             }
         return result
 
-    def PCA(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
+    def PCA(self, acquisition_names, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Perform PCA on provided feature table
 
@@ -289,29 +304,26 @@ class FeatureTable:
         sample_ftable = self.feature_table[acquisition_names].T
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        feature_vector_matrix = np.log2(sample_ftable+1)
-        pca_embedded_vector_matrix = pca_embedder.fit_transform(scaler.fit_transform((feature_vector_matrix)))
-        if interactive_plot or save_figs:
-            plt.title("PCA (n_components=2)")
-            plt.scatter(pca_embedded_vector_matrix[:,0], pca_embedded_vector_matrix[:,1])
-            for (x, y), name in zip(pca_embedded_vector_matrix, acquisition_names):
-                plt.text(x, y, name)
-            plt.xlabel("PC 1 " + str(round(pca_embedder.explained_variance_ratio_[0] * 100, 1)) + "%", fontsize=14)
-            plt.ylabel("PC 2 " + str(round(pca_embedder.explained_variance_ratio_[1] * 100, 1)) + "%", fontsize=14)
-            if save_figs:
-                print("saving")
-                plt.savefig(self.save_fig_path("pca_two_components"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        log_sample_ftable = np.log2(sample_ftable+1)
+        pca_embedding = pca_embedder.fit_transform(scaler.fit_transform((log_sample_ftable)))
+        FeatureTable.gen_figure("scatter", 
+                                pca_embedding, 
+                                "PCA (n_components=2)",
+                                x_label = "PC 1 " + str(round(pca_embedder.explained_variance_ratio_[0] * 100, 1)) + "%",
+                                y_label = "PC 2 " + str(round(pca_embedder.explained_variance_ratio_[1] * 100, 1)) + "%",
+                                interactive=interactive_plot,
+                                save_fig="pca_two_components" if save_figs else False,
+                                colors=colors,
+                                text=texts,
+                                markers=markers)
         result = {
             "Type": "PCA",
             "Config": {"n_components": 2, "scaler": "StandardScaler"},
-            "Result": {"Sample_Coord_Dict": {name: list(coord) for name, coord in zip(acquisition_names, pca_embedded_vector_matrix)}}
+            "Result": {"Sample_Coord_Dict": {name: list(coord) for name, coord in zip(acquisition_names, pca_embedding)}}
         }
         return result
             
-    def TSNE(self, feature_vector_matrix, acquisition_names, interactive_plot=False, perplexity=30, save_figs=False):
+    def TSNE(self, acquisition_names, perplexity=30, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Perform TSNE on provided feature table
 
@@ -326,16 +338,18 @@ class FeatureTable:
         """        
         try:
             tnse_embedded_vector_matrix = TSNE(n_components=2, perplexity=perplexity).fit_transform(self.feature_table[acquisition_names].T)
-            if interactive_plot or save_figs:
-                plt.title("TSNE")
-                plt.scatter(tnse_embedded_vector_matrix[:,0], tnse_embedded_vector_matrix[:,1])
-                for (x, y), name in zip(tnse_embedded_vector_matrix, acquisition_names):
-                    plt.text(x, y, name)
-                if save_figs:
-                    plt.savefig(self.save_fig_path("tsne_two_components"))
-                if interactive_plot:
-                    plt.show()
-                plt.clf()
+            FeatureTable.gen_figure(
+                "scatter",
+                tnse_embedded_vector_matrix,
+                "TSNE (n_components=2)",
+                x_label="Latent 1",
+                y_label="Latent 2",
+                interactive=interactive_plot,
+                save_fig="tsne_two_components" if save_figs else False,
+                colors=colors,
+                text=texts,
+                markers=markers
+            )
             result = {
                 "Type": "TSNE",
                 "Config": {"n_components": 2},
@@ -344,11 +358,11 @@ class FeatureTable:
             return result
         except:
             if perplexity > 0:
-                self.TSNE(feature_vector_matrix, acquisition_names, interactive_plot, perplexity=perplexity-1)
+                self.TSNE(acquisition_names, perplexity=perplexity-1, interactive_plot=interactive_plot, save_figs=save_figs, texts=texts, colors=colors, markers=markers)
             else:
-                pass
+                return {}
     
-    def missing_feature_percentiles(self, feature_vector_matrix, acquisition_names, interactive_plot=False, save_figs=False):
+    def missing_feature_percentiles(self, acquisition_names, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Calculate the distribution of missing features with respect to percent of smaples with feature
 
@@ -367,17 +381,15 @@ class FeatureTable:
         for percentile in range(101):
             num_samples_threshold = len(acquisition_names) * percentile/100
             percentile_table.append([percentile, num_samples_threshold, int(np.sum(num_sample_with_feature <= num_samples_threshold))])
-        if interactive_plot or save_figs:
-            plt.title("Missing Feature Percentiles")
-            plt.xlabel("Percentile")
-            plt.ylabel("Num. Dropped Features")
-            plt.scatter([x[0] for x in percentile_table], [x[2] for x in percentile_table])
-            plt.axhline(len(num_sample_with_feature), color='r', linestyle='-')
-            if save_figs:
-                plt.savefig(self.save_fig_path("missing_feature_percentiles"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "scatter",
+            np.array([[x[0], x[2]] for x in percentile_table]),
+            "Missing Feature Percentiles",
+            "Percentile",
+            "Num. Dropped Features",
+            interactive=interactive_plot,
+            save_fig="missing_feature_percentiles" if save_figs else False,
+        )
         result = {
             "Type": "MissingFeaturePercentiles",
             "Config": {},
@@ -385,7 +397,7 @@ class FeatureTable:
         }
         return result
 
-    def missing_feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
+    def missing_feature_distribution(self, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Count the number of missing features or featuers below the specified intensity cutoff per features
 
@@ -405,16 +417,17 @@ class FeatureTable:
             for value in masked_ftables[name]:
                 if value is True:
                     missing_feature_counts[name] += 1
-        if interactive_plot or save_figs:
-            plt.title("Missing Feature Counts")
-            plt.ylabel("Num. Missing Features")
-            plt.bar(acquisition_names, [missing_feature_counts[name] for name in acquisition_names])
-            plt.xticks(rotation='vertical')
-            if save_figs:
-                plt.savefig(self.save_fig_path("missing_feature_counts"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "bar",
+            (acquisition_names, [missing_feature_counts[name] for name in acquisition_names]),
+            "Missing Feature Counts",
+            y_label="Num. Missing Features",
+            save_fig="missing_feature_counts" if save_figs else False,
+            interactive=interactive_plot,
+            text=texts,
+            colors=colors,
+            markers=markers,
+        )
         result = {
             "Type": "MissingFeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -422,7 +435,7 @@ class FeatureTable:
         }
         return result
     
-    def feature_distribution(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
+    def feature_distribution(self, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Count the number of features above the specified intensity cutoff per features
 
@@ -441,16 +454,17 @@ class FeatureTable:
             for value in masked_ftables[name]:
                 if value is True:
                     feature_counts[name] += 1
-        if interactive_plot or save_figs:
-            plt.title("Feature Counts")
-            plt.ylabel("Num. Features")
-            plt.bar(acquisition_names, [feature_counts[name] for name in acquisition_names])
-            plt.xticks(rotation='vertical')
-            if save_figs:
-                plt.savefig(self.save_fig_path("feature_counts"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "bar",
+            (acquisition_names, [feature_counts[name] for name in acquisition_names]),
+            "Feature Counts",
+            y_label="Num. Features",
+            save_fig="feature_counts" if save_figs else False,
+            interactive=interactive_plot,
+            text=texts,
+            colors=colors,
+            markers=markers,
+        )
         result = {
             "Type": "FeatureDistribution",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -458,7 +472,7 @@ class FeatureTable:
         }
         return result
     
-    def feature_distribution_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
+    def feature_distribution_outlier_detection(self, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False, colors=None, texts=None, markers=None):
         """
         Count the number of features above the specified intensity cutoff per features and express as a Z-score based
         on feature count across all samples. 
@@ -473,20 +487,22 @@ class FeatureTable:
             result: dictionary storing the result of this QCQA operation
         """   
 
-        feature_counts_result = self.feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)
+        feature_counts_result = self.feature_distribution(acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)
         sample_names = [*feature_counts_result["Result"].keys()]
         feature_counts = np.array([*feature_counts_result["Result"].values()])
         feature_z_scores = (feature_counts - np.mean(feature_counts)) / np.std(feature_counts)
-        if interactive_plot or save_figs:
-            plt.title("Num Feature Z-Score")
-            plt.scatter(list(range(len(feature_z_scores))), feature_z_scores)
-            for x, y, name in zip(list(range(len(feature_z_scores))), feature_z_scores, acquisition_names):
-                plt.text(x, y, name)
-            if save_figs:
-                plt.savefig(self.save_fig_path("num_feature_z_score"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "scatter",
+            {i: z_score for i, z_score in enumerate(feature_z_scores)},
+            "Num Feature Z-Score",
+            "Sample",
+            "Num Feature Z-Score",
+            colors=colors,
+            text=texts,
+            markers=markers,
+            interactive=interactive_plot,
+            save_fig="feature_z_score" if save_figs else False,
+        )
         result = {
             "Type": "FeatureCountZScores",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -494,7 +510,7 @@ class FeatureTable:
         }
         return result
 
-    def missing_feature_outlier_detection(self, feature_vector_matrix, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False):
+    def missing_feature_outlier_detection(self, acquisition_names, intensity_cutoff=0, interactive_plot=False, save_figs=False, texts=None, colors=None, markers=None):
         """
         Count the number of features below the specified intensity cutoff per features and express as a Z-score based
         on missing feature count across all samples. 
@@ -508,21 +524,23 @@ class FeatureTable:
         Returns:
             result: dictionary storing the result of this QCQA operation
         """   
-        missing_feature_counts_result = self.missing_feature_distribution(feature_vector_matrix, acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)        
-        # this relies upon the sorted order of the dictionary, may not be safe in all Python versions        
+        missing_feature_counts_result = self.missing_feature_distribution(acquisition_names, intensity_cutoff=intensity_cutoff, interactive_plot=False, save_figs=False)        
+        # this relies upon the sorted order of the dictionary, may not be safe in all Python versions       
         sample_names = [*missing_feature_counts_result["Result"].keys()]
         missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
         missing_feature_z_scores = (missing_feature_counts - np.mean(missing_feature_counts)) / np.std(missing_feature_counts)
-        if interactive_plot or save_figs:
-            plt.title("Num Missing Feature Z-Score")
-            plt.scatter(list(range(len(missing_feature_z_scores))), missing_feature_z_scores)
-            for x, y, name in zip(list(range(len(missing_feature_z_scores))), missing_feature_z_scores, sample_names):
-                plt.text(x, y, name)
-            if save_figs:
-                plt.savefig(self.save_fig_path("missing_feature_z_score"))
-            if interactive_plot:
-                plt.show()
-            plt.clf()
+        FeatureTable.gen_figure(
+            "scatter",
+            {i: z_score for i, z_score in enumerate(missing_feature_z_scores)},
+            "Num Missing Feature Z-Score",
+            "Sample",
+            "Num Missing Feature Z-Score",
+            colors=colors,
+            text=texts,
+            markers=markers,
+            interactive=interactive_plot,
+            save_fig="missing_feature_z_score" if save_figs else False,
+        )
         result = {
             "Type": "MissingFeatureZScores",
             "Config": {"intensity_cutoff": intensity_cutoff},
@@ -743,7 +761,10 @@ class FeatureTable:
              intensity_analysis=False,
              feature_distribution=False,
              feature_outlier_detection=False,
-             save_figs=False):
+             save_figs=False,
+             colorby='batch',
+             textby='batch',
+             markerby='Sample Type'):
         """
         This is the wrapper for all the qcqa functions. 
 
@@ -772,29 +793,50 @@ class FeatureTable:
         """        
         if sort is None:
             sort=False
-        selected_acquisition_names = list(self.sample_columns)
-        selected_feature_matrix = None
+
+        import matplotlib.pyplot as plt
+        import matplotlib.colors as mcolors
+        import random
+
+        banned_colors = {'snow', 'beige', 'honeydew', 'azure', 'aliceblue', 'lightcyan', 'lightyellow', 'white', 'oldlace', 'antiquewhite', 'ivory'}
+        allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
+        colors, texts, markers = None, None, None
+        if colorby:
+            colors = [x.metadata_tags[colorby] for x in self.experiment.acquisitions]
+            colormap = {b: c for b, c in zip(set(colors), random.sample(allowed_colors, len(set(colors))))}
+            colors = [colormap[x] for x in colors]
+        if textby:
+            texts = [x.metadata_tags[textby] for x in self.experiment.acquisitions]
+        if markerby:
+            marker_list = [".", "o", "v", "^", ">", "<"] + [str(x) for x in [1,2,3,4,8]] + ["s", "P"]
+            markers = [x.metadata_tags[markerby] for x in self.experiment.acquisitions]
+            markermap = {m: s for m,s in zip(set(markers), random.sample(marker_list, len(set(markers))))}
+            markers = [markermap[x] for x in markers]
+            print(markers)
+        selected_acquisition_names = [x.name for x in self.experiment.acquisitions]
+        print(set(colors))
+
         #selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
         qcqa_result = []
-        #if pca:
-        #    qcqa_result.append(self.PCA(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if tsne:
-        #    qcqa_result.append(self.TSNE(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if pearson:
-        #    qcqa_result.append(self.correlation_heatmap(selected_feature_matrix, selected_acquisition_names, correlation_type='pearson', tag=tag, log_transform=True, interactive_plot=interactive, save_figs=save_figs))
-        #if missing_feature_percentiles:
-        #    qcqa_result.append(self.missing_feature_percentiles(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if missing_feature_distribution:
-        #    qcqa_result.append(self.missing_feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if missing_feature_outlier_detection:
-        #    qcqa_result.append(self.missing_feature_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if median_correlation_outlier_detection:
-        #    qcqa_result.append(self.median_correlation_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if intensity_analysis:
-        #    qcqa_result.append(self.intensity_analysis(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
-        #if feature_distribution:
-        #    qcqa_result.append(self.feature_distribution(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+        if pca:
+            qcqa_result.append(self.PCA(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if tsne:
+            qcqa_result.append(self.TSNE(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if pearson:
+            qcqa_result.append(self.correlation_heatmap(selected_acquisition_names, correlation_type='pearson', log_transform=True, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if missing_feature_percentiles:
+            qcqa_result.append(self.missing_feature_percentiles(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if missing_feature_distribution:
+            qcqa_result.append(self.missing_feature_distribution(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if missing_feature_outlier_detection:
+            qcqa_result.append(self.missing_feature_outlier_detection(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if median_correlation_outlier_detection:
+            qcqa_result.append(self.median_correlation_outlier_detection(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if intensity_analysis:
+            qcqa_result.append(self.intensity_analysis(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
+        if feature_distribution:
+            qcqa_result.append(self.feature_distribution(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
         if feature_outlier_detection:
-            qcqa_result.append(self.feature_distribution_outlier_detection(selected_feature_matrix, selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs))
+            qcqa_result.append(self.feature_distribution_outlier_detection(selected_acquisition_names, interactive_plot=interactive, save_figs=save_figs, texts=texts, colors=colors, markers=markers))
         exit()
         return qcqa_result
