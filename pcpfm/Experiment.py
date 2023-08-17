@@ -187,8 +187,17 @@ class Experiment:
                 "feature_tables": self.feature_tables,
                 "empCpds": self.empCpds
             }
-            JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
-            json.dump(JSON_repr, save_filehandle, indent=4)
+            if os.path.exists(save_filehandle):
+                shutil.copy(save_filehandle, save_filehandle + ".bak")
+            try:
+                JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
+                json.dump(JSON_repr, save_filehandle, indent=4)
+            except:
+                print("recovering from backup")
+                if os.path.exists(save_filehandle + ".bak"):
+                    shutil(save_filehandle + ".bak", save_filehandle)
+            if os.path.exists(save_filehandle + ".bak"):
+                os.remove(save_filehandle + ".bak")
 
     def add_acquisition(self, acquisition, override=False, mode="link"):
         """
@@ -288,6 +297,7 @@ class Experiment:
         if self.__ionization_mode is None:
             num_files_to_check = len(self.acquisitions) if num_files_to_check is None else num_files_to_check
             ionization_modes = list(set([acquisition.ionization_mode for acquisition in self.acquisitions[:num_files_to_check]]))
+            ionization_modes = [x for x in ionization_modes if x]
             if len(ionization_modes) == 1:
                 self.__ionization_mode = ionization_modes[0]
         return self.__ionization_mode
