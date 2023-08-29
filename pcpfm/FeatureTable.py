@@ -13,10 +13,11 @@ from combat.pycombat import pycombat
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
+import re
 
 
 class FeatureTable:
-    def __init__(self, feature_table_filepath, experiment, moniker, fillna=True):
+    def __init__(self, feature_table_filepath, experiment, moniker, fillna=False):
         """
         This object wraps a feature table
 
@@ -29,15 +30,24 @@ class FeatureTable:
         self.moniker = moniker
 
         self.feature_table = pd.read_csv(feature_table_filepath, delimiter="\t")
-        if fillna:
-            self.feature_table.fillna(0)
+
         self.sample_columns = [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
         self.non_sample_columns = [x for x in self.feature_table.columns if x not in self.sample_columns]
+    
+    @property
+    def log_transformed(self):
+        return self.moniker in self.experiment.log_transformed_feature_tables
 
     @staticmethod
     def load(moniker, experiment):
         return FeatureTable(pd.read_csv(open(experiment.feature_tables[moniker])), experiment, moniker)
     
+    def make_nonnegative(self, new_moniker=None):
+        self.feature_table.fillna(0)
+        for column in self.sample_columns:
+            sample_min = min([x for x in self.feature_table[column] if x > 0])
+            self.feature_table[column] = [x if x > 0 else sample_min for x in self.feature_table[column]]
+
     def save(self, new_moniker):
         try:
             output_path = os.path.join(self.experiment.filtered_feature_tables_subdirectory, new_moniker + "_Feature_table.tsv")
@@ -50,89 +60,172 @@ class FeatureTable:
         fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "QAQC_figs/" + self.moniker + "/")
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
+        name = re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "_", name)
         return os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png") 
 
-        
     def gen_figure(self, figure_type, data, title='', x_label=None, y_label=None, params=None, skip_annot=False):
-        if params['interactive'] or params['save_figs']:
-            colors = params['colors']
-            markers = params['markers']
-            text = params['text']
-            if figure_type == "scatter":
-                if type(data) is dict:
-                    X = data.keys()
-                    Y = data.values()
-                else:
-                    X = data[:, 0]
-                    Y = data[:, 1]
-                plt.title(title)
-                plt.xlabel(x_label)
-                plt.ylabel(y_label)
-                if skip_annot is False:
-                    if markers is None:
-                        markers = ['o' for _ in markers]
-                    if colors is None:
-                        colors = ['k' for _ in colors]
-                    for x,y,c,m in zip(X,Y,list(colors[0]),list(markers[0])):
-                        plt.scatter(x, y, c=c, marker=m)
-                    if text:
-                        for x, y, t in zip(X, Y, text[0]):
-                            plt.text(x,y,t)
-                else:
-                    plt.scatter(X,Y)
-                if params['marker_legend'] and skip_annot is False:
+        try:
+            
+            if params['interactive'] or params['save_figs']:
+                colors = params['colors']
+                markers = params['markers']
+                text = params['text']
+                if figure_type == "scatter":
+                    if type(data) is dict:
+                        X = data.keys()
+                        Y = data.values()
+                    else:
+                        X = data[:, 0]
+                        Y = data[:, 1]
+                    plt.title(title)
+                    plt.xlabel(x_label)
+                    plt.ylabel(y_label)
+                    if skip_annot is False:
+                        if markers is None:
+                            markers = ['o' for _ in markers]
+                        if colors is None:
+                            colors = ['k' for _ in colors]
+                        for x,y,c,m in zip(X,Y,list(colors[0]),list(markers[0])):
+                            plt.scatter(x, y, c=c, marker=m)
+                        if text:
+                            for x, y, t in zip(X, Y, text[0]):
+                                plt.text(x,y,t)
+                    else:
+                        plt.scatter(X,Y)
+                    if params['marker_legend'] and skip_annot is False:
 
-                    plt.tight_layout(rect=[0, 0, 0.75, 1])
-                    handles = [mlines.Line2D(
-                            [],
-                            [],
-                            color='k',
-                            marker=v,
-                            linestyle='None',
-                            markersize=10,
-                            label=k
-                    ) for k, v in params['marker_legend'].items() if v in markers[0]] 
-                    handles += [Patch(facecolor=v, label=k) for k,v in params['color_legend'].items() if v in colors[0]]
-                    plt.legend(
-                        handles=handles,
-                        bbox_to_anchor=(1.0 ,0.0),
-                        bbox_transform=plt.gcf().transFigure,
-                        loc='lower right'
-                )
-            elif figure_type == "heatmap":                
-                if colors is not None:
-                    sns.clustermap(data, col_colors=colors)
-                    plt.suptitle(title)
-                if params['color_legend']:
-                    plt.tight_layout(rect=[0, 0, 0.75, 1])
-                    plt.legend(
-                        [Patch(facecolor=color) for color in params['color_legend'].values()],
-                        list(params['color_legend'].keys()),
-                        bbox_to_anchor=(1.0,0.0),
-                        bbox_transform=plt.gcf().transFigure,
-                        loc='lower right'
+                        plt.tight_layout(rect=[0, 0, 0.75, 1])
+                        handles = [mlines.Line2D(
+                                [],
+                                [],
+                                color='k',
+                                marker=v,
+                                linestyle='None',
+                                markersize=10,
+                                label=k
+                        ) for k, v in params['marker_legend'].items() if v in markers[0]] 
+                        handles += [Patch(facecolor=v, label=k) for k,v in params['color_legend'].items() if v in colors[0]]
+                        plt.legend(
+                            handles=handles,
+                            bbox_to_anchor=(1.0 ,0.0),
+                            bbox_transform=plt.gcf().transFigure,
+                            loc='lower right'
                     )
-            elif figure_type == "bar":
-                plt.bar([x+"_"+str(i) for i,x in enumerate(text[0])], data[1], color=colors[0])
-                plt.title(title)
-                plt.xticks(rotation=90)
-                plt.xlabel(x_label)
-                plt.ylabel(y_label)
-                if params['color_legend']:
-                    plt.tight_layout(rect=[0, 0, 0.75, 1])
-                    plt.legend(
-                        [Patch(facecolor=color) for color in params['color_legend'].values()],
-                        list(params['color_legend'].keys()),
-                        bbox_to_anchor=(1.0,0.0),
-                        bbox_transform=plt.gcf().transFigure,
-                        loc='lower right'
-                    )
-            if params['save_figs']:
-                plt.savefig(self.save_fig_path(title.replace(" ", "_")))
-            if params['interactive']:
-                plt.show()
-            plt.clf()
+                elif figure_type == "heatmap":                
+                    if colors is not None:
+                        g = sns.clustermap(data, col_colors=colors, yticklabels=y_label)
+                        plt.suptitle(title)
+                    if params['color_legend']:
+                        plt.tight_layout(rect=[0, 0, 0.75, 1])
+                        plt.legend(
+                            [Patch(facecolor=color) for color in params['color_legend'].values()],
+                            list(params['color_legend'].keys()),
+                            bbox_to_anchor=(1.0,0.0),
+                            bbox_transform=plt.gcf().transFigure,
+                            loc='lower right'
+                        )
+                elif figure_type == "clustermap":                
+                    if colors is not None:
+                        sns.clustermap(data, col_colors=colors)
+                        plt.suptitle(title)
+                    if params['color_legend']:
+                        plt.tight_layout(rect=[0, 0, 0.75, 1])
+                        plt.legend(
+                            [Patch(facecolor=color) for color in params['color_legend'].values()],
+                            list(params['color_legend'].keys()),
+                            bbox_to_anchor=(1.0,0.0),
+                            bbox_transform=plt.gcf().transFigure,
+                            loc='lower right'
+                        )
+                elif figure_type == "bar":
+                    plt.bar([x+"_"+str(i) for i,x in enumerate(text[0])], data[1], color=colors[0])
+                    plt.title(title)
+                    plt.xticks(rotation=90)
+                    plt.xlabel(x_label)
+                    plt.ylabel(y_label)
+                    if params['color_legend']:
+                        plt.tight_layout(rect=[0, 0, 0.75, 1])
+                        plt.legend(
+                            [Patch(facecolor=color) for color in params['color_legend'].values()],
+                            list(params['color_legend'].keys()),
+                            bbox_to_anchor=(1.0,0.0),
+                            bbox_transform=plt.gcf().transFigure,
+                            loc='lower right'
+                        )
+                if params['save_figs']:
+                    plt.savefig(self.save_fig_path(title.replace(" ", "_")))
+                if params['interactive']:
+                    plt.show()
+                plt.clf()
+        except:
+            pass
 
+    def check_for_standards(self, figure_params, standards_csv=None):
+        from mass2chem.formula import calculate_mass, PROTON, ELECTRON
+        import csv
+        import json
+        from khipu.extended import adduct_search_patterns, adduct_search_patterns_neg
+        adduct_search_patterns = adduct_search_patterns + [(PROTON + ELECTRON, "H")]
+        adduct_search_patterns_neg = adduct_search_patterns_neg + [(PROTON + ELECTRON, "H")]
+
+        to_search = []
+        if standards_csv:
+            for entry in csv.DictReader(open(standards_csv)):
+                entry['Isotope Dictionary'] = {'[' + k + ']': v for k, v in json.loads(entry["Isotope Dictionary"]).items()}
+                entry['mass'] = calculate_mass(entry["Isotope Dictionary"])
+                entry["adducts"] = {}
+                if "\ufeffName" in entry:
+                    entry["Name"] = entry["\ufeffName"]
+                if self.experiment.ionization_mode == "pos":
+                    for adduct_search_pattern in adduct_search_patterns:
+                        entry['adducts'][adduct_search_pattern[1]] = {"name": adduct_search_pattern[1], 
+                                            "mass": entry['mass'] + adduct_search_pattern[0] - ELECTRON, 
+                                            'matches': [],
+                                            "lower_mass": entry['mass'] + adduct_search_pattern[0] - ELECTRON - (entry['mass'] - ELECTRON + adduct_search_pattern[0])/1e6 * 5,
+                                            "upper_mass": entry['mass'] + adduct_search_pattern[0] - ELECTRON + (entry['mass'] - ELECTRON + adduct_search_pattern[0])/1e6 * 5}
+                else:
+                    for adduct_search_pattern in adduct_search_patterns_neg:
+                        entry['adducts'][adduct_search_pattern[1]] = {"name": adduct_search_pattern[1], 
+                                            "mass": entry['mass'] - adduct_search_pattern[0] + ELECTRON, 
+                                            'matches': [],
+                                            "lower_mass": entry['mass'] - adduct_search_pattern[0] + ELECTRON - (entry['mass'] - adduct_search_pattern[0])/1e6 * 5,
+                                            "upper_mass": entry['mass'] - adduct_search_pattern[0] + ELECTRON + (entry['mass'] - adduct_search_pattern[0])/1e6 * 5}
+                to_search.append(entry)
+        for id, mz in zip(self.feature_table['id_number'], self.feature_table['mz']):
+            for entry in to_search:
+                for adduct in entry["adducts"].values():
+                    if adduct['lower_mass'] < mz < adduct['upper_mass']:
+                        adduct['matches'].append(id)
+        for entry in to_search:
+            print(entry["Name"])
+            for x, adduct in entry["adducts"].items():
+                print("\t", x, adduct["mass"])
+        standards_matrix = {}
+        for entry in to_search:
+            for adduct_name, adduct in entry["adducts"].items():
+                for match in adduct["matches"]:
+                    name = entry["Name"] + " " + adduct_name + " @ rtime= " + str(self.feature_table[self.feature_table['id_number'] == match]['rtime'].values[0]) + " mz=" + str(adduct['mass'])
+                    values = [x for x in self.feature_table[self.feature_table['id_number'] == match][self.sample_columns].values[0]]
+                    add = False
+                    for value in values:
+                        if value > 0:
+                            add = True
+                    if add:
+                        values = [np.log2(x+1) for x in values]
+                        standards_matrix[name] = values
+                        self.gen_figure(
+                            "bar",
+                            [None, values],
+                            title=name,
+                            params=figure_params
+                        )
+        self.gen_figure(
+            "heatmap", 
+            data = np.array(list(standards_matrix.values())),
+            title = "Standards Present",
+            params=figure_params,
+            y_label = list(standards_matrix.keys())
+        )
 
     def median_correlation_outlier_detection(self, figure_params, correlation_type='pearson'):
         """
@@ -188,7 +281,6 @@ class FeatureTable:
             "Result": z_score_correlations
         }
         return result
-    
     
     def intensity_analysis(self, figure_params):
         """
@@ -254,10 +346,9 @@ class FeatureTable:
         }
         return result
 
-
     def correlation_heatmap(self, figure_params, correlation_type, log_transform=True):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
         feature_vector_matrix = self.feature_table[figure_params['acquisitions']].T
-        if log_transform:
+        if log_transform and not self.log_transformed:
             feature_vector_matrix = feature_vector_matrix + 1
             feature_vector_matrix = np.log2(feature_vector_matrix)        
         if correlation_type == "pearson":
@@ -276,7 +367,7 @@ class FeatureTable:
                     corr_matrix[i][j] = corr_matrix[j][i] = spearmanr
         
         self.gen_figure(
-            "heatmap",
+            "clustermap",
             corr_matrix,
             title=correlation_type + "\n(log transformed)" if log_transform else correlation_type,
             x_label=figure_params['text'],
@@ -290,7 +381,7 @@ class FeatureTable:
             }
         return result
 
-    def PCA(self, figure_params):
+    def PCA(self, figure_params, log_transform=True):
         """
         Perform PCA on provided feature table
 
@@ -305,8 +396,9 @@ class FeatureTable:
         sample_ftable = self.feature_table[figure_params['acquisitions']].T
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        log_sample_ftable = np.log2(sample_ftable+1)
-        pca_embedding = pca_embedder.fit_transform(scaler.fit_transform((log_sample_ftable)))
+        if log_transform and not self.log_transformed:
+            sample_ftable = np.log2(sample_ftable+1)
+        pca_embedding = pca_embedder.fit_transform(scaler.fit_transform((sample_ftable)))
         self.gen_figure("scatter", 
                                 pca_embedding, 
                                 "PCA (n_components=2)",
@@ -535,6 +627,7 @@ class FeatureTable:
             drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
         else:
             pass
+        print(drop)
         self.feature_table.drop(columns=drop, inplace=True)
         self.save(new_moniker)
 
@@ -612,20 +705,27 @@ class FeatureTable:
             "mean": np.mean,
         }
         if by_batch:
-            for _, batch_name_list in self.experiment.batches().items():
+            aggregate_batch_TICs = {}
+            for batch_name, batch_name_list in self.experiment.batches().items():
                 batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
                 self.feature_table["percent_inclusion"] = np.sum(self.feature_table[batch_name_list] > 0, axis=1) / len(batch_name_list)
                 TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in batch_name_list}
                 norm_factors = {sample: function_map[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
+                aggregate_batch_TICs[batch_name] = function_map[normalize_mode](list(TICs.values()))
                 for sample, norm_factor in norm_factors.items():
                     self.feature_table[sample] = self.feature_table[sample] * norm_factor
-        sample_names = [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
-        self.feature_table["percent_inclusion"] = np.sum(self.feature_table[sample_names] > 0, axis=1) / len(sample_names)
-        TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}        
-        norm_factors = {sample: function_map[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
-        for sample, norm_factor in norm_factors.items():
-            print(sample, norm_factor)
-            self.feature_table[sample] = self.feature_table[sample] * norm_factor
+            aggregate_batch_TIC_corrections = {batch: function_map[normalize_mode](list(aggregate_batch_TICs.values()))/value for batch, value in aggregate_batch_TICs.items()}
+            for batch_name, batch_name_list in self.experiment.batches().items():
+                batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
+                for sample in batch_name_list:
+                    self.feature_table[sample] = self.feature_table[sample] * aggregate_batch_TIC_corrections[batch_name]
+        else:
+            sample_names = [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
+            self.feature_table["percent_inclusion"] = np.sum(self.feature_table[sample_names] > 0, axis=1) / len(sample_names)
+            TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in sample_names}        
+            norm_factors = {sample: function_map[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
+            for sample, norm_factor in norm_factors.items():
+                self.feature_table[sample] = self.feature_table[sample] * norm_factor
         self.feature_table.drop(columns="percent_inclusion", inplace=True)
         self.save(new_moniker)
 
@@ -646,10 +746,17 @@ class FeatureTable:
             "log10": np.log10,
             "log2": np.log2
         }
-
+        try:
+            self.experiment.log_transformed_feature_tables.append(new_moniker)
+            self.experiment.save()
+        except:
+            self.experiment.log_transformed_feature_tables = [new_moniker]
+            self.experiment.save()
+    
         sample_names = [x.name for x in self.experiment.acquisitions if x.name in self.feature_table.columns]
         for sample_name in sample_names:
             self.feature_table[sample_name] = log_types[log_mode](self.feature_table[sample_name]+1)
+        self.make_nonnegative()
         self.save(new_moniker)
 
     def drop_missing_features(self, new_moniker, by_batch=False, drop_percentile=0.8, logic_mode="or", sample_type="Unknown", type_field="Sample Type"):
@@ -683,42 +790,33 @@ class FeatureTable:
         self.feature_table.drop(columns=batch_columns, inplace=True)
         self.save(new_moniker)
 
+
     def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
-        banned_colors = {'snow', 'beige', 'honeydew', 'azure', 
-                         'aliceblue', 'lightcyan', 'lightyellow', 
-                         'white', 'oldlace', 'antiquewhite', 'ivory', 
-                         'whitesmoke', 'mistyrose', 'seashell', 'linen', 
-                         'antiquewhite', 'lightgoldenrodyellow', 'cornsilk', 
-                         'lemonchiffon', 'honeydew', 'mintcream', 'ghostwhite',
-                         'lavenderblush'}
-        marker_list = [".", "o", "v", "^", ">", "<"] + [str(x) for x in [1,2,3,4,8]] + ["s", "P"]
-        if seed:
-            random.seed(seed)
-        
-        colors, markers, texts, needs_color_map, needs_marker_map = [[] for _ in colorby], [[] for _ in markerby], [[] for _ in textby], set(), set()
+        combined_cosmetic_map = {}
+        for cosmetic_map in [self.experiment.generate_cosmetic_map(c, 'color', seed) for c in colorby]:
+            if cosmetic_map:
+                for k,v in cosmetic_map.items():
+                    combined_cosmetic_map[k] = v
+        for cosmetic_map in [self.experiment.generate_cosmetic_map(m, 'marker', seed) for m in markerby]:
+            if cosmetic_map:
+                for k,v in cosmetic_map.items():
+                    combined_cosmetic_map[k] = v
+        colors = [[] for _ in colorby]
+        markers = [[] for _ in markerby]
+        texts = [[] for _ in textby]
+        color_legend = {}
+        marker_legend = {}
         for acquisition in self.experiment.acquisitions:
             if acquisition.name in self.feature_table.columns:
-                for i, x in enumerate(colorby):
-                    colors[i].append(acquisition.metadata_tags[x])
-                    needs_color_map.add(acquisition.metadata_tags[x])
-                for i, x in enumerate(markerby):
-                    markers[i].append(acquisition.metadata_tags[x])
-                    needs_marker_map.add(acquisition.metadata_tags[x])
+                for i,x in enumerate(colorby):
+                    colors[i].append(combined_cosmetic_map[acquisition.metadata_tags[x]])
+                    color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[acquisition.metadata_tags[x]]
+                for i,x in enumerate(markerby):
+                    markers[i].append(combined_cosmetic_map[acquisition.metadata_tags[x]])
+                    marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[acquisition.metadata_tags[x]]
                 for i, x in enumerate(textby):
                     texts[i].append(acquisition.metadata_tags[x])
-        
-        allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
-        color_map = {x: color for x, color in zip(needs_color_map, random.sample(allowed_colors, len(needs_color_map)))}
-        marker_map = {x: marker for x, marker in zip(needs_marker_map, random.sample(marker_list, len(needs_marker_map)))}
-
-        colors = np.array(colors, dtype=object)
-        markers = np.array(markers, dtype=object)
-        for index in np.ndindex(colors.shape):
-            colors[index] = color_map[colors[index]]
-        for index in np.ndindex(markers.shape):
-            markers[index] = marker_map[markers[index]]
-            
-        return colors, markers, texts, color_map, marker_map
+        return colors, markers, texts, color_legend, marker_legend    
 
     def qcqa(self, 
              tag=None, 
@@ -738,7 +836,7 @@ class FeatureTable:
              feature_outlier_detection=False,
              save_figs=False,
              colorby=['batch', 'Sample Type'],
-             textby=['batch'],
+             textby=['file_no'],
              markerby=['Sample Type']):
         """
         This is the wrapper for all the qcqa functions. 
@@ -784,8 +882,10 @@ class FeatureTable:
             "marker_legend": marker_legend
         }
 
-        #selected_feature_matrix, selected_acquisition_names = self.selected_feature_matrix(tag=tag, sort=sort)
         qcqa_result = []
+        #if True:
+            #qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards.csv"))
+            #qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
         if pca:
             qcqa_result.append(self.PCA(figure_params))
         if tsne:
