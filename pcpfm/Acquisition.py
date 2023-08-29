@@ -87,15 +87,18 @@ class Acqusition(object):
     
     @property
     def ionization_mode(self):
-        if self.__ionization_mode is None:
-            for spec in pymzml.run.Reader(self.mzml_filepath):
-                if spec["positive scan"]:
-                    self.__ionization_mode = "pos"
-                    break
-                else:
-                    self.__ionization_mode = "neg"
-                    break
-        return self.__ionization_mode
+        try:
+            if self.__ionization_mode is None:
+                for spec in pymzml.run.Reader(self.mzml_filepath):
+                    if spec["positive scan"]:
+                        self.__ionization_mode = "pos"
+                        break
+                    else:
+                        self.__ionization_mode = "neg"
+                        break
+            return self.__ionization_mode
+        except:
+            return None
     
     @property
     def JSON_repr(self):

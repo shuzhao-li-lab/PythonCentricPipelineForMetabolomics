@@ -2,6 +2,8 @@ import csv
 import shutil
 import json
 import os
+import random
+import matplotlib.colors as mcolors
 
 from . import ThermoRawFileConverter
 from . import Acquisition
@@ -31,7 +33,10 @@ class Experiment:
                  organized_samples=None,
                  log=None,
                  feature_tables=None,
-                 empCpds=None):
+                 empCpds=None,
+                 log_transformed_feature_tables=None,
+                 cosmetics=None,
+                 used_cosmetics=None):
         """
         The Experiment object represents the set of acquisitions in an experiment and associated metadata.
 
@@ -65,6 +70,9 @@ class Experiment:
         self.log = '' if log is None else log
         self.feature_tables = {} if feature_tables is None else feature_tables
         self.empCpds = {} if empCpds is None else empCpds
+        self.log_transformed_feature_tables = [] if log_transformed_feature_tables is None else log_transformed_feature_tables
+        self.cosmetics = {} if cosmetics is None else cosmetics
+        self.used_cosmetics = [] if used_cosmetics is None else used_cosmetics
 
         self.__ionization_mode = ionization_mode
 
@@ -135,7 +143,10 @@ class Experiment:
                                     ionization_mode=JSON_repr["__ionization_mode"],
                                     organized_samples=JSON_repr["organized_samples"],
                                     feature_tables=JSON_repr["feature_tables"] if "feature_tables" in JSON_repr else None,
-                                    empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None
+                                    empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None,
+                                    log_transformed_feature_tables=JSON_repr["log_transformed_feature_tables"] if "log_transformed_feature_tables" in JSON_repr else None,
+                                    cosmetics=JSON_repr["cosmetics"] if "cosmetics" in JSON_repr else None,
+                                    used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None
                                     )
         return experiment
         
@@ -173,7 +184,8 @@ class Experiment:
         """
         Serialize the experiment and acquisitions and store it on disk
         """        
-        with open(os.path.join(self.experiment_directory, "experiment.json"), "w") as save_filehandle:
+        save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
+        with open(os.path.join(self.experiment_directory, "experiment.json.tmp"), "w") as save_filehandle:
             JSON_repr = {
                 "experiment_directory": self.experiment_directory,
                 "experiment_name": self.experiment_name,
@@ -185,19 +197,18 @@ class Experiment:
                 "__ionization_mode": self.__ionization_mode,
                 "organized_samples": self.organized_samples,
                 "feature_tables": self.feature_tables,
-                "empCpds": self.empCpds
+                "empCpds": self.empCpds,
+                "log_tranformed_feature_tables": self.log_transformed_feature_tables,
+                "cosmetics": self.cosmetics,
+                "used_cosmetics": self.used_cosmetics
             }
-            if os.path.exists(save_filehandle):
-                shutil.copy(save_filehandle, save_filehandle + ".bak")
             try:
                 JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
+                test = json.dumps(JSON_repr)
                 json.dump(JSON_repr, save_filehandle, indent=4)
+                shutil.move(save_path, save_path.replace(".tmp",''))
             except:
-                print("recovering from backup")
-                if os.path.exists(save_filehandle + ".bak"):
-                    shutil(save_filehandle + ".bak", save_filehandle)
-            if os.path.exists(save_filehandle + ".bak"):
-                os.remove(save_filehandle + ".bak")
+                pass
 
     def add_acquisition(self, acquisition, override=False, mode="link"):
         """
@@ -302,7 +313,6 @@ class Experiment:
                 self.__ionization_mode = ionization_modes[0]
         return self.__ionization_mode
 
-
     def summarize(self):
         """
         Print the list of empCpds and feature tables in the experiment to the console
@@ -313,6 +323,39 @@ class Experiment:
         print("feature tables:")
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
+
+    def generate_cosmetic_map(self, field=None, cos_type='color', seed=None):
+        print(field)
+        if seed:
+            random.seed(seed)
+        if cos_type in self.cosmetics:
+            if field in self.cosmetics[cos_type]:
+                return self.cosmetics[cos_type][field]
+        else:
+            if cos_type == 'color':
+                banned_colors = {'snow', 'beige', 'honeydew', 'azure', 
+                            'aliceblue', 'lightcyan', 'lightyellow', 
+                            'white', 'oldlace', 'antiquewhite', 'ivory', 
+                            'whitesmoke', 'mistyrose', 'seashell', 'linen', 
+                            'antiquewhite', 'lightgoldenrodyellow', 'cornsilk', 
+                            'lemonchiffon', 'honeydew', 'mintcream', 'ghostwhite',
+                            'lavenderblush'}
+                allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
+                allowed_cosmetics = [x for x in allowed_colors if x not in self.used_cosmetics]
+            elif cos_type == 'marker':
+                allowed_markers = [".", "o", "v", "^", ">", "<"] + [str(x) for x in [1,2,3,4,8]] + ["s", "P"]
+                allowed_cosmetics = [x for x in allowed_markers if x not in self.used_cosmetics]
+            elif cos_type == 'text':
+                pass
+            needs_cosmetic = list(set([acquisition.metadata_tags[field] for acquisition in self.acquisitions]))
+            cosmetic_map = {t: c for t, c in zip(needs_cosmetic, random.sample(allowed_cosmetics, len(needs_cosmetic)))}   
+            self.used_cosmetics.extend(list(cosmetic_map.values()))
+            if cos_type not in self.cosmetics:
+                self.cosmetics[cos_type] = {}
+            self.cosmetics[cos_type][field] = cosmetic_map
+            self.save()
+            print(cosmetic_map)
+            return cosmetic_map
 
     def batches(self, field="name", batch_field="batch", debug=False, skip_batch=False):
         #batches = {"ALL": [a.name for a in self.acquisitions]}
