@@ -2,13 +2,11 @@ from khipu.epdsConstructor import epdsConstructor
 from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
 from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
 from jms.io import read_table_to_peaks
-from sklearn.metrics.pairwise import cosine_similarity
 from mass2chem.formula import PROTON
-
+import matchms
 import json
 import intervaltree
 import os
-import pymzml
 
 class empCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
@@ -24,6 +22,7 @@ class empCpds:
         self.dict_empCpds = dict_empCpds
         self.experiment = experiment
         self.moniker = moniker
+
 
     def save(self, save_as_moniker=None):
         """
@@ -130,7 +129,17 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def MS2_annotate(self, DDA_file, msp_files, rt_tolerance=20, mz_tolerance=5, multiplier=10, max_mass=2000, match_threshold=0.60):
+
+    def MS2_annotate(self, 
+                     DDA_file, 
+                     msp_file, 
+                     rt_tolerance=20, 
+                     mz_tolerance=5, 
+                     multiplier=10, 
+                     max_mass=2000, 
+                     match_threshold=0.60, 
+                     min_peaks=3,
+                     similarity_function="cosine_greedy"):
         """
         Given the DDA file for the experiment, database entries in MSP format, annotate with MS2 data. 
 
@@ -142,72 +151,77 @@ class empCpds:
             multiplier (int, optional): this determines the bin size, must be power of 10. Defaults to 10.
             max_mass (int, optional): masses above this value will be ignored in DDA and MSP spectra. Defaults to 2000.
             match_threshold (float, optional): cosine similarities above this value are considered a match, Defaults to 0.60
-        """        
-        msp_ionization_mode = 'P' if self.experiment.ionization_mode == 'pos' else 'N'
-        DDA_rt_tree = intervaltree.IntervalTree()
-        DDA_mz_tree = intervaltree.IntervalTree()
-        DDA_spectral_registry = {}
-        for spectrum in pymzml.run.Reader(DDA_file):
-            if spectrum.ms_level == 2:
-                spectrum_scan_time = spectrum.scan_time[0] * 60
-                spectrum_precursor_mz = spectrum.selected_precursors[0]['mz']
-                spectrum_peaks = spectrum.peaks('centroided')
-                spectrum_intensity_max = max([intensity for mz, intensity in spectrum_peaks])
-                normalized_spectrum_peaks = [[mz, intensity / spectrum_intensity_max * 100] for mz, intensity in spectrum_peaks]
-                spectrum_id = len(DDA_spectral_registry)
-                truncated_spectrum = [0 for _ in range(max_mass * multiplier)]
-                for mz, intensity in normalized_spectrum_peaks:
-                    if float(mz) < max_mass - 1:
-                        truncated_spectrum[int(round(float(mz) * multiplier, 0))] += float(intensity)
-                DDA_spectral_registry[spectrum_id] = (spectrum_scan_time, spectrum_precursor_mz, normalized_spectrum_peaks, truncated_spectrum)
-                precursor_mz_error = spectrum_precursor_mz / 1e6 * mz_tolerance
-                DDA_mz_tree.addi(spectrum_precursor_mz - precursor_mz_error, spectrum_precursor_mz + precursor_mz_error, spectrum_id)
-                DDA_rt_tree.addi(spectrum_scan_time - rt_tolerance, spectrum_scan_time + rt_tolerance, spectrum_id)
+        """
 
-        MSP_entries = []
-        MSP_entry = {}
-        MSP_mz_tree = intervaltree.IntervalTree()
-        found_peaks = 0
-        for msp_file in msp_files:
-            for line in open(msp_file):
-                if line.startswith("Name: "):
-                    MSP_entry["name"] = line.rstrip()
-                elif line.startswith("Synon: "):
-                    MSP_entry["synon"] = line
-                elif line.startswith("PrecursorMZ: "):
-                    MSP_entry["precursor_mz"] = float(line.split()[-1])
-                elif line.startswith("Num Peaks:"):
-                    MSP_entry["num peaks"] = int(line.split()[-1])
-                    MSP_entry["spectrum"] = []
-                elif line.startswith("Ion_mode: "):
-                    MSP_entry["ion_mode"] = line.split()[-1]
-                elif "num peaks" in MSP_entry and found_peaks < MSP_entry["num peaks"]:
-                    mz, intensity = line.split()
-                    found_peaks += 1
-                    MSP_entry["spectrum"].append({"mz": float(mz), "intensity": float(intensity)})
-                    if found_peaks == MSP_entry["num peaks"]:
-                        if "precursor_mz" in MSP_entry and (("ion_mode" in MSP_entry and MSP_entry['ion_mode'] == msp_ionization_mode) or "ion_mode" not in MSP_entry):
-                            new_spectrum = [0 for _ in range(max_mass * multiplier)]
-                            for peak in MSP_entry["spectrum"]:
-                                mz = peak['mz']
-                                intensity = peak['intensity']
-                                if float(mz) < max_mass - 1:
-                                    new_spectrum[int(round(float(mz) * multiplier, 0))] += float(intensity)
-                            MSP_entry["truncated_spectrum"] = new_spectrum
-                            precursor_mz = MSP_entry["precursor_mz"] 
-                            if DDA_mz_tree.at(precursor_mz):
-                                db_index = len(MSP_entries)
-                                MSP_entry["source"] = msp_file
-                                MSP_entries.append(MSP_entry)
-                                precursor_mz_error = precursor_mz / 1e6 * mz_tolerance
-                                MSP_mz_tree.addi(precursor_mz - precursor_mz_error, precursor_mz + precursor_mz_error, db_index)
-                            else:
-                                pass
-                        MSP_entry = {}
-                        found_peaks = 0    
+        similarity_methods = {
+            "cosine_greedy": matchms.similarity.CosineGreedy,
+            "cosine_hungarian": matchms.similarity.CosineHungarian,
+        }
 
+        DDA_mz_tree, DDA_rt_tree, DDA_spectral_registry = intervaltree(), intervaltree(), {}
+        for spectrum in matchms.importing.load_from_mzml(DDA_file):
+            spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+            spectrum = matchms.filtering.default_filters(spectrum)
+            spectrum = matchms.filtering.normalize_intensities(spectrum)
+            spectrum = matchms.filtering.add_precursor_mz(spectrum)
+            spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+            if spectrum:
+                precursor_mz, precursor_rt = None, None
+                try:
+                    precursor_mz = float(spectrum.get('precursor_mz'))
+                    precursor_rt = float(spectrum.get('retention_time'))
+                except:
+                    pass
+                if precursor_mz and precursor_rt:
+                    precursor_mz_error = precursor_mz / 1e6 * mz_tolerance
+                    entry_id = len(DDA_spectral_registry)
+                    DDA_spectral_registry[entry_id] = spectrum
+                    DDA_mz_tree.addi(precursor_mz - precursor_mz_error, precursor_mz + precursor_mz_error, entry_id)
+                    DDA_rt_tree.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, entry_id)
+        
+        MS2_matches = {}
+        for db_spectrum in matchms.importing.load_from_msp(msp_file):
+            precursor_mz = None
+            try:
+                precursor_mz = float(db_spectrum.get('precursor_mz'))
+            except:
+                pass
+            mz_matches = set()
+            
+            if precursor_mz:
+                for match in DDA_mz_tree.at(precursor_mz):
+                    mz_matches.add(match.data)
+            for exp_spec_id, experimental_spectrum in ([x, DDA_spectral_registry[x]] for x in mz_matches):
+                msms_score, n_matches = similarity_methods[similarity_function](db_spectrum, experimental_spectrum).tolist()
+                if msms_score > match_threshold and n_matches > min_peaks:
+                    feature_mz = experimental_spectrum.get("precursor_mz") if experimental_spectrum.get("precursor_mz") else None
+                    feature_rt = experimental_spectrum.get("retention_time") if experimental_spectrum.get("retention_time") else None
+                    match_mz = db_spectrum.get("precursor_mz") if db_spectrum.get("precursor_mz") else None
+                    match_rt = db_spectrum.get("retention_time") if db_spectrum.get("retention_time") else None
+                    try:
+                        match_mz = float(match_mz)
+                    except:
+                        match_mz = None
+                    if exp_spec_id not in MS2_matches:
+                        MS2_matches[exp_spec_id] = []
+                    MS2_matches[exp_spec_id].append({
+                        'msms_score':msms_score,
+                        'matched_peaks':n_matches,
+                        'feature_id': None,
+                        'feature_precursor_mz': feature_mz,
+                        'feature_precursor_rt': feature_rt,
+                        'match_precursor_mz': match_mz,
+                        'match_precursor_rt': match_rt,
+                        'reference_id': db_spectrum.get("compound_name")}
+                    )
+                            
         for empCpd in self.dict_empCpds.values():
-            empCpd["MS2_Spectra"] = []
+            if "MS2_Spectra" not in empCpd:
+                empCpd["MS2_Spectra"] = {}
+                empCpd["MS2_Annotations"] = {}
+            if DDA_file not in empCpd["MS2_Spectra"]:
+                empCpd["MS2_Spectra"][DDA_file] = {}
+                empCpd["MS2_Annotations"][DDA_file] = {}
             for peak in empCpd["MS1_pseudo_Spectra"]:
                 peak_rtime = peak['rtime']
                 peak_mz = peak['mz']
@@ -215,26 +229,12 @@ class empCpds:
                 rt_matches = [x.data for x in DDA_rt_tree.at(peak_rtime)]
                 mz_rt_matches = set(mz_matches).intersection(set(rt_matches))
                 for DDA_match in mz_rt_matches:
-                    DDA_data = DDA_spectral_registry[DDA_match]
-                    DDA_rtime, DDA_precursor_mz, DDA_normalized_spectrum, DDA_truncated_spectrum = DDA_data
-                    possible_db_matches = [x.data for x in MSP_mz_tree.at(peak_mz)]
-                    MS2_matches = []
-                    if possible_db_matches:
-                        possible_db_spectra_matches = [MSP_entries[x]["truncated_spectrum"] for x in possible_db_matches]
-                        scores = cosine_similarity([DDA_truncated_spectrum], possible_db_spectra_matches)
-                        for MSP_entry_id, score in zip(possible_db_matches, scores[0]):
-                            if score > match_threshold:
-                                MSP_entry_copy = dict(MSP_entries[MSP_entry_id])
-                                del MSP_entry_copy['truncated_spectrum']
-                                MS2_matches.append({'entry': MSP_entry_copy, "score": score})
-                    ms2_entry = {
-                        "precursor_feature_id": peak["id_number"],
-                        "DDA_spectrum_rtime": DDA_rtime,
-                        "DDA_spectrum_precursor_mz": DDA_precursor_mz,
-                        "DDA_normalized_spectrum": [{"mz": mz, "intensity": intensity} for mz, intensity in DDA_normalized_spectrum],
-                        "MS2_matches": MS2_matches
-                    }
-                    empCpd["MS2_Spectra"].append(ms2_entry)
+                    DDA_spectrum = DDA_spectral_registry[DDA_match]
+                    empCpd["MS2_Spectra"][DDA_file][DDA_match] = DDA_spectrum
+                    if DDA_match in MS2_matches:
+                        MS2_annot = MS2_matches[DDA_match].copy()
+                        MS2_annot['feature_id'] = peak['id_number']
+                        empCpd["MS2_Annotations"][DDA_file][DDA_match] = MS2_annot
     
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
         """
