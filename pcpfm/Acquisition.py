@@ -3,9 +3,11 @@ import pymzml
 import numpy as np
 import bisect
 import os
+import pickle
+import functools
+import lzma
 
-class Acqusition(object):
-    Peak = namedtuple('Peak', ['level', 'rt', 'mz', 'intensity', 'id'])
+class Acquisition(object):
     def __init__(self, name, source_filepath, metadata_dict):
         """
         An Acquisition object wraps raw or mzml file and stores associated metadata
@@ -18,16 +20,35 @@ class Acqusition(object):
         self.name = name
         self.metadata_tags = metadata_dict
         self.source_filepath = source_filepath
-
+        print(self.source_filepath)
         self.raw_filepath = None
         self.mzml_filepath = None
+        if not self.source_filepath.endswith(".raw") and not self.source_filepath.endswith(".mzML"):
+            if self.name.endswith(".mzML"):
+                self.source_filepath = os.path.join(self.source_filepath, self.name + ".mzML")
+                self.mzml_filepath = self.source_filepath
+                self.raw_filepath = None
+            else:
+                self.source_filepath = os.path.join(self.source_filepath, self.name + ".raw")
+                self.raw_filepath = self.source_filepath
+                self.mzml_filepath = None
+
+        self.data_path = None
         self.spectra = {}
 
         self.__min_mz = None
         self.__max_mz = None
         self.__min_rt = None
         self.__max_rt = None
-        self.__ionization_mode = None
+        self._ionization_mode = None
+        self.__TIC = None
+
+    @property
+    @functools.lru_cache(10)
+    def TIC(self):
+        if self.__TIC is None:
+            self.__TIC = self.__extract_ms_information(None, "TIC")
+        return self.__TIC
 
     @property
     def min_rt(self):
@@ -38,7 +59,7 @@ class Acqusition(object):
             float: the min_rt in the experiment, the smallest observed retention time
         """        
         if self.__min_rt is None:
-            peak_rts = [peak.rt for peak in self.__extract_ms_information(1, "peaks")]
+            peak_rts = [peak["rt"] for peak in self.__extract_ms_information(1, "peaks")]
             self.__min_rt = min(peak_rts)
             self.__max_rt = max(peak_rts)
         return self.__min_rt
@@ -52,7 +73,7 @@ class Acqusition(object):
             float: the max_rt in the experiment, the largest observed retention time
         """     
         if self.__max_rt is None:
-            peak_rts = [peak.rt for peak in self.__extract_ms_information(1, "peaks")]
+            peak_rts = [peak["rt"] for peak in self.__extract_ms_information(1, "peaks")]
             self.__min_rt = min(peak_rts)
             self.__max_rt = max(peak_rts)
         return self.__max_rt
@@ -66,9 +87,9 @@ class Acqusition(object):
             float: the min_mz in the experiment, the smallest observed mz
         """             
         if self.__min_mz is None:
-            mz_sorted_mzs = self.__extract_ms_information(1, "mz_sorted_mzs")
-            self.__min_mz = mz_sorted_mzs[0]
-            self.__max_mz = mz_sorted_mzs[-1]
+            mz_sorted_mzs = [peak["mz"] for peak in self.__extract_ms_information(1, "mz")]
+            self.__min_mz = min(mz_sorted_mzs)
+            self.__max_mz = max(mz_sorted_mzs)
         return self.__min_mz
 
     @property
@@ -80,23 +101,23 @@ class Acqusition(object):
             float: the max_mz in the experiment, the largest observed mz
         """     
         if self.__max_mz is None:
-            mz_sorted_mzs = self.__extract_ms_information(1, "mz_sorted_mzs")
-            self.__min_mz = mz_sorted_mzs[0]
-            self.__max_mz = mz_sorted_mzs[-1]
+            mz_sorted_mzs = [peak["mz"] for peak in self.__extract_ms_information(1, "mz")]
+            self.__min_mz = min(mz_sorted_mzs)
+            self.__max_mz = max(mz_sorted_mzs)
         return self.__max_mz
     
     @property
     def ionization_mode(self):
         try:
-            if self.__ionization_mode is None:
+            if self._ionization_mode is None:
                 for spec in pymzml.run.Reader(self.mzml_filepath):
                     if spec["positive scan"]:
-                        self.__ionization_mode = "pos"
+                        self._ionization_mode = "pos"
                         break
                     else:
-                        self.__ionization_mode = "neg"
+                        self._ionization_mode = "neg"
                         break
-            return self.__ionization_mode
+            return self._ionization_mode
         except:
             return None
     
@@ -119,9 +140,49 @@ class Acqusition(object):
             "__max_mz": self.__max_mz,
             "__min_rt": self.__min_rt,
             "__max_rt": self.__max_rt,
-            "__ionization_mode": self.__ionization_mode
+            "__ionization_mode": self._ionization_mode,
+            "__TIC": self.__TIC,
+            "data_path": self.data_path
         }
     
+    @staticmethod
+    def extract_acquisition(acquisition):
+        try:
+            reader = pymzml.run.Reader(acquisition.mzml_filepath)
+            spectra = {}
+            peaks = {}
+            id = 0
+            for spec in reader:
+                if acquisition._ionization_mode is None:
+                    acquisition._ionization_mode = "pos" if spec["positive scan"] else "neg"
+                if spec.ms_level not in spectra:
+                    spectra[spec.ms_level] = []
+                    peaks[spec.ms_level] = []
+                peak_objs = []
+                for peak in spec.peaks("centroided"):
+                    id += 1
+                    peak_objs.append({
+                        "ms_level": spec.ms_level,
+                        "rt": spec.scan_time[0],
+                        "mz": float(peak[0]),
+                        "intensity": float(peak[1]),
+                        "id": id}
+                    )
+                spectra[spec.ms_level].append(peak_objs)
+                peaks[spec.ms_level].extend(peak_objs)
+            acquisition_data = {
+                "spectra": spectra,
+                "peaks": peaks,
+                "TIC": list(zip([spectrum[0]['rt'] for spectrum in spectra[1]], [sum([peak['intensity'] for peak in spectrum]) for spectrum in spectra[1]])),
+                "acquisition_mode": acquisition._ionization_mode
+            }
+            data_path = os.path.abspath(os.path.join(acquisition.experiment.acquisition_datapath, acquisition.name + ".pickle"))
+            with open(data_path, 'wb+') as out_fh:
+                pickle.dump(acquisition_data, out_fh)
+            return data_path
+        except:
+            return None
+
     def filter(self, filter):
         """
         This method filters acquisition based on their metadata keys. 
@@ -158,32 +219,8 @@ class Acqusition(object):
                 for not_include in rules["lacks"]:
                     passed_filter = passed_filter and not_include.lower() not in values_to_filter
         return passed_filter
-            
-    def __extract_mzml(self, ms_level=None):
-        """
-        This reads the mzml file for the acquisition and populates the spectra datamember.
 
-        The spectra field contains spectra (collections of peaks), peaks, and the peaks sorted by mz and the sorted
-        mz values for all peaks. These are used by other methods in acquisition. 
-
-        **This should never be called manually.**
-
-        Args:
-            ms_level (int, optional): The MS level to extract. Defaults to None. If None, all ms_levels are extracted
-        """
-        for spec in pymzml.run.Reader(self.mzml_filepath):
-            if self.__ionization_mode is None:
-                self.__ionization_mode = "pos" if spec["positive scan"] else "neg"
-            if spec.ms_level == ms_level or ms_level is None:
-                if (spec.ms_level, "peaks") not in self.spectra:
-                    self.spectra[(spec.ms_level, "spectra")] = []
-                    self.spectra[(spec.ms_level, "peaks")] = []
-                peaks = [Acqusition.Peak(spec.ms_level, spec.scan_time[0], float(mz), int(intensity), id + len(self.spectra[(spec.ms_level, "peaks")])) for id, (mz, intensity) in enumerate(spec.peaks("centroided"))]
-                self.spectra[(spec.ms_level, "spectra")].append(peaks)
-                self.spectra[(spec.ms_level, "peaks")].extend(peaks)
-        self.spectra[(spec.ms_level, "mz_sorted_peaks")] = sorted(self.spectra[(spec.ms_level, "peaks")], key=lambda x: x.mz)
-        self.spectra[(spec.ms_level, "mz_sorted_mzs")] = [peak.mz for peak in self.spectra[(spec.ms_level, "mz_sorted_peaks")]]
-
+    @functools.lru_cache(1)
     def __extract_ms_information(self, ms_level, type):
         """
         This is a wrapper around __extract_mzml that enables caching of mzML data. ms_level specifies if MSn level,
@@ -198,23 +235,15 @@ class Acqusition(object):
 
         Returns:
             list: can be list of spectra, peaks, mz_sorted_peaks or mz_sorted_mzs depending on type
-        """        
-        if (ms_level, type) not in self.spectra:
-            self.__extract_mzml(ms_level=ms_level)
-        return self.spectra[(ms_level, type)]
-
-
-    def calculate_TIC(self):
         """
-        This method will calculate the TIC for the acquisition, using MS1 level data only
+        if self.data_path is None:
+            self.data_path = Acquisition.extract_acquisition(self)
+        data = pickle.load(open(self.data_path, 'rb'))
+        if type != "TIC":
+            return data[type][ms_level]
+        else:
+            return data["TIC"]
 
-        Returns:
-            (list, list): list of rts and associated peak intensity sum for that rt
-        """        
-        MS1_spectra = self.__extract_ms_information(1, 'spectra')
-        rts = [spectrum[0].rt for spectrum in MS1_spectra]
-        sum_intensities = [sum([peak.intensity for peak in spectrum]) for spectrum in MS1_spectra]
-        return rts, sum_intensities
 
     def search_for_peak_match(self, mz, rt, mslevel, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity):
         """
@@ -338,7 +367,6 @@ class Acqusition(object):
             dict: results from standards search and null_distribution calculation
         """        
         
-        print("Start: ", self.name)
         null_match_count = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
         search_results = self.check_for_standards(standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=null_match_count)
         if text_report:

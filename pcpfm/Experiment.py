@@ -4,6 +4,7 @@ import json
 import os
 import random
 import matplotlib.colors as mcolors
+import multiprocessing as mp
 
 from . import ThermoRawFileConverter
 from . import Acquisition
@@ -16,6 +17,7 @@ class Experiment:
         "asari_results": "asari_results/",
         "converted": "converted_acquisitions/",
         "raw": "raw_acquisitions/",
+        "acquisition_data": "acquisitions/",
         "annotations": "annotations/",
         "filtered_feature_tables": "filtered_feature_tables/",
         "qaqc_figs": "QAQC_figs/"
@@ -36,7 +38,8 @@ class Experiment:
                  empCpds=None,
                  log_transformed_feature_tables=None,
                  cosmetics=None,
-                 used_cosmetics=None):
+                 used_cosmetics=None,
+                 extracted=None):
         """
         The Experiment object represents the set of acquisitions in an experiment and associated metadata.
 
@@ -73,6 +76,7 @@ class Experiment:
         self.log_transformed_feature_tables = [] if log_transformed_feature_tables is None else log_transformed_feature_tables
         self.cosmetics = {} if cosmetics is None else cosmetics
         self.used_cosmetics = [] if used_cosmetics is None else used_cosmetics
+        self.extracted = [] if extracted is None else extracted
 
         self.__ionization_mode = ionization_mode
 
@@ -105,6 +109,20 @@ class Experiment:
             if not os.path.isdir(subdirectory_full_path):
                 os.makedirs(subdirectory_full_path)
 
+    def extract_all_acquisitions(self):
+        workers = mp.Pool(mp.cpu_count())
+        for data_path, acquisition in zip(workers.map(Acquisition.Acquisition.extract_acquisition, self.acquisitions), [x for x in self.acquisitions if x.name not in self.extracted]):
+            if data_path is None:
+                pass
+            else:
+                acquisition.data_path = data_path
+                self.extracted.append(acquisition.name)
+        self.save()
+
+    @property
+    def acquisition_datapath(self):
+        return os.path.join(self.experiment_directory, self.subdirectories["acquisition_data"])
+
     @staticmethod
     def load(experiment_json_filepath):
         """
@@ -120,7 +138,7 @@ class Experiment:
             JSON_repr = json.load(experiment_json_filehandle)
             acquisitions = []
             for acquisition_JSON in JSON_repr["acquisitions"]:
-                acquisition = Acquisition.Acqusition(acquisition_JSON["name"], 
+                acquisition = Acquisition.Acquisition(acquisition_JSON["name"], 
                                          acquisition_JSON["source_filepath"], 
                                          acquisition_JSON["metadata"])
                 acquisition.mzml_filepath = acquisition_JSON["mzml_filepath"]
@@ -130,6 +148,8 @@ class Experiment:
                 acquisition.__max_mz = acquisition_JSON["__max_mz"]
                 acquisition.__min_rt = acquisition_JSON["__min_rt"]
                 acquisition.__max_rt = acquisition_JSON["__max_rt"]
+                acquisition.__TIC = acquisition_JSON["__TIC"] if "__TIC" in acquisition_JSON else None
+                acquisition.data_path = acquisition_JSON["data_path"] if "data_path" in acquisition_JSON else None
                 acquisitions.append(acquisition)
             #JSON_repr = defaultdict(JSON_repr, None)
             experiment = Experiment(JSON_repr["experiment_name"], 
@@ -146,8 +166,11 @@ class Experiment:
                                     empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None,
                                     log_transformed_feature_tables=JSON_repr["log_transformed_feature_tables"] if "log_transformed_feature_tables" in JSON_repr else None,
                                     cosmetics=JSON_repr["cosmetics"] if "cosmetics" in JSON_repr else None,
-                                    used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None
+                                    used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None,
+                                    extracted=None #JSON_repr["extracted"] if "extracted" in JSON_repr else None
                                     )
+            for acquisition in experiment.acquisitions:
+                acquisition.experiment = experiment
         return experiment
         
     def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
@@ -200,7 +223,8 @@ class Experiment:
                 "empCpds": self.empCpds,
                 "log_tranformed_feature_tables": self.log_transformed_feature_tables,
                 "cosmetics": self.cosmetics,
-                "used_cosmetics": self.used_cosmetics
+                "used_cosmetics": self.used_cosmetics,
+                "extracted": self.extracted
             }
             try:
                 JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
@@ -298,10 +322,11 @@ class Experiment:
                     name_field = "File Name"
                 if name_field not in acquisition_info or path_field not in acquisition_info:
                     raise Exception()
-                acquisition = Acquisition.Acqusition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
+                acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
         experiment.__ionization_mode = ionization_mode
+        experiment.extract_all_acquisitions()
         return experiment
     
     def determine_ionization_mode(self, num_files_to_check=5):
@@ -325,7 +350,6 @@ class Experiment:
             print("\t", moniker, " - ", path)
 
     def generate_cosmetic_map(self, field=None, cos_type='color', seed=None):
-        print(field)
         if seed:
             random.seed(seed)
         if cos_type in self.cosmetics:
@@ -354,11 +378,9 @@ class Experiment:
                 self.cosmetics[cos_type] = {}
             self.cosmetics[cos_type][field] = cosmetic_map
             self.save()
-            print(cosmetic_map)
             return cosmetic_map
 
     def batches(self, field="name", batch_field="batch", debug=False, skip_batch=False):
-        #batches = {"ALL": [a.name for a in self.acquisitions]}
         batches = {}
         for acquisition in self.acquisitions:
             if skip_batch:
