@@ -16,6 +16,7 @@ Usage:
   main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>] [--blank_type=<type>] [--sample_type=<type>]
   main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
   main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>]
+  main.py drop_other_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>]
   main.py batch_correct <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>]
   main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
   main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>]
@@ -158,9 +159,11 @@ def main(args):
     elif args['convert_to_mzML']:
         experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'])
     elif args['asari_full_processing']:
-        extra_args = ''
         if args['--extra_args'] is not None:
             extra_args = " " + args['--extra_args']
+        else:
+            extra_args = " "
+        print(experiment.ionization_mode)
         print("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory + extra_args)
         os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory + extra_args)
         experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
@@ -264,7 +267,8 @@ def main(args):
         blank_type = "Blank" if not args['--blank_type'] else args['--blank_type']
         sample_type = "Unknown" if not args['--sample_type'] else args['--sample_type']
         feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio)
-    elif args['drop_samples']:
+    elif args['drop_samples'] or args["drop_other_samples"]:
+        drop_method = feature_table.drop_samples if args['drop_samples'] else feature_table.drop_others
         drop_field_values = [args['--field_value']] if args['--field_value'] else None 
         drop_field_type = args['--field_type'] if args['--field_type'] else "Sample Type"
         drop_name = args['--name'] if args['--name'] else None
@@ -272,11 +276,11 @@ def main(args):
         if '--auto_drop' in args and args['--auto_drop']:
             auto_drop_config = json.load(open(args['--auto_drop']))
         if drop_field_values:
-            feature_table.drop_samples(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
+            drop_method(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
         elif drop_name:
-            feature_table.drop_samples(new_table_moniker, drop_name=drop_name)
+            drop_method(new_table_moniker, drop_name=drop_name)
         elif auto_drop_config:
-            feature_table.drop_samples(new_table_moniker, auto_drop=auto_drop_config)
+            drop_method(new_table_moniker, auto_drop=auto_drop_config)
     elif args['TIC_normalize']:
         TIC_normalization_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
         feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile)
@@ -296,7 +300,7 @@ def main(args):
     elif args['retrieve']:
         print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
     experiment.save()
-    print(os.path.join(experiment.experiment_directory, "experiment.json"))
+    #print(os.path.join(experiment.experiment_directory, "experiment.json"))
 
 def CLI():
     args = docopt(__doc__)

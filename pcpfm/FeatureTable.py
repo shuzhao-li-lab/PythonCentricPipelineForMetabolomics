@@ -2,9 +2,6 @@ import csv
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import random
-from matplotlib.patches import Patch
-import matplotlib.colors as mcolors
 import matplotlib.lines as mlines
 import scipy.stats
 import os
@@ -13,11 +10,16 @@ from combat.pycombat import pycombat
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
-import re
+from matplotlib.patches import Patch
 
+import re
+from mass2chem.formula import calculate_mass, PROTON, ELECTRON
+import csv
+import json
+from khipu.extended import adduct_search_patterns, adduct_search_patterns_neg
 
 class FeatureTable:
-    def __init__(self, feature_table_filepath, experiment, moniker, fillna=False):
+    def __init__(self, feature_table_filepath, experiment, moniker):
         """
         This object wraps a feature table
 
@@ -28,11 +30,15 @@ class FeatureTable:
         self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
         self.moniker = moniker
-
         self.feature_table = pd.read_csv(feature_table_filepath, delimiter="\t")
 
-        self.sample_columns = [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
-        self.non_sample_columns = [x for x in self.feature_table.columns if x not in self.sample_columns]
+    @property
+    def sample_columns(self):
+        return [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
+    
+    @property
+    def non_sample_columns(self):
+        return [x for x in self.feature_table.columns if x not in self.sample_columns]
     
     @property
     def log_transformed(self):
@@ -49,6 +55,8 @@ class FeatureTable:
             self.feature_table[column] = [x if x > 0 else sample_min for x in self.feature_table[column]]
 
     def save(self, new_moniker):
+        print(self.feature_table.columns)
+        self.drop_all_zero_features()
         try:
             output_path = os.path.join(self.experiment.filtered_feature_tables_subdirectory, new_moniker + "_Feature_table.tsv")
             self.feature_table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t", index=False)
@@ -65,7 +73,11 @@ class FeatureTable:
 
     def gen_figure(self, figure_type, data, title='', x_label=None, y_label=None, params=None, skip_annot=False):
         try:
-            
+            colors = params['colors']
+            markers = params['markers']
+            text = params['text']
+            #print(colors, markers, text)
+
             if params['interactive'] or params['save_figs']:
                 colors = params['colors']
                 markers = params['markers']
@@ -158,16 +170,11 @@ class FeatureTable:
                     plt.show()
                 plt.clf()
         except:
-            pass
+            plt.clf()
 
     def check_for_standards(self, figure_params, standards_csv=None):
-        from mass2chem.formula import calculate_mass, PROTON, ELECTRON
-        import csv
-        import json
-        from khipu.extended import adduct_search_patterns, adduct_search_patterns_neg
         adduct_search_patterns = adduct_search_patterns + [(PROTON + ELECTRON, "H")]
         adduct_search_patterns_neg = adduct_search_patterns_neg + [(PROTON + ELECTRON, "H")]
-
         to_search = []
         if standards_csv:
             for entry in csv.DictReader(open(standards_csv)):
@@ -346,7 +353,7 @@ class FeatureTable:
         }
         return result
 
-    def correlation_heatmap(self, figure_params, correlation_type, log_transform=True):#tag=None, log_transform=True, correlation_type="linear", sorting=None):
+    def correlation_heatmap(self, figure_params, correlation_type, log_transform=True):
         feature_vector_matrix = self.feature_table[figure_params['acquisitions']].T
         if log_transform and not self.log_transformed:
             feature_vector_matrix = feature_vector_matrix + 1
@@ -396,8 +403,8 @@ class FeatureTable:
         sample_ftable = self.feature_table[figure_params['acquisitions']].T
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        if log_transform and not self.log_transformed:
-            sample_ftable = np.log2(sample_ftable+1)
+        #if log_transform and not self.log_transformed:
+        #    sample_ftable = np.log2(sample_ftable+1)
         pca_embedding = pca_embedder.fit_transform(scaler.fit_transform((sample_ftable)))
         self.gen_figure("scatter", 
                                 pca_embedding, 
@@ -618,6 +625,19 @@ class FeatureTable:
         }
         return result
 
+    def drop_all_zero_features(self):
+        def __filter_all_zero(row, columns):
+            for value in row[columns]:
+                if value > 0:
+                    return True
+            return False
+
+        to_keep = []
+        for keep_feature, id_number in zip(self.feature_table.apply(__filter_all_zero, axis=1, args=(self.sample_columns,)), self.feature_table["id_number"]):
+            if keep_feature:
+                to_keep.append(id_number)
+        self.feature_table = self.feature_table[self.feature_table['id_number'].isin(to_keep)].copy()
+
     def drop_samples(self, new_moniker, drop_types=[], type_field="Sample Type", drop_name=None):
         drop = []
         if not drop_name:
@@ -627,7 +647,20 @@ class FeatureTable:
             drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
         else:
             pass
-        print(drop)
+        drop = [x for x in drop if x in self.feature_table.columns]
+        self.feature_table.drop(columns=drop, inplace=True)
+        self.save(new_moniker)
+
+    def drop_others(self, new_moniker, drop_types, type_field="Sample Type", drop_name=None):
+        drop = []
+        if not drop_name:
+            for drop_type in drop_types:
+                drop += list(self.experiment.filter_samples({type_field: {"lacks": [drop_type]}}))
+        elif drop_name:
+            drop = [a.name for a in self.experiment.acquisition if a.name != drop_name]
+        else:
+            pass
+        drop = [x for x in drop if x in self.feature_table.columns]
         self.feature_table.drop(columns=drop, inplace=True)
         self.save(new_moniker)
 
@@ -657,12 +690,13 @@ class FeatureTable:
                 blank_mask_column = "blank_masked_" + batch_name
                 blank_mask_columns.append(blank_mask_column)
                 self.feature_table[blank_mask_column] = to_filter
-        to_filter = []
-        for blank_mean, sample_mean in zip(blank_means, sample_means):
-            to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
-        blank_mask_column = "blank_masked_ALL"
-        blank_mask_columns.append(blank_mask_column)
-        self.feature_table[blank_mask_column] = to_filter
+        else:
+            to_filter = []
+            for blank_mean, sample_mean in zip(blank_means, sample_means):
+                to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+                blank_mask_column = "blank_masked_ALL"
+                blank_mask_columns.append(blank_mask_column)
+                self.feature_table[blank_mask_column] = to_filter
 
         if logic_mode == "and":
             self.feature_table["mask_feature"] = self.feature_table.apply(__all_logical, axis=1, args=(blank_mask_columns,))
@@ -699,7 +733,7 @@ class FeatureTable:
             self.feature_table.drop(columns="feature_interpolate_value", inplace=True)
         self.save(new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median', interactive_plot=False, save_figs=False):
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median'):
         function_map = {
             "median": np.median,
             "mean": np.mean,
@@ -790,17 +824,17 @@ class FeatureTable:
         self.feature_table.drop(columns=batch_columns, inplace=True)
         self.save(new_moniker)
 
-
     def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
         combined_cosmetic_map = {}
         for cosmetic_map in [self.experiment.generate_cosmetic_map(c, 'color', seed) for c in colorby]:
             if cosmetic_map:
                 for k,v in cosmetic_map.items():
-                    combined_cosmetic_map[k] = v
+                    combined_cosmetic_map[("color", k)] = v
+        print(combined_cosmetic_map)
         for cosmetic_map in [self.experiment.generate_cosmetic_map(m, 'marker', seed) for m in markerby]:
             if cosmetic_map:
                 for k,v in cosmetic_map.items():
-                    combined_cosmetic_map[k] = v
+                    combined_cosmetic_map[("marker", k)] = v
         colors = [[] for _ in colorby]
         markers = [[] for _ in markerby]
         texts = [[] for _ in textby]
@@ -809,14 +843,23 @@ class FeatureTable:
         for acquisition in self.experiment.acquisitions:
             if acquisition.name in self.feature_table.columns:
                 for i,x in enumerate(colorby):
-                    colors[i].append(combined_cosmetic_map[acquisition.metadata_tags[x]])
-                    color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[acquisition.metadata_tags[x]]
+                    colors[i].append(combined_cosmetic_map[('color', acquisition.metadata_tags[x])])
+                    color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[('color', acquisition.metadata_tags[x])]
                 for i,x in enumerate(markerby):
-                    markers[i].append(combined_cosmetic_map[acquisition.metadata_tags[x]])
-                    marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[acquisition.metadata_tags[x]]
+                    markers[i].append(combined_cosmetic_map[('marker', acquisition.metadata_tags[x])])
+                    marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[('marker', acquisition.metadata_tags[x])]
                 for i, x in enumerate(textby):
                     texts[i].append(acquisition.metadata_tags[x])
         return colors, markers, texts, color_legend, marker_legend    
+
+    def overlay_TICs(self):
+        TICs = []
+        for acquisition in self.experiment.acquisitions:
+            TIC = acquisition.TIC
+            plt.scatter([x[0] for x in TIC], [x[1] for x in TIC])
+            plt.show()
+            print(acquisition.TIC)
+
 
     def qcqa(self, 
              tag=None, 
@@ -835,8 +878,9 @@ class FeatureTable:
              feature_distribution=False,
              feature_outlier_detection=False,
              save_figs=False,
-             colorby=['batch', 'Sample Type'],
-             textby=['file_no'],
+             standards=False,
+             colorby=['batch'],
+             textby=[],
              markerby=['Sample Type']):
         """
         This is the wrapper for all the qcqa functions. 
@@ -867,7 +911,6 @@ class FeatureTable:
         if sort is None:
             sort=False
 
-
         colors, markers, texts, color_legend, marker_legend = self.generate_cosmetic(colorby, markerby, textby)
         selected_acquisition_names = [x.name for x in self.experiment.acquisitions if x.name in self.feature_table.columns]
 
@@ -882,16 +925,26 @@ class FeatureTable:
             "marker_legend": marker_legend
         }
 
+        #self.experiment.extract_all_acquisitions()
         qcqa_result = []
-        #if True:
-            #qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards.csv"))
-            #qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
+        #self.overlay_TICs()
+
+
+        if standards:
+            qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards.csv"))
+            qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
         if pca:
             qcqa_result.append(self.PCA(figure_params))
         if tsne:
             qcqa_result.append(self.TSNE(figure_params))
         if pearson:
             qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='pearson', log_transform=True))
+        if kendall:
+            qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='kendall', log_transform=True))
+            qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='kendall', log_transform=False))
+        if spearman:
+            #qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='spearman', log_transform=True))
+            qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='spearman', log_transform=False))
         if missing_feature_percentiles:
             qcqa_result.append(self.missing_feature_percentiles(figure_params))
         if missing_feature_distribution:
