@@ -20,7 +20,6 @@ class Acquisition(object):
         self.name = name
         self.metadata_tags = metadata_dict
         self.source_filepath = source_filepath
-        print(self.source_filepath)
         self.raw_filepath = None
         self.mzml_filepath = None
         if not self.source_filepath.endswith(".raw") and not self.source_filepath.endswith(".mzML"):
@@ -108,18 +107,21 @@ class Acquisition(object):
     
     @property
     def ionization_mode(self):
-        try:
+        #try:
+            print(self._ionization_mode)
             if self._ionization_mode is None:
                 for spec in pymzml.run.Reader(self.mzml_filepath):
+                    print(spec)
                     if spec["positive scan"]:
                         self._ionization_mode = "pos"
                         break
                     else:
                         self._ionization_mode = "neg"
                         break
+            
             return self._ionization_mode
-        except:
-            return None
+        #except:
+        #    return None
     
     @property
     def JSON_repr(self):
@@ -147,41 +149,39 @@ class Acquisition(object):
     
     @staticmethod
     def extract_acquisition(acquisition):
-        try:
-            reader = pymzml.run.Reader(acquisition.mzml_filepath)
-            spectra = {}
-            peaks = {}
-            id = 0
-            for spec in reader:
-                if acquisition._ionization_mode is None:
-                    acquisition._ionization_mode = "pos" if spec["positive scan"] else "neg"
-                if spec.ms_level not in spectra:
-                    spectra[spec.ms_level] = []
-                    peaks[spec.ms_level] = []
-                peak_objs = []
-                for peak in spec.peaks("centroided"):
-                    id += 1
-                    peak_objs.append({
-                        "ms_level": spec.ms_level,
-                        "rt": spec.scan_time[0],
-                        "mz": float(peak[0]),
-                        "intensity": float(peak[1]),
-                        "id": id}
-                    )
-                spectra[spec.ms_level].append(peak_objs)
-                peaks[spec.ms_level].extend(peak_objs)
-            acquisition_data = {
-                "spectra": spectra,
-                "peaks": peaks,
-                "TIC": list(zip([spectrum[0]['rt'] for spectrum in spectra[1]], [sum([peak['intensity'] for peak in spectrum]) for spectrum in spectra[1]])),
-                "acquisition_mode": acquisition._ionization_mode
-            }
-            data_path = os.path.abspath(os.path.join(acquisition.experiment.acquisition_datapath, acquisition.name + ".pickle"))
-            with open(data_path, 'wb+') as out_fh:
-                pickle.dump(acquisition_data, out_fh)
-            return data_path
-        except:
-            return None
+        reader = pymzml.run.Reader(acquisition.mzml_filepath)
+        spectra = {}
+        peaks = {}
+        id = 0
+        for spec in reader:
+            if acquisition._ionization_mode is None:
+                acquisition._ionization_mode = "pos" if spec["positive scan"] else "neg"
+            if spec.ms_level not in spectra:
+                spectra[spec.ms_level] = []
+                peaks[spec.ms_level] = []
+            peak_objs = []
+            for peak in spec.peaks("centroided"):
+                id += 1
+                peak_objs.append({
+                    "ms_level": spec.ms_level,
+                    "rt": spec.scan_time[0],
+                    "mz": float(peak[0]),
+                    "intensity": float(peak[1]),
+                    "id": id}
+                )
+            spectra[spec.ms_level].append(peak_objs)
+            peaks[spec.ms_level].extend(peak_objs)
+        acquisition_data = {
+            "spectra": spectra,
+            "peaks": peaks,
+            "TIC": list(zip([spectrum[0]['rt'] for spectrum in spectra[1]], [sum([peak['intensity'] for peak in spectrum]) for spectrum in spectra[1]])),
+            "acquisition_mode": acquisition._ionization_mode
+        }
+        data_path = os.path.abspath(os.path.join(acquisition.experiment.acquisition_datapath, acquisition.name + ".pickle"))
+        with open(data_path, 'wb+') as out_fh:
+            pickle.dump(acquisition_data, out_fh)
+        return data_path
+
 
     def filter(self, filter):
         """

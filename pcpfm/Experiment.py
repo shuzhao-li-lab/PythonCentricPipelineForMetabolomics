@@ -5,6 +5,7 @@ import os
 import random
 import matplotlib.colors as mcolors
 import multiprocessing as mp
+import pandas as pd
 
 from . import ThermoRawFileConverter
 from . import Acquisition
@@ -234,7 +235,7 @@ class Experiment:
             except:
                 pass
 
-    def add_acquisition(self, acquisition, override=False, mode="link"):
+    def add_acquisition(self, acquisition, mode="link"):
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
         and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
@@ -244,27 +245,27 @@ class Experiment:
             override (bool, optional): if True, duplicate names or source paths are allowed. Defaults to False.
             mode (str, optional): if 'link', use symlink, if 'copy' copy the .raw file. Defaults to "link".
         """        
-        used_acquisition_names = {acquisition.name for acquisition in self.acquisitions} 
-        used_acquisition_sources = {acquisition.source_filepath for acquisition in self.acquisitions} 
-        if (acquisition.name in used_acquisition_names or acquisition.source_filepath in used_acquisition_sources) and override is False:
-            raise Exception("here")
         addition_modes = {
             "copy": shutil.copy,
             "link": os.link,
         }
-        try:
+        if os.path.exists(acquisition.source_filepath):
             if acquisition.source_filepath.endswith(".mzML"):
-                acquisition.mzml_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+                target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+                acquisition.mzml_filepath = target_path
                 acquisition.raw_filepath = None
-                addition_modes[mode](acquisition.source_filepath, self.converted_subdirectory + os.path.basename(acquisition.source_filepath))
             elif acquisition.source_filepath.endswith(".raw"):
+                target_path = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
                 acquisition.mzml_filepath = None
-                acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
-                addition_modes[mode](acquisition.source_filepath, self.raw_subdirectory + os.path.basename(acquisition.source_filepath))
-        except FileNotFoundError:
-            raise Warning("File Not Found: ", acquisition.name)
-        self.acquisitions.append(acquisition)
-            
+                acquisition.raw_filepath = target_path
+            if not os.path.exists(target_path):
+                addition_modes[mode](acquisition.source_filepath, target_path)
+                self.acquisitions.append(acquisition)
+            else:
+                print("Target already exists: ", target_path)
+        else:
+            print("File Not Found: ", acquisition.name)
+
     def convert_raw_to_mzML(self, mono_path, exe_path):
         """
         Convert all raw files to mzML
@@ -315,7 +316,7 @@ class Experiment:
         experiment = Experiment('', experiment_directory)
         with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
             for acquisition_info in csv.DictReader(CSV_fh):
-                #print(acquisition_info)
+                acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
                 if path_field not in acquisition_info:
                     path_field = "Path"
                 if name_field not in acquisition_info:
@@ -323,10 +324,12 @@ class Experiment:
                 if name_field not in acquisition_info or path_field not in acquisition_info:
                     raise Exception()
                 acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
+                acquisition.experiment = experiment
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
         experiment.__ionization_mode = ionization_mode
-        experiment.extract_all_acquisitions()
+        #experiment.extract_all_acquisitions()
+        experiment.save()
         return experiment
     
     def determine_ionization_mode(self, num_files_to_check=5):
@@ -352,9 +355,8 @@ class Experiment:
     def generate_cosmetic_map(self, field=None, cos_type='color', seed=None):
         if seed:
             random.seed(seed)
-        if cos_type in self.cosmetics:
-            if field in self.cosmetics[cos_type]:
-                return self.cosmetics[cos_type][field]
+        if cos_type in self.cosmetics and field in self.cosmetics[cos_type]:
+            return self.cosmetics[cos_type][field]
         else:
             if cos_type == 'color':
                 banned_colors = {'snow', 'beige', 'honeydew', 'azure', 
@@ -380,8 +382,11 @@ class Experiment:
             self.save()
             return cosmetic_map
 
-    def batches(self, field="name", batch_field="batch", debug=False, skip_batch=False):
+    def batches(self, field="name", batch_field="Batch", debug=False, skip_batch=False):
         batches = {}
+        if batch_field == "Batch" and "batch" in self.acquisitions[0].metadata_tags:
+            batch_field = "batch"
+
         for acquisition in self.acquisitions:
             if skip_batch:
                 batch_name = "no_batch"
