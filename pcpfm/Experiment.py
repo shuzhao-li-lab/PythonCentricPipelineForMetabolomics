@@ -330,9 +330,15 @@ class Experiment:
                 acquisition.experiment = experiment
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
-        experiment.__ionization_mode = ionization_mode
-        experiment.save()
-        return experiment
+        if experiment.acquisitions:
+            experiment.__ionization_mode = ionization_mode
+            experiment.save()
+            return experiment
+        else:
+            import shutil
+            shutil.rmtree(experiment.experiment_directory)
+            print("Unable to create empty experiment")
+            exit()
     
     def determine_ionization_mode(self, num_files_to_check=5):
         tested = []
