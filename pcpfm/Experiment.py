@@ -6,6 +6,7 @@ import random
 import matplotlib.colors as mcolors
 import multiprocessing as mp
 import pandas as pd
+import random
 
 from . import ThermoRawFileConverter
 from . import Acquisition
@@ -94,8 +95,10 @@ class Experiment:
 
     @property
     def ionization_mode(self):
+        print(self.__ionization_mode)
         if self.__ionization_mode is None:
             self.__ionization_mode = self.determine_ionization_mode()
+        print(self.__ionization_mode)
         return self.__ionization_mode
 
     def initialize_subdirectories(self):
@@ -262,9 +265,9 @@ class Experiment:
                 addition_modes[mode](acquisition.source_filepath, target_path)
                 self.acquisitions.append(acquisition)
             else:
-                print("Target already exists: ", target_path)
+                print("Target already exists: ", acquisition.name, acquisition.source_filepath)
         else:
-            print("File Not Found: ", acquisition.name)
+            print("File Not Found: ", acquisition.name, acquisition.source_filepath)
 
     def convert_raw_to_mzML(self, mono_path, exe_path):
         """
@@ -328,17 +331,24 @@ class Experiment:
                 if acquisition.filter(filter):
                     experiment.add_acquisition(acquisition)
         experiment.__ionization_mode = ionization_mode
-        #experiment.extract_all_acquisitions()
         experiment.save()
         return experiment
     
     def determine_ionization_mode(self, num_files_to_check=5):
-        if self.__ionization_mode is None:
-            num_files_to_check = len(self.acquisitions) if num_files_to_check is None else num_files_to_check
-            ionization_modes = list(set([acquisition.ionization_mode for acquisition in self.acquisitions[:num_files_to_check]]))
-            ionization_modes = [x for x in ionization_modes if x]
-            if len(ionization_modes) == 1:
-                self.__ionization_mode = ionization_modes[0]
+        tested = []
+        ion_modes = set()
+        while len(tested) < num_files_to_check:
+            acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
+            try:
+                ionization_mode = acquisition.ionization_mode
+                tested.append(acquisition)
+                ion_modes.add(ionization_mode)
+            except:
+                pass 
+        if len(ion_modes) == 1:
+            self.__ionization_mode = list(ion_modes)[0]
+        else:
+            raise Exception()
         return self.__ionization_mode
 
     def summarize(self):
@@ -382,24 +392,11 @@ class Experiment:
             self.save()
             return cosmetic_map
 
-    def batches(self, field="name", batch_field="Batch", debug=False, skip_batch=False):
+    def batches(self, batch_field):
         batches = {}
-        if batch_field == "Batch" and "batch" in self.acquisitions[0].metadata_tags:
-            batch_field = "batch"
-
         for acquisition in self.acquisitions:
-            if skip_batch:
-                batch_name = "no_batch"
-            else:
-                if batch_field in acquisition.metadata_tags:
-                    batch_name = acquisition.metadata_tags[batch_field]
-                else:
-                    batch_name = "no_batch"
-            if batch_name not in batches:
-                batches[batch_name] = []
-            if field:
-                batches[batch_name].append(getattr(acquisition, field))
-            else:
-                batches[batch_name].append(acquisition)
+            batch_field_value = acquisition.metadata_tags[batch_field]
+            if batch_field_value not in batches:
+                batches[batch_field_value] = []
+            batches[batch_field_value].append(acquisition)
         return batches
-    

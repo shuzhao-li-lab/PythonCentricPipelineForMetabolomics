@@ -55,8 +55,7 @@ class FeatureTable:
             self.feature_table[column] = [x if x > 0 else sample_min for x in self.feature_table[column]]
 
     def save(self, new_moniker):
-        print(self.feature_table.columns)
-        self.drop_all_zero_features()
+        self.drop_invariants()
         try:
             output_path = os.path.join(self.experiment.filtered_feature_tables_subdirectory, new_moniker + "_Feature_table.tsv")
             self.feature_table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t", index=False)
@@ -72,104 +71,122 @@ class FeatureTable:
         return os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png") 
 
     def gen_figure(self, figure_type, data, title='', x_label=None, y_label=None, params=None, skip_annot=False):
-        try:
+        colors = params['colors']
+        markers = params['markers']
+        text = params['text']
+        #print(colors, markers, text)
+
+        if params['interactive'] or params['save_figs']:
             colors = params['colors']
             markers = params['markers']
             text = params['text']
-            #print(colors, markers, text)
-
-            if params['interactive'] or params['save_figs']:
-                colors = params['colors']
-                markers = params['markers']
-                text = params['text']
-                if figure_type == "scatter":
-                    if type(data) is dict:
-                        X = data.keys()
-                        Y = data.values()
-                    else:
-                        X = data[:, 0]
-                        Y = data[:, 1]
-                    plt.title(title)
-                    plt.xlabel(x_label)
-                    plt.ylabel(y_label)
-                    if skip_annot is False:
-                        if markers is None:
-                            markers = ['o' for _ in markers]
-                        if colors is None:
-                            colors = ['k' for _ in colors]
+            if figure_type == "scatter":
+                if type(data) is dict:
+                    X = data.keys()
+                    Y = data.values()
+                else:
+                    X = data[:, 0]
+                    Y = data[:, 1]
+                plt.title(title)
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+                if skip_annot is False:
+                    if markers and colors:
                         for x,y,c,m in zip(X,Y,list(colors[0]),list(markers[0])):
                             plt.scatter(x, y, c=c, marker=m)
-                        if text:
-                            for x, y, t in zip(X, Y, text[0]):
-                                plt.text(x,y,t)
+                    elif markers and not colors:
+                        for x,y,m in zip(X,Y,list(colors[0])):
+                            plt.scatter(x, y, marker=m)
+                    elif colors and not markers:
+                        for x,y,m in zip(X,Y,list(colors[0])):
+                            plt.scatter(x, y, c=c)
                     else:
                         plt.scatter(X,Y)
-                    if params['marker_legend'] and skip_annot is False:
-
-                        plt.tight_layout(rect=[0, 0, 0.75, 1])
-                        handles = [mlines.Line2D(
-                                [],
-                                [],
-                                color='k',
-                                marker=v,
-                                linestyle='None',
-                                markersize=10,
-                                label=k
-                        ) for k, v in params['marker_legend'].items() if v in markers[0]] 
-                        handles += [Patch(facecolor=v, label=k) for k,v in params['color_legend'].items() if v in colors[0]]
-                        plt.legend(
-                            handles=handles,
-                            bbox_to_anchor=(1.0 ,0.0),
-                            bbox_transform=plt.gcf().transFigure,
-                            loc='lower right'
+                    if text:
+                        for x, y, t in zip(X, Y, text[0]):
+                            plt.text(x,y,t)
+                else:
+                    plt.scatter(X,Y)
+                if params['marker_legend'] and skip_annot is False:
+                    plt.tight_layout(rect=[0, 0, 0.75, 1])
+                    handles = [mlines.Line2D(
+                            [],
+                            [],
+                            color='k',
+                            marker=v,
+                            linestyle='None',
+                            markersize=10,
+                            label=k
+                    ) for k, v in params['marker_legend'].items() if v in markers[0]] 
+                    handles += [Patch(facecolor=v, label=k) for k,v in params['color_legend'].items() if v in colors[0]]
+                    plt.legend(
+                        handles=handles,
+                        bbox_to_anchor=(1.0 ,0.0),
+                        bbox_transform=plt.gcf().transFigure,
+                        loc='lower right'
+                )
+            elif figure_type == "heatmap":               
+                if colors:
+                    g = sns.clustermap(data, col_colors=colors, yticklabels=y_label)
+                else:
+                    g = sns.clustermap(data, yticklabels=y_label)
+                plt.suptitle(title)
+                if params['color_legend']:
+                    plt.tight_layout(rect=[0, 0, 0.75, 1])
+                    plt.legend(
+                        [Patch(facecolor=color) for color in params['color_legend'].values()],
+                        list(params['color_legend'].keys()),
+                        bbox_to_anchor=(1.0,0.0),
+                        bbox_transform=plt.gcf().transFigure,
+                        loc='lower right'
                     )
-                elif figure_type == "heatmap":                
-                    if colors is not None:
-                        g = sns.clustermap(data, col_colors=colors, yticklabels=y_label)
-                        plt.suptitle(title)
-                    if params['color_legend']:
-                        plt.tight_layout(rect=[0, 0, 0.75, 1])
-                        plt.legend(
-                            [Patch(facecolor=color) for color in params['color_legend'].values()],
-                            list(params['color_legend'].keys()),
-                            bbox_to_anchor=(1.0,0.0),
-                            bbox_transform=plt.gcf().transFigure,
-                            loc='lower right'
-                        )
-                elif figure_type == "clustermap":                
-                    if colors is not None:
-                        sns.clustermap(data, col_colors=colors)
-                        plt.suptitle(title)
-                    if params['color_legend']:
-                        plt.tight_layout(rect=[0, 0, 0.75, 1])
-                        plt.legend(
-                            [Patch(facecolor=color) for color in params['color_legend'].values()],
-                            list(params['color_legend'].keys()),
-                            bbox_to_anchor=(1.0,0.0),
-                            bbox_transform=plt.gcf().transFigure,
-                            loc='lower right'
-                        )
-                elif figure_type == "bar":
-                    plt.bar([x+"_"+str(i) for i,x in enumerate(text[0])], data[1], color=colors[0])
-                    plt.title(title)
-                    plt.xticks(rotation=90)
-                    plt.xlabel(x_label)
-                    plt.ylabel(y_label)
-                    if params['color_legend']:
-                        plt.tight_layout(rect=[0, 0, 0.75, 1])
-                        plt.legend(
-                            [Patch(facecolor=color) for color in params['color_legend'].values()],
-                            list(params['color_legend'].keys()),
-                            bbox_to_anchor=(1.0,0.0),
-                            bbox_transform=plt.gcf().transFigure,
-                            loc='lower right'
-                        )
-                if params['save_figs']:
-                    plt.savefig(self.save_fig_path(title.replace(" ", "_")))
-                if params['interactive']:
-                    plt.show()
-                plt.clf()
-        except:
+            elif figure_type == "clustermap":      
+                if colors:
+                    sns.clustermap(data, col_colors=colors)
+                else:
+                    sns.clustermap(data)
+                plt.suptitle(title)
+                if params['color_legend']:
+                    plt.tight_layout(rect=[0, 0, 0.75, 1])
+                    plt.legend(
+                        [Patch(facecolor=color) for color in params['color_legend'].values()],
+                        list(params['color_legend'].keys()),
+                        bbox_to_anchor=(1.0,0.0),
+                        bbox_transform=plt.gcf().transFigure,
+                        loc='lower right'
+                    )
+            elif figure_type == "bar":
+                if False:
+                    if text and colors:
+                        plt.bar([x+"_"+str(i) for i,x in enumerate(text[0])], data[1], color=colors[0])
+                    elif text and not colors:
+                        plt.bar([x+"_"+str(i) for i,x in enumerate(text[0])], data[1])
+                    elif not text and colors:                    
+                        plt.bar([i for i in range(len(data[1]))], data[1], color=colors[0])
+                    else:
+                        plt.bar([i for i in range(data[1])], data[1])
+                else:
+                    if colors:
+                        plt.scatter([i for i in range(len(data[1]))], data[1], color=colors[0])
+                    else:
+                        plt.scatter([i for i in range(len(data[1]))], data[1])
+                plt.title(title)
+                plt.xticks(rotation=90)
+                plt.xlabel(x_label)
+                plt.ylabel(y_label)
+                if params['color_legend']:
+                    plt.tight_layout(rect=[0, 0, 0.75, 1])
+                    plt.legend(
+                        [Patch(facecolor=color) for color in params['color_legend'].values()],
+                        list(params['color_legend'].keys()),
+                        bbox_to_anchor=(1.0,0.0),
+                        bbox_transform=plt.gcf().transFigure,
+                        loc='lower right'
+                    )
+            if params['save_figs']:
+                plt.savefig(self.save_fig_path(title.replace(" ", "_")))
+            if params['interactive']:
+                plt.show()
             plt.clf()
 
     def check_for_standards(self, figure_params, standards_csv=None):
@@ -403,8 +420,8 @@ class FeatureTable:
         sample_ftable = self.feature_table[figure_params['acquisitions']].T
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
-        #if log_transform and not self.log_transformed:
-        #    sample_ftable = np.log2(sample_ftable+1)
+        if log_transform and not self.log_transformed:
+            sample_ftable = np.log2(sample_ftable+1)
         pca_embedding = pca_embedder.fit_transform(scaler.fit_transform((sample_ftable)))
         self.gen_figure("scatter", 
                                 pca_embedding, 
@@ -625,28 +642,56 @@ class FeatureTable:
         }
         return result
 
-    def drop_all_zero_features(self):
-        def __filter_all_zero(row, columns):
-            for value in row[columns]:
-                if value > 0:
-                    return True
-            return False
+    def drop_invariants(self, zeros_only=False):
+        def __filter_invariant(row, columns):
+            values = set(list([x for x in row[columns]]))
+            if len(values) == 1:
+                if zeros_only and values[0] == 0:
+                    return False
+                else:
+                    return False
+            return True
 
         to_keep = []
-        for keep_feature, id_number in zip(self.feature_table.apply(__filter_all_zero, axis=1, args=(self.sample_columns,)), self.feature_table["id_number"]):
+        for keep_feature, id_number in zip(self.feature_table.apply(__filter_invariant, axis=1, args=(self.sample_columns,)), self.feature_table["id_number"]):
             if keep_feature:
                 to_keep.append(id_number)
         self.feature_table = self.feature_table[self.feature_table['id_number'].isin(to_keep)].copy()
 
-    def drop_samples(self, new_moniker, drop_types=[], type_field="Sample Type", drop_name=None):
-        drop = []
-        if not drop_name:
-            for drop_type in drop_types:
-                drop += list(self.experiment.filter_samples({type_field: {"includes": [drop_type]}}))
-        elif drop_name:
-            drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
+        for sample_column in self.sample_columns:
+            values = set(list([x for x in self.feature_table[sample_column]]))
+            if len(values) == 1:
+                if zeros_only and values[0] == 0:
+                    self.feature_table.drop(columns=[sample_column], inplace=True)
+                else:
+                    self.feature_table.drop(columns=[sample_column], inplace=True)
+
+    def drop_samples(self, new_moniker, drop_types=[], type_field="Sample Type", drop_name=None, auto_drop=None):
+        if not auto_drop:
+            drop = []
+            if not drop_name:
+                for drop_type in drop_types:
+                    drop += list(self.experiment.filter_samples({type_field: {"includes": [drop_type]}}))
+            elif drop_name:
+                drop = [a.name for a in self.experiment.acquisitions if a.name == drop_name]
+            else:
+                pass
         else:
-            pass
+            drop = []
+            qaqc_results = {entry["Type"]: entry for entry in self.experiment.QCQA_results[self.moniker]}
+            for field in auto_drop.keys():
+                qaqc_results_for_field = qaqc_results[field]["Result"]
+                if "GreaterThan" in auto_drop[field]["Conditions"]:
+                    max_value = auto_drop[field]["Conditions"]["GreaterThan"]
+                if "LessThan" in auto_drop[field]["Conditions"]:
+                    min_value = auto_drop[field]["Conditions"]["LessThan"]
+                for sample, value in qaqc_results_for_field.items():
+                    if min_value < value < max_value:
+                        if auto_drop[field]["Action"] == "Keep":
+                            drop.append(sample)
+                    else:
+                        if auto_drop[field]["Action"] == "Drop":
+                            drop.append(sample)
         drop = [x for x in drop if x in self.feature_table.columns]
         self.feature_table.drop(columns=drop, inplace=True)
         self.save(new_moniker)
@@ -664,7 +709,7 @@ class FeatureTable:
         self.feature_table.drop(columns=drop, inplace=True)
         self.save(new_moniker)
 
-    def blank_mask(self, new_moniker, by_batch=True, blank_intensity_ratio=3, logic_mode="or", blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
+    def blank_mask(self, new_moniker, by_batch=None, blank_intensity_ratio=3, logic_mode="or", blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
         def __non_zero_mean(row, columns):
             non_zero_columns = [x for x in row[columns] if x > 0]
             return np.mean(non_zero_columns) if len(non_zero_columns) > 0 else 0
@@ -679,7 +724,7 @@ class FeatureTable:
         sample_names = {x for x in self.experiment.filter_samples({type_field: {"includes": [sample_type]}}) if x in self.sample_columns}
         blank_mask_columns = []
         if by_batch:
-            for batch_name, batch_name_list in self.experiment.batches().items():
+            for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_blanks = [x for x in batch_name_list if x in blank_names]
                 batch_samples = [x for x in batch_name_list if x in sample_names]
                 blank_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(batch_blanks,))
@@ -710,7 +755,7 @@ class FeatureTable:
         self.feature_table.drop(columns="mask_feature", inplace=True)
         self.save(new_moniker)
 
-    def interpolate_missing_features(self, new_moniker, ratio=0.5, by_batch=False):
+    def interpolate_missing_features(self, new_moniker, ratio=0.5, by_batch=None):
         def calc_interpolated_value(row, sample_names):
             values = [x for x in row[sample_names] if x > 0]
             if values:
@@ -720,7 +765,7 @@ class FeatureTable:
             
         sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
         if by_batch:
-            for _, batch_name_list in self.experiment.batches(skip_batch=not by_batch).items():
+            for _, batch_name_list in self.experiment.batches(by_batch).items():
                 filtered_batch_name_list = [x for x in batch_name_list if x in sample_names]
                 self.feature_table["feature_interpolate_value"] = self.feature_table.apply(calc_interpolated_value, axis=1, args=(filtered_batch_name_list,))
                 for sample_name in filtered_batch_name_list:
@@ -733,14 +778,14 @@ class FeatureTable:
             self.feature_table.drop(columns="feature_interpolate_value", inplace=True)
         self.save(new_moniker)
 
-    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=True, sample_type="Unknown", type_field="Sample Type", normalize_mode='median'):
+    def TIC_normalize(self, new_moniker, TIC_normalization_percentile=0.90, by_batch=None, sample_type="Unknown", type_field="Sample Type", normalize_mode='median'):
         function_map = {
             "median": np.median,
             "mean": np.mean,
         }
         if by_batch:
             aggregate_batch_TICs = {}
-            for batch_name, batch_name_list in self.experiment.batches().items():
+            for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
                 self.feature_table["percent_inclusion"] = np.sum(self.feature_table[batch_name_list] > 0, axis=1) / len(batch_name_list)
                 TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in batch_name_list}
@@ -749,7 +794,7 @@ class FeatureTable:
                 for sample, norm_factor in norm_factors.items():
                     self.feature_table[sample] = self.feature_table[sample] * norm_factor
             aggregate_batch_TIC_corrections = {batch: function_map[normalize_mode](list(aggregate_batch_TICs.values()))/value for batch, value in aggregate_batch_TICs.items()}
-            for batch_name, batch_name_list in self.experiment.batches().items():
+            for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
                 for sample in batch_name_list:
                     self.feature_table[sample] = self.feature_table[sample] * aggregate_batch_TIC_corrections[batch_name]
@@ -763,17 +808,21 @@ class FeatureTable:
         self.feature_table.drop(columns="percent_inclusion", inplace=True)
         self.save(new_moniker)
 
-    def batch_correct(self, new_moniker):
-        batch_idx_map = {}
-        for batch_idx, (_, acquisition_name_list) in enumerate(self.experiment.batches().items()):
-            for acquisition_name in acquisition_name_list:
-                batch_idx_map[acquisition_name] = batch_idx
-        sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
-        batches = [batch_idx_map[a.name] for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
-        batch_corrected = pycombat(self.feature_table[sample_names], batches)
-        for column in batch_corrected.columns:
-            self.feature_table[column] = batch_corrected[column]
-        self.save(new_moniker)
+    def batch_correct(self, new_moniker, by_batch):
+        if len(self.experiment.batches(by_batch).keys()) > 1:
+            batch_idx_map = {}
+            for batch_idx, (_, acquisition_list) in enumerate(self.experiment.batches(by_batch).items()):
+                for acquisition in acquisition_list:
+                    batch_idx_map[acquisition.name] = batch_idx
+            sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
+            batches = [batch_idx_map[a.name] for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
+            batch_corrected = pycombat(self.feature_table[sample_names], batches)
+            for column in batch_corrected.columns:
+                self.feature_table[column] = batch_corrected[column]
+            self.save(new_moniker)
+        else:
+            print("Unable to batch correct if only one batch!")
+            self.save(new_moniker)
 
     def log_transform(self, new_moniker, log_mode="log2"):
         log_types = {
@@ -793,7 +842,7 @@ class FeatureTable:
         self.make_nonnegative()
         self.save(new_moniker)
 
-    def drop_missing_features(self, new_moniker, by_batch=False, drop_percentile=0.8, logic_mode="or", sample_type="Unknown", type_field="Sample Type"):
+    def drop_missing_features(self, new_moniker, by_batch=None, drop_percentile=0.8, logic_mode="or", sample_type="Unknown", type_field="Sample Type"):
         def __any(row, columns, drop_percentile):
             return not np.any(row[columns] >= drop_percentile)
         
@@ -804,7 +853,7 @@ class FeatureTable:
         sample_names = [a.name for a in self.experiment.acquisitions]
         batch_columns = []
         if by_batch:
-            for batch_name, batch_name_list in self.experiment.batches().items():
+            for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_column = "percent_inclusion_" + batch_name
                 filtered_batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns and x in sample_names]
                 self.feature_table[batch_column] = np.sum(self.feature_table[filtered_batch_name_list] > 0, axis=1) / len(filtered_batch_name_list)
@@ -826,15 +875,16 @@ class FeatureTable:
 
     def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
         combined_cosmetic_map = {}
-        for cosmetic_map in [self.experiment.generate_cosmetic_map(c, 'color', seed) for c in colorby]:
-            if cosmetic_map:
-                for k,v in cosmetic_map.items():
-                    combined_cosmetic_map[("color", k)] = v
-        print(combined_cosmetic_map)
-        for cosmetic_map in [self.experiment.generate_cosmetic_map(m, 'marker', seed) for m in markerby]:
-            if cosmetic_map:
-                for k,v in cosmetic_map.items():
-                    combined_cosmetic_map[("marker", k)] = v
+        if colorby:
+            for cosmetic_map in [self.experiment.generate_cosmetic_map(c, 'color', seed) for c in colorby]:
+                if cosmetic_map:
+                    for k,v in cosmetic_map.items():
+                        combined_cosmetic_map[("color", k)] = v
+        if markerby:
+            for cosmetic_map in [self.experiment.generate_cosmetic_map(m, 'marker', seed) for m in markerby]:
+                if cosmetic_map:
+                    for k,v in cosmetic_map.items():
+                        combined_cosmetic_map[("marker", k)] = v
         colors = [[] for _ in colorby]
         markers = [[] for _ in markerby]
         texts = [[] for _ in textby]
@@ -863,7 +913,6 @@ class FeatureTable:
 
     def qcqa(self, 
              tag=None, 
-             sort=None, 
              interactive=False, 
              pca=False, 
              tsne=False, 
@@ -879,9 +928,11 @@ class FeatureTable:
              feature_outlier_detection=False,
              save_figs=False,
              standards=False,
-             colorby=['batch'],
+             colorby=[],
              textby=[],
-             markerby=['Sample Type']):
+             markerby=[],
+             batchby=[],
+             sortby=[]):
         """
         This is the wrapper for all the qcqa functions. 
 
@@ -908,8 +959,6 @@ class FeatureTable:
         Returns:
             list: with all qcqa results for the performed QCQA steps
         """        
-        if sort is None:
-            sort=False
 
         colors, markers, texts, color_legend, marker_legend = self.generate_cosmetic(colorby, markerby, textby)
         selected_acquisition_names = [x.name for x in self.experiment.acquisitions if x.name in self.feature_table.columns]
@@ -925,14 +974,11 @@ class FeatureTable:
             "marker_legend": marker_legend
         }
 
-        #self.experiment.extract_all_acquisitions()
         qcqa_result = []
-        #self.overlay_TICs()
 
-
-        if standards:
-            qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards.csv"))
-            qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
+        #if standards:
+        #    qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards.csv"))
+        #    qcqa_result.append(self.check_for_standards(figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
         if pca:
             qcqa_result.append(self.PCA(figure_params))
         if tsne:
@@ -940,10 +986,8 @@ class FeatureTable:
         if pearson:
             qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='pearson', log_transform=True))
         if kendall:
-            qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='kendall', log_transform=True))
             qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='kendall', log_transform=False))
         if spearman:
-            #qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='spearman', log_transform=True))
             qcqa_result.append(self.correlation_heatmap(figure_params, correlation_type='spearman', log_transform=False))
         if missing_feature_percentiles:
             qcqa_result.append(self.missing_feature_percentiles(figure_params))
