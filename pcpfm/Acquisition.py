@@ -107,11 +107,9 @@ class Acquisition(object):
     
     @property
     def ionization_mode(self):
-        #try:
-            print(self._ionization_mode)
+        try:
             if self._ionization_mode is None:
                 for spec in pymzml.run.Reader(self.mzml_filepath):
-                    print(spec)
                     if spec["positive scan"]:
                         self._ionization_mode = "pos"
                         break
@@ -120,8 +118,8 @@ class Acquisition(object):
                         break
             
             return self._ionization_mode
-        #except:
-        #    return None
+        except:
+            return None
     
     @property
     def JSON_repr(self):
