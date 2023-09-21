@@ -129,7 +129,6 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-
     def MS2_annotate(self, 
                      DDA_file, 
                      msp_file, 

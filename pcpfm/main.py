@@ -134,7 +134,7 @@ def main(args):
     if args["help"]:
         print(__doc__)
         exit()
-    if args['assemble_experiment_from_CSV']:
+    elif args['assemble_experiment_from_CSV']:
         if args['pos']:
             ionization_mode = "pos"
         elif args['neg']:
@@ -142,7 +142,7 @@ def main(args):
         elif args["auto"]:
             ionization_mode = None
         experiment = Experiment.Experiment.construct_experiment_from_CSV(args['<experiment_directory>'], args['<sequence_csv>'], ionization_mode, filter=args['--filter'])
-    if args['MS1_annotate']:
+    elif args['MS1_annotate']:
         empCpds.MS1_annotate(args['<annotation_source>'])
         empCpds.save(new_empCpd_moniker)
     elif args['standards_annotate']:
@@ -189,7 +189,6 @@ def main(args):
             for acquisition in experiment.acquisitions:
                 standards_search_result = acquisition.generate_report(spikeins, float(args["<mz_search_tolerance_ppm>"]), float(args["<rt_search_tolerance>"]), int(args["<null_cutoff_percentile>"]), int(args["<min_intensity>"]), text_report=True, output_directory=os.path.join(experiment.experiment_directory, "reports"))
                 standards_search_results.append(standards_search_result)
-        print(standards_search_results)
         sample_names = [a.name for a in experiment.acquisitions]
         for spikein in spikeins:
             spikein_name = spikein['Name']
@@ -300,7 +299,6 @@ def main(args):
     elif args['retrieve']:
         print(experiment.retrieve(args['<moniker>'], args['table'], args['empCpd']))
     experiment.save()
-    #print(os.path.join(experiment.experiment_directory, "experiment.json"))
 
 def CLI():
     args = docopt(__doc__)
