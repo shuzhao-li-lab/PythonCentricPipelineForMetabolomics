@@ -315,29 +315,33 @@ class Experiment:
         Returns:
             experiment: the experiment object
         """        
-        filter = {} if filter is None else json.loads(filter)
-        experiment = Experiment('', experiment_directory)
-        with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
-            for acquisition_info in csv.DictReader(CSV_fh):
-                acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
-                if path_field not in acquisition_info:
-                    path_field = "Path"
-                if name_field not in acquisition_info:
-                    name_field = "File Name"
-                if name_field not in acquisition_info or path_field not in acquisition_info:
-                    raise Exception()
-                acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
-                acquisition.experiment = experiment
-                if acquisition.filter(filter):
-                    experiment.add_acquisition(acquisition)
-        if experiment.acquisitions:
-            experiment.__ionization_mode = ionization_mode
-            experiment.save()
-            return experiment
+        if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
+            filter = {} if filter is None else json.loads(filter)
+            experiment = Experiment('', experiment_directory)
+            with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
+                for acquisition_info in csv.DictReader(CSV_fh):
+                    acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
+                    if path_field not in acquisition_info:
+                        path_field = "Path"
+                    if name_field not in acquisition_info:
+                        name_field = "File Name"
+                    if name_field not in acquisition_info or path_field not in acquisition_info:
+                        raise Exception()
+                    acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
+                    acquisition.experiment = experiment
+                    if acquisition.filter(filter):
+                        experiment.add_acquisition(acquisition)
+            if experiment.acquisitions:
+                experiment.__ionization_mode = ionization_mode
+                experiment.save()
+                return experiment
+            else:
+                import shutil
+                shutil.rmtree(experiment.experiment_directory)
+                print("Unable to create empty experiment")
+                exit()
         else:
-            import shutil
-            shutil.rmtree(experiment.experiment_directory)
-            print("Unable to create empty experiment")
+            print("Experiment already exists!")
             exit()
     
     def determine_ionization_mode(self, num_files_to_check=5):

@@ -1,0 +1,26 @@
+{
+    "experiment_subdirectories": {
+        "asari_results": "asari_results/",
+        "converted": "converted_acquisitions/",
+        "raw": "raw_acquisitions/",
+        "acquisition_data": "acquisitions/",
+        "annotations": "annotations/",
+        "filtered_feature_tables": "filtered_feature_tables/",
+        "qaqc_figs": "QAQC_figs/"
+    },
+    "banned_colors": [
+        "snow", "beige", "honeydew", "azure", 
+        "aliceblue", "lightcyan", "lightyellow", 
+        "white", "oldlace", "antiquewhite", "ivory", 
+        "whitesmoke", "mistyrose", "seashell", "linen", 
+        "antiquewhite", "lightgoldenrodyellow", "cornsilk", 
+        "lemonchiffon", "honeydew", "mintcream", "ghostwhite",
+        "lavenderblush"
+    ],
+    "allowed_markers": [
+        ".", "o", "v", "^", ">", "<", "1", 
+        "2", "3", "4", "8", "s", "P"
+    ]
+}
+    
+    

@@ -1,0 +1,3 @@
+[console_scripts]
+pcpfm = pcpfm.main:CLI
+
