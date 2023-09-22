@@ -5,7 +5,7 @@ from jms.io import read_table_to_peaks
 from mass2chem.formula import PROTON
 import matchms
 import json
-import intervaltree
+from intervaltree import IntervalTree
 import os
 
 class empCpds:
@@ -54,7 +54,7 @@ class empCpds:
         return empCpds(json.load(open(experiment.empCpds[moniker])), experiment, moniker)
 
     @staticmethod
-    def construct_empCpds_from_feature_table(experiment, isotopes=isotope_search_patterns, adducts=None, extended_adducts=extended_adducts, feature_table_moniker='full', empCpd_moniker='default', add_singletons=True, rt_search_window=2, mz_tolerance=5, charges=[1,2,3]):
+    def construct_empCpds_from_feature_table(experiment, isotopes=isotope_search_patterns, adducts=None, extended_adducts=extended_adducts, feature_table_moniker='full', empCpd_moniker='default', add_singletons=False, rt_search_window=2, mz_tolerance=5, charges=[1,2,3]):
         """_summary_
 
         Args:
@@ -91,7 +91,10 @@ class empCpds:
             for peak in peaklist:
                 if peak['id_number'] not in all_feature_ids:
                     peak['ion_relation'] = None
-                    dict_empCpds[len(dict_empCpds)] = {'interim_id': len(dict_empCpds), 'neutral_formula_mass': '', 'neutral_formula': '', 'MS1_pseudo_Spectra': [peak]}
+                    dict_empCpds[len(dict_empCpds)] = {'interim_id': len(dict_empCpds), 
+                                                       'neutral_formula_mass': '', 
+                                                       'neutral_formula': '', 
+                                                       'MS1_pseudo_Spectra': [peak]}
         empCpd = empCpds(dict_empCpds, experiment, empCpd_moniker)
         empCpd.save()
         return empCpd
@@ -106,7 +109,8 @@ class empCpds:
             rt_tolerance (int, optional): the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
         """        
         EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance)
-        EED.build_from_list_empCpds(self.dict_empCpds.values())
+        EED.build_from_list_empCpds(list(self.dict_empCpds.values()))
+
         formula_entry_lookup = {}
         for source in annotation_sources:
             for entry in json.load(open(source)):
@@ -117,7 +121,7 @@ class empCpds:
             KCD.mass_index_list_compounds(json.load(open(source)))
             KCD.build_emp_cpds_index()
             EED.extend_empCpd_annotation(KCD)
-            EED.annotate_singletons(KCD)
+            #EED.annotate_singletons(KCD)
 
         for empCpd in self.dict_empCpds.values():
             if 'mz_only_db_matches' not in empCpd:
@@ -129,14 +133,25 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
+    def AcquireX_annotate(self,
+                          acquireX_path,
+                          msp_file,
+                          rt_tolerance=20,
+                          mz_tolerance=5,
+                          match_threshold=0.60,
+                          min_peaks=3,
+                          similarity_function="cosine_greedy"):
+        for file in os.listdir(acquireX_path):
+            if file.endswith(".mzML"):
+                filepath = os.path.join(acquireX_path, file)
+                for msp_f in msp_file:
+                    self.MS2_annotate(filepath, msp_f, rt_tolerance=rt_tolerance, mz_tolerance=mz_tolerance, match_threshold=match_threshold, min_peaks=min_peaks, similarity_function=similarity_function)
 
     def MS2_annotate(self, 
                      DDA_file, 
                      msp_file, 
                      rt_tolerance=20, 
                      mz_tolerance=5, 
-                     multiplier=10, 
-                     max_mass=2000, 
                      match_threshold=0.60, 
                      min_peaks=3,
                      similarity_function="cosine_greedy"):
@@ -158,8 +173,11 @@ class empCpds:
             "cosine_hungarian": matchms.similarity.CosineHungarian,
         }
 
-        DDA_mz_tree, DDA_rt_tree, DDA_spectral_registry = intervaltree(), intervaltree(), {}
-        for spectrum in matchms.importing.load_from_mzml(DDA_file):
+        similarity_metric = similarity_methods[similarity_function]()
+
+        DDA_mz_tree, DDA_rt_tree, DDA_spectral_registry = IntervalTree(), IntervalTree(), {}
+        print("READING: ", DDA_file)
+        for spectrum in matchms.importing.load_from_mzml(DDA_file, metadata_harmonization=False):
             spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
             spectrum = matchms.filtering.default_filters(spectrum)
             spectrum = matchms.filtering.normalize_intensities(spectrum)
@@ -179,8 +197,9 @@ class empCpds:
                     DDA_mz_tree.addi(precursor_mz - precursor_mz_error, precursor_mz + precursor_mz_error, entry_id)
                     DDA_rt_tree.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, entry_id)
         
+        print("READING: ", msp_file)
         MS2_matches = {}
-        for db_spectrum in matchms.importing.load_from_msp(msp_file):
+        for i, db_spectrum in enumerate(matchms.importing.load_from_msp(msp_file, metadata_harmonization=False)):
             precursor_mz = None
             try:
                 precursor_mz = float(db_spectrum.get('precursor_mz'))
@@ -192,7 +211,7 @@ class empCpds:
                 for match in DDA_mz_tree.at(precursor_mz):
                     mz_matches.add(match.data)
             for exp_spec_id, experimental_spectrum in ([x, DDA_spectral_registry[x]] for x in mz_matches):
-                msms_score, n_matches = similarity_methods[similarity_function](db_spectrum, experimental_spectrum).tolist()
+                msms_score, n_matches = similarity_metric.pair(db_spectrum, experimental_spectrum).tolist()
                 if msms_score > match_threshold and n_matches > min_peaks:
                     feature_mz = experimental_spectrum.get("precursor_mz") if experimental_spectrum.get("precursor_mz") else None
                     feature_rt = experimental_spectrum.get("retention_time") if experimental_spectrum.get("retention_time") else None
@@ -214,14 +233,8 @@ class empCpds:
                         'match_precursor_rt': match_rt,
                         'reference_id': db_spectrum.get("compound_name")}
                     )
-                            
+        print("ANNOTATING!")               
         for empCpd in self.dict_empCpds.values():
-            if "MS2_Spectra" not in empCpd:
-                empCpd["MS2_Spectra"] = {}
-                empCpd["MS2_Annotations"] = {}
-            if DDA_file not in empCpd["MS2_Spectra"]:
-                empCpd["MS2_Spectra"][DDA_file] = {}
-                empCpd["MS2_Annotations"][DDA_file] = {}
             for peak in empCpd["MS1_pseudo_Spectra"]:
                 peak_rtime = peak['rtime']
                 peak_mz = peak['mz']
@@ -229,12 +242,17 @@ class empCpds:
                 rt_matches = [x.data for x in DDA_rt_tree.at(peak_rtime)]
                 mz_rt_matches = set(mz_matches).intersection(set(rt_matches))
                 for DDA_match in mz_rt_matches:
-                    DDA_spectrum = DDA_spectral_registry[DDA_match]
-                    empCpd["MS2_Spectra"][DDA_file][DDA_match] = DDA_spectrum
                     if DDA_match in MS2_matches:
-                        MS2_annot = MS2_matches[DDA_match].copy()
-                        MS2_annot['feature_id'] = peak['id_number']
-                        empCpd["MS2_Annotations"][DDA_file][DDA_match] = MS2_annot
+                        if "MS2_Annotations" not in empCpd:
+                            empCpd["MS2_Spectra"] = {}
+                            empCpd["MS2_Annotations"] = {}
+                        if DDA_file not in empCpd["MS2_Annotations"]:
+                            empCpd["MS2_Spectra"][DDA_file] = {}
+                            empCpd["MS2_Annotations"][DDA_file] = {}
+                        for MS2_annot_master in MS2_matches[DDA_match]:
+                            MS2_annot = MS2_annot_master.copy()
+                            MS2_annot['feature_id'] = peak['id_number']
+                            empCpd["MS2_Annotations"][DDA_file][DDA_match] = MS2_annot
     
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
         """
@@ -246,8 +264,8 @@ class empCpds:
             rt_tolerance (int, optional): rt tolerance, in absolute seconds, for matches. Defaults to 30.
             rtime_permissive (bool, optional): if true, rtime matching is not enforced. Defaults to False.
         """        
-        mz_tree = intervaltree.IntervalTree()
-        rt_tree = intervaltree.IntervalTree()
+        mz_tree = IntervalTree()
+        rt_tree = IntervalTree()
 
         for empCpd_id, empCpd in self.dict_empCpds.items():
             if empCpd['neutral_formula_mass'] == "":
