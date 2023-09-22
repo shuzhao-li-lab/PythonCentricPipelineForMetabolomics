@@ -686,6 +686,7 @@ class FeatureTable:
                 if "LessThan" in auto_drop[field]["Conditions"]:
                     min_value = auto_drop[field]["Conditions"]["LessThan"]
                 for sample, value in qaqc_results_for_field.items():
+                    print(value, min_value < value < max_value)
                     if min_value < value < max_value:
                         if auto_drop[field]["Action"] == "Keep":
                             drop.append(sample)
@@ -693,7 +694,11 @@ class FeatureTable:
                         if auto_drop[field]["Action"] == "Drop":
                             drop.append(sample)
         drop = [x for x in drop if x in self.feature_table.columns]
-        self.feature_table.drop(columns=drop, inplace=True)
+        print(len(drop))
+        print(self.feature_table.shape)
+        if drop:
+            self.feature_table.drop(columns=drop, inplace=True)
+        print(self.feature_table.shape)
         self.save(new_moniker)
 
     def drop_others(self, new_moniker, drop_types, type_field="Sample Type", drop_name=None):
@@ -706,7 +711,8 @@ class FeatureTable:
         else:
             pass
         drop = [x for x in drop if x in self.feature_table.columns]
-        self.feature_table.drop(columns=drop, inplace=True)
+        if drop:
+            self.feature_table.drop(columns=drop, inplace=True)
         self.save(new_moniker)
 
     def blank_mask(self, new_moniker, by_batch=None, blank_intensity_ratio=3, logic_mode="or", blank_type="Blank", sample_type="Unknown", type_field="Sample Type"):
@@ -909,7 +915,6 @@ class FeatureTable:
             plt.scatter([x[0] for x in TIC], [x[1] for x in TIC])
             plt.show()
             print(acquisition.TIC)
-
 
     def qcqa(self, 
              tag=None, 
