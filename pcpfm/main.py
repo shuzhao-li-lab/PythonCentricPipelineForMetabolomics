@@ -4,22 +4,22 @@ Usage:
   main.py convert_to_mzML <experiment_directory> <mono_path> <ThermoRawFileConverter.exe_path> 
   main.py spectral_QCQA <experiment_directory> <standards_csv> <adducts_csv> <mz_search_tolerance_ppm> <rt_search_tolerance> <null_cutoff_percentile> <min_intensity> [--multi]
   main.py asari_full_processing <experiment_directory> [--extra_args=<extra_args>]
-  main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis] [--save_figs]
-  main.py preprocess_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] <TIC_inclusion_percentile> <drop_percentile> <blank_intensity_ratio> <blank_filter> <sample_filter> [--annotations=<annotated_empCpds>] [--drop_samples] [--log_transform=<mode>]
+  main.py feature_QCQA <experiment_directory> <table_moniker> [--all] [--tag=<tag>] [--sort_by=<sort>] [--interactive] [--pca] [--tsne] [--pearson] [--spearman] [--kendall] [--missing_feature_percentiles] [--missing_feature_distribution] [--feature_distribution] [--median_correlation_outlier_detection] [--missing_feature_outlier_detection] [--feature_outlier_detection] [--intensity_analysis] [--save_figs] [--color_by=<colorby>] [--text_by=<textby>] [--marker_by=<markerby>] [--batch_by=<batchby>]
   main.py build_empCpds <experiment_directory> <empCpd_moniker> [--table_moniker=<table_moniker>] [--isotopes=<isotope_json>] [--adducts=<adducts_json>] [--extended_adducts=<extended_adducts>] [--charges=<default_charges>] [--rt_tolerance=<rt_tolerance>] [--mz_tolerance=<mz_tolerance>] [--skip_singletons]
   main.py MS1_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <annotation_source>...
   main.py MS2_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] [--DDA=<DDA>] <msp_files>...
+  main.py AcquireX_annotate <experiment_directory> <empCpd_moniker> <AcquireX_path> [--new_empCpd_moniker=<moniker>] <msp_files>...
   main.py standards_annotate <experiment_directory> <empCpd_moniker> [--new_empCpd_moniker=<moniker>] <auth_stds>...
   main.py summarize <experiment_directory>
   main.py delete <experiment_directory> (empCpd|table) <moniker>
   main.py retrieve <experiment_directory> (empCpd|table) <moniker>
-  main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>] [--blank_type=<type>] [--sample_type=<type>]
-  main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
-  main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>]
+  main.py blank_masking <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--blank_intensity_ratio=<blank_intensity_ratio>] [--blank_type=<type>] [--sample_type=<type>] [--batch_by=<batch_by>]
+  main.py TIC_normalize <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>] [--batch_by=<batch_by>]
+  main.py drop_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>] [--auto_drop_config=<auto_drop_config>] [--auto_drop]
   main.py drop_other_samples <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--field_type=<field_name>] [--field_value=<field_value>] [--name=<name>]
-  main.py batch_correct <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>]
-  main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>]
-  main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>]
+  main.py batch_correct <experiment_directory> <table_moniker> <batch_by> [--new_table_moniker=<new_table_moniker>]
+  main.py drop_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--percentile=<percentile>] [--batch_by=<batch_by>]
+  main.py interpolate_missing_features <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--ratio=<ratio>] [--batch_by=<batch_by>]
   main.py log_transform <experiment_directory> <table_moniker> [--new_table_moniker=<new_table_moniker>] [--log_mode=<log_mode>]
   main.py help
  '''
@@ -29,9 +29,10 @@ import json
 import multiprocessing as mp
 import csv
 import itertools
-from mass2chem.formula import atom_mass_dict
+import matplotlib.pyplot as plt
 
 from docopt import docopt
+from mass2chem.formula import atom_mass_dict
 
 from . import Experiment
 from . import EmpCpds
@@ -98,7 +99,6 @@ def job_TICs(job_desc):
     acquisition, rt_resolution = job_desc
     return acquisition.TIC(rt_resolution)
 
-
 def main(args):
     """
     This is the main function for the pipeline that implements the CLI using docopt
@@ -106,11 +106,16 @@ def main(args):
     Args:
         args (dict): the args generated from doctopt
     """    
+
     if args['<experiment_directory>'] and not args['assemble_experiment_from_CSV']:
-        if args['<experiment_directory>'].endswith("experiment.json"):
-            experiment = Experiment.Experiment.load(os.path.join(args['<experiment_directory>']))
-        else:
-            experiment = Experiment.Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
+        try:
+            if args['<experiment_directory>'].endswith("experiment.json"):
+                experiment = Experiment.Experiment.load(os.path.join(args['<experiment_directory>']))
+            else:
+                experiment = Experiment.Experiment.load(os.path.join(args['<experiment_directory>'], "experiment.json"))
+        except:
+            print("Failure loading experiment")
+            exit()
     if args["<empCpd_moniker>"]:
         empCpd_moniker = args["<empCpd_moniker>"]
         if not args['build_empCpds']:
@@ -156,21 +161,19 @@ def main(args):
         for DDA_path in DDA_paths:
             empCpds.MS2_annotate(DDA_path, args['<msp_files>'])
         empCpds.save(new_empCpd_moniker)
+    elif args["AcquireX_annotate"]:
+        acquireX_path = args["<AcquireX_path>"]
+        empCpds.AcquireX_annotate(acquireX_path, args['<msp_files>'])
+        empCpds.save(new_empCpd_moniker)
     elif args['convert_to_mzML']:
         experiment.convert_raw_to_mzML(args['<mono_path>'], args['<ThermoRawFileConverter.exe_path>'])
     elif args['asari_full_processing']:
-        if args['--extra_args'] is not None:
-            extra_args = " " + args['--extra_args']
-        else:
-            extra_args = " "
-        print(experiment.ionization_mode)
-        print("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory + extra_args)
+        extra_args = " " + args['--extra_args'] if args['--extra_args'] is not None else " "
         os.system("asari process -m " + experiment.ionization_mode + " -i " + experiment.converted_subdirectory + "/" + " -o " + experiment.asari_subdirectory + extra_args)
         experiment.feature_tables['full'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
         experiment.feature_tables['preferred'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
         experiment.empCpds['asari'] = os.path.join(experiment.asari_subdirectory, os.listdir(experiment.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
     elif args['spectral_QCQA']:
-        import matplotlib.pyplot as plt
         spikeins = adductify_standards(args["<standards_csv>"], args["<adducts_csv>"])
         if args['--multi']:
             job_descs = [(
@@ -209,9 +212,14 @@ def main(args):
                 plt.text(x,y,name, rotation='vertical')
             plt.show()
     elif args['feature_QCQA']:
+        if args['--color_by']:
+            colorby = json.loads(args['--color_by'])
+        else:
+            colorby = []
+
         experiment.QCQA_results[feature_table_moniker] = feature_table.qcqa(
                                     tag=args['--tag'] if args['--tag'] is not None else None, 
-                                    sort=json.loads(args['--sort']) if args['--sort'] is not None else None, 
+                                    sortby=json.loads(args['--sort_by']) if args['--sort_by'] is not None else None, 
                                     interactive=args["--interactive"], 
                                     pca=args["--pca"] or args["--all"], 
                                     tsne=args['--tsne'] or args["--all"], 
@@ -225,7 +233,11 @@ def main(args):
                                     intensity_analysis=args['--intensity_analysis'] or args["--all"],
                                     feature_distribution=args['--feature_distribution'] or args["--all"],
                                     feature_outlier_detection=args['--feature_outlier_detection'] or args["--all"],
-                                    save_figs=args["--save_figs"])
+                                    save_figs=args["--save_figs"],
+                                    colorby=colorby,
+                                    textby=[args['--text_by']] if args['--text_by'] is not None else [],
+                                    markerby=[args['--marker_by']] if args['--marker_by'] is not None else [],
+                                    batchby=[args['--batch_by']] if args['--batch_by'] is not None else [])
     elif args['summarize']:
         experiment.summarize()
     elif args['build_empCpds']:
@@ -266,14 +278,17 @@ def main(args):
         blank_intensity_ratio = 3 if not args['--blank_intensity_ratio'] else float(args['--blank_intensity_ratio'])
         blank_type = "Blank" if not args['--blank_type'] else args['--blank_type']
         sample_type = "Unknown" if not args['--sample_type'] else args['--sample_type']
-        feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio)
+        by_batch = False if not args['--batch_by'] else args['--batch_by']
+        feature_table.blank_mask(new_table_moniker, blank_type=blank_type, sample_type=sample_type, blank_intensity_ratio=blank_intensity_ratio, by_batch=by_batch)
     elif args['drop_samples'] or args["drop_other_samples"]:
         drop_method = feature_table.drop_samples if args['drop_samples'] else feature_table.drop_others
         drop_field_values = [args['--field_value']] if args['--field_value'] else None 
         drop_field_type = args['--field_type'] if args['--field_type'] else "Sample Type"
         drop_name = args['--name'] if args['--name'] else None
         auto_drop_config = None
-        if '--auto_drop' in args and args['--auto_drop']:
+        if args['--auto_drop'] and not args['--auto_drop_config']:
+            auto_drop_config = json.load(open(os.path.join(os.path.dirname(__file__), "default_configs/default_auto_drop.json")))
+        elif args['--auto_drop_config']:
             auto_drop_config = json.load(open(args['--auto_drop']))
         if drop_field_values:
             drop_method(new_table_moniker, drop_types=drop_field_values, type_field=drop_field_type)
@@ -283,15 +298,19 @@ def main(args):
             drop_method(new_table_moniker, auto_drop=auto_drop_config)
     elif args['TIC_normalize']:
         TIC_normalization_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
-        feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile)
+        by_batch = False if not args['--batch_by'] else args['--batch_by']
+        feature_table.TIC_normalize(new_table_moniker, TIC_normalization_percentile=TIC_normalization_percentile, by_batch=by_batch)
     elif args['drop_missing_features']:
         drop_percentile = 0.90 if not args['--percentile'] else float(args['--percentile'])
-        feature_table.drop_missing_features(new_table_moniker, drop_percentile=drop_percentile)
+        by_batch = False if not args['--batch_by'] else args['--batch_by']
+        feature_table.drop_missing_features(new_table_moniker, drop_percentile=drop_percentile, by_batch=by_batch)
     elif args['interpolate_missing_features']:
         ratio = float(args['--ratio']) if args['--ratio'] else 0.5
-        feature_table.interpolate_missing_features(new_table_moniker, ratio=ratio)
+        by_batch = False if not args['--batch_by'] else args['--batch_by']
+        feature_table.interpolate_missing_features(new_table_moniker, ratio=ratio, by_batch=by_batch)
     elif args['batch_correct']:
-        feature_table.batch_correct(new_table_moniker)
+        by_batch = False if not args['<batch_by>'] else args['<batch_by>']
+        feature_table.batch_correct(new_table_moniker, by_batch)
     elif args['delete']:
         experiment.delete(args['<moniker>'], args['table'], args['empCpd'])
     elif args['log_transform']:
