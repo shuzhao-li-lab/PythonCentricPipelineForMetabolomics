@@ -7,3 +7,9 @@ pandas
 sklearn
 docopt
 pycombat
+mass2chem
+khipu
+matplotlib
+jms-metabolite-services
+matchms
+asari-metabolomics

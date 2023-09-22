@@ -1,11 +1,9 @@
-from collections import namedtuple
 import pymzml
 import numpy as np
 import bisect
 import os
 import pickle
 import functools
-import lzma
 
 class Acquisition(object):
     def __init__(self, name, source_filepath, metadata_dict):
