@@ -105,19 +105,16 @@ class Acquisition(object):
     
     @property
     def ionization_mode(self):
-        try:
-            if self._ionization_mode is None:
-                for spec in pymzml.run.Reader(self.mzml_filepath):
-                    if spec["positive scan"]:
-                        self._ionization_mode = "pos"
-                        break
-                    else:
-                        self._ionization_mode = "neg"
-                        break
-            
-            return self._ionization_mode
-        except:
-            return None
+        if self._ionization_mode is None:
+            for spec in pymzml.run.Reader(self.mzml_filepath):
+                if spec["positive scan"]:
+                    self._ionization_mode = "pos"
+                    break
+                else:
+                    self._ionization_mode = "neg"
+                    break
+        return self._ionization_mode
+
     
     @property
     def JSON_repr(self):
@@ -206,14 +203,15 @@ class Acquisition(object):
             bool: True if the acquistion matches or False if the acquisition fails the filter 
         """        
         passed_filter  = True
-        for key, rules in filter.items():
-            values_to_filter = self.metadata_tags[key].lower()
-            if "includes" in rules:
-                for must_include in rules["includes"]:
-                    passed_filter = passed_filter and must_include.lower() in values_to_filter
-            if "lacks" in rules:
-                for not_include in rules["lacks"]:
-                    passed_filter = passed_filter and not_include.lower() not in values_to_filter
+        if filter:
+            for key, rules in filter.items():
+                values_to_filter = self.metadata_tags[key].strip()
+                if "includes" in rules:
+                    for must_include in rules["includes"]:
+                        passed_filter = passed_filter and must_include in values_to_filter
+                if "lacks" in rules:
+                    for not_include in rules["lacks"]:
+                        passed_filter = passed_filter and not_include not in values_to_filter
         return passed_filter
 
     @functools.lru_cache(1)
