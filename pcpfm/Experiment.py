@@ -8,22 +8,14 @@ import multiprocessing as mp
 import pandas as pd
 import random
 
-from . import ThermoRawFileConverter
 from . import Acquisition
 from . import FeatureTable
 from . import EmpCpds
 
 
 class Experiment:
-    subdirectories = {
-        "asari_results": "asari_results/",
-        "converted": "converted_acquisitions/",
-        "raw": "raw_acquisitions/",
-        "acquisition_data": "acquisitions/",
-        "annotations": "annotations/",
-        "filtered_feature_tables": "filtered_feature_tables/",
-        "qaqc_figs": "QAQC_figs/"
-    }
+
+
     def __init__(self, 
                  experiment_name, 
                  experiment_directory,
@@ -41,7 +33,8 @@ class Experiment:
                  log_transformed_feature_tables=None,
                  cosmetics=None,
                  used_cosmetics=None,
-                 extracted=None):
+                 extracted=None,
+                 sub_dirs=None):
         """
         The Experiment object represents the set of acquisitions in an experiment and associated metadata.
 
@@ -63,6 +56,16 @@ class Experiment:
             feature_tables (dict, optional): mapping of feature table monikers to feature tables on disk. Defaults to None.
             empCpds (dict, optional): mapping of empCpd monikers to empCpds on disk. Defaults to None.
         """        
+        self.subdirectories =  {
+            "asari_results": "asari_results/",
+            "converted": "converted_acquisitions/",
+            "raw": "raw_acquisitions/",
+            "acquisition_data": "acquisitions/",
+            "annotations": "annotations/",
+            "filtered_feature_tables": "filtered_feature_tables/",
+            "qaqc_figs": "QAQC_figs/"
+        }
+
         # provided parameters
         self.experiment_name = experiment_name
         self.experiment_directory = os.path.abspath(experiment_directory)
@@ -79,26 +82,26 @@ class Experiment:
         self.cosmetics = {} if cosmetics is None else cosmetics
         self.used_cosmetics = [] if used_cosmetics is None else used_cosmetics
         self.extracted = [] if extracted is None else extracted
-
         self.__ionization_mode = ionization_mode
-
+        if sub_dirs is not None:
+            self.subdirectories = sub_dirs
         # generate subdirectories
         if not skip_subdirectory_initialization:
+            if sub_dirs:
+                self.subdirectories = sub_dirs
             self.initialize_subdirectories()
 
         # always computed
-        self.asari_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["asari_results"])
-        self.converted_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["converted"])
-        self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["raw"])
-        self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["annotations"])
-        self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), Experiment.subdirectories["filtered_feature_tables"])
+        self.asari_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["asari_results"])
+        self.converted_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["converted"])
+        self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["raw"])
+        self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["annotations"])
+        self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["filtered_feature_tables"])
 
     @property
     def ionization_mode(self):
-        print(self.__ionization_mode)
         if self.__ionization_mode is None:
             self.__ionization_mode = self.determine_ionization_mode()
-        print(self.__ionization_mode)
         return self.__ionization_mode
 
     def initialize_subdirectories(self):
@@ -108,7 +111,7 @@ class Experiment:
         The set of subdirectories to create is determiend by the class variable "subdirectories"
         """        
         to_create = [os.path.abspath(self.experiment_directory)]
-        to_create += [os.path.join(to_create[0], subdir) for subdir in Experiment.subdirectories.values()]
+        to_create += [os.path.join(to_create[0], subdir) for subdir in self.subdirectories.values()]
         for subdirectory_full_path in to_create:
             if not os.path.isdir(subdirectory_full_path):
                 os.makedirs(subdirectory_full_path)
@@ -171,7 +174,8 @@ class Experiment:
                                     log_transformed_feature_tables=JSON_repr["log_transformed_feature_tables"] if "log_transformed_feature_tables" in JSON_repr else None,
                                     cosmetics=JSON_repr["cosmetics"] if "cosmetics" in JSON_repr else None,
                                     used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None,
-                                    extracted=None #JSON_repr["extracted"] if "extracted" in JSON_repr else None
+                                    extracted=None,
+                                    sub_dirs=JSON_repr['subdirectories'] #JSON_repr["extracted"] if "extracted" in JSON_repr else None
                                     )
             for acquisition in experiment.acquisitions:
                 acquisition.experiment = experiment
@@ -228,7 +232,8 @@ class Experiment:
                 "log_tranformed_feature_tables": self.log_transformed_feature_tables,
                 "cosmetics": self.cosmetics,
                 "used_cosmetics": self.used_cosmetics,
-                "extracted": self.extracted
+                "extracted": self.extracted,
+                "subdirectories": self.subdirectories
             }
             try:
                 JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
@@ -269,21 +274,42 @@ class Experiment:
         else:
             print("File Not Found: ", acquisition.name, acquisition.source_filepath)
 
-    def convert_raw_to_mzML(self, mono_path, exe_path):
+    def convert_raw_to_mzML(self, conversion_command):
         """
         Convert all raw files to mzML
 
         Args:
             mono_path (str): path to mono executable
             exe_path (str): path to converter executable
-        """        
+        """ 
         raw_acquisitions = [acquisition for acquisition in self.acquisitions if acquisition.mzml_filepath is None]
-        converter = ThermoRawFileConverter.ThermoRawFileConverter(mono_path, exe_path)
-        converted_filepaths = converter.convert_multi(raw_acquisitions, self.converted_subdirectory)
-        for acquisition, mzml_filepath in zip(raw_acquisitions, converted_filepaths):
-            acquisition.mzml_filepath = mzml_filepath
+        jobs = []
+        output_paths = []
+        for acquisition in raw_acquisitions:
+            input_filepath = acquisition.raw_filepath
+            output_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.raw_filepath)).replace(".raw", ".mzML")
+            output_paths.append(output_filepath)
+            new_job = []
+            if type(conversion_command) is list:
+                for element in conversion_command:
+                    if element == "$RAW_PATH":
+                        new_job.append(input_filepath)
+                    elif element == "$OUT_PATH":
+                        new_job.append(output_filepath)
+                    else:
+                        new_job.append(element)
+                jobs.append(new_job)
+            elif type(conversion_command is str):
+                conversion_command = conversion_command.replace("$RAW_PATH", input_filepath)
+                conversion_command = conversion_command.replace("$OUT_PATH", output_filepath) 
+        print(jobs)
+        workers = mp.Pool(mp.cpu_count())
+        for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
+            print(output_path)
+            raw_acquisition.mzml_filepath = output_path
+            
 
-    def filter_samples(self, filter, return_field="name"):
+    def filter_samples(self, filter, return_field=None):
         """
         Find the set of acquisitions that pass the provided filter and return either the acquisition object or the 
         specified field of each passing sample
@@ -300,7 +326,7 @@ class Experiment:
         else:
             return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
-    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath'):
+    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath', exp_config=None):
         """
         For a given sequence file, create the experiment object, including the addition of acquisitions
 
@@ -316,15 +342,11 @@ class Experiment:
             experiment: the experiment object
         """        
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
-            filter = {} if filter is None else json.loads(filter)
-            experiment = Experiment('', experiment_directory)
+            filter = {} if filter is None else filter
+            experiment = Experiment('', experiment_directory, sub_dirs=exp_config["experiment_subdirectories"])
             with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
                 for acquisition_info in csv.DictReader(CSV_fh):
                     acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
-                    if path_field not in acquisition_info:
-                        path_field = "Path"
-                    if name_field not in acquisition_info:
-                        name_field = "File Name"
                     if name_field not in acquisition_info or path_field not in acquisition_info:
                         raise Exception()
                     acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
@@ -332,6 +354,8 @@ class Experiment:
                     if acquisition.filter(filter):
                         experiment.add_acquisition(acquisition)
             if experiment.acquisitions:
+                if exp_config:
+                    Experiment.subdirectories = exp_config["experiment_subdirectories"]
                 experiment.__ionization_mode = ionization_mode
                 experiment.save()
                 return experiment
@@ -349,12 +373,11 @@ class Experiment:
         ion_modes = set()
         while len(tested) < num_files_to_check:
             acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
-            try:
-                ionization_mode = acquisition.ionization_mode
-                tested.append(acquisition)
-                ion_modes.add(ionization_mode)
-            except:
-                pass 
+            print(acquisition.name)
+            ionization_mode = acquisition.ionization_mode
+            tested.append(acquisition)
+            ion_modes.add(ionization_mode)
+            print(ionization_mode)
         if len(ion_modes) == 1:
             self.__ionization_mode = list(ion_modes)[0]
         else:
@@ -379,17 +402,11 @@ class Experiment:
             return self.cosmetics[cos_type][field]
         else:
             if cos_type == 'color':
-                banned_colors = {'snow', 'beige', 'honeydew', 'azure', 
-                            'aliceblue', 'lightcyan', 'lightyellow', 
-                            'white', 'oldlace', 'antiquewhite', 'ivory', 
-                            'whitesmoke', 'mistyrose', 'seashell', 'linen', 
-                            'antiquewhite', 'lightgoldenrodyellow', 'cornsilk', 
-                            'lemonchiffon', 'honeydew', 'mintcream', 'ghostwhite',
-                            'lavenderblush'}
+                banned_colors = self.parameters["banned_colors"]
                 allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
                 allowed_cosmetics = [x for x in allowed_colors if x not in self.used_cosmetics]
             elif cos_type == 'marker':
-                allowed_markers = [".", "o", "v", "^", ">", "<"] + [str(x) for x in [1,2,3,4,8]] + ["s", "P"]
+                allowed_markers = self.parameters["allowed_markers"]
                 allowed_cosmetics = [x for x in allowed_markers if x not in self.used_cosmetics]
             elif cos_type == 'text':
                 pass
@@ -408,5 +425,41 @@ class Experiment:
             batch_field_value = acquisition.metadata_tags[batch_field]
             if batch_field_value not in batches:
                 batches[batch_field_value] = []
-            batches[batch_field_value].append(acquisition)
+            batches[batch_field_value].append(acquisition.name)
         return batches
+    
+    def enumerate(self, metadata_field):
+        return list(set([x.metadata_tags[metadata_field] for x in self.acquisitions]))
+    
+    def list_metadata_fields(self):
+        for k in self.acquisitions[0].metadata_tags.keys():
+            print(k)
+            observed = set()
+            for acquisition in self.acquisitions:
+                v = acquisition.metadata_tags[k]
+                if v not in observed:
+                    print("\t", v)
+                    observed.add(v)
+    
+    def asari(self, asari_cmd):
+        import subprocess
+        mapping = {
+            '$IONIZATION_MODE': self.ionization_mode,
+            '$CONVERTED_SUBDIR': self.converted_subdirectory,
+            '$ASARI_SUBDIR': self.asari_subdirectory
+        }
+        job = []
+        if type(asari_cmd) is list:
+            for field in asari_cmd:
+                job.append(mapping.get(field, field))
+        if type(asari_cmd) is str:
+            for key, value in mapping.items():
+                asari_cmd.replace(key, value)
+            job = asari_cmd.split(" ")
+        print(job)
+        completed_process = subprocess.run(job)
+        if completed_process.returncode == 0:
+            self.feature_tables['full'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
+            self.feature_tables['preferred'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
+            self.empCpds['asari'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
+            

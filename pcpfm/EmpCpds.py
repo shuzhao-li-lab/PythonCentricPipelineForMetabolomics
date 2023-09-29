@@ -7,6 +7,7 @@ import matchms
 import json
 from intervaltree import IntervalTree
 import os
+from copy import deepcopy
 
 class empCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
@@ -22,6 +23,69 @@ class empCpds:
         self.dict_empCpds = dict_empCpds
         self.experiment = experiment
         self.moniker = moniker
+        
+        self.feature_id_to_khipu_id = {}
+        for kp_id, khipu in dict_empCpds.items():
+            for peak in khipu["MS1_pseudo_Spectra"]:
+                self.feature_id_to_khipu_id[peak['id_number']] = kp_id
+
+        self.__mz_trees = {}
+        self.__rt_trees = {}
+
+    def get_mz_tree(self, mz_tolerance):
+        if mz_tolerance not in self.__mz_trees:
+            mz_tree = IntervalTree()
+            for _, khipu in self.dict_empCpds.items():
+                for peak in khipu["MS1_pseudo_Spectra"]:
+                    mz_tree.addi(peak["mz"] - peak["mz"]/1e6 * mz_tolerance, peak["mz"] + peak["mz"]/1e6 * mz_tolerance, peak['id_number'])
+            self.__mz_trees[mz_tolerance] = mz_tree
+        return self.__mz_trees[mz_tolerance]
+
+    def get_rt_tree(self, rt_tolerance):
+        if rt_tolerance not in self.__rt_trees:
+            rt_tree = IntervalTree()
+            for _, khipu in self.dict_empCpds.items():
+                for peak in khipu["MS1_pseudo_Spectra"]:
+                    rt_tree.addi(peak["rtime"] - rt_tolerance, peak["rtime"] + rt_tolerance, peak['id_number'])
+            self.__rt_trees[rt_tolerance] = rt_tree 
+        return self.__rt_trees[rt_tolerance]
+
+    def search_for_feature(self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None):
+        """search_for_feature 
+
+        Given a query_mz and query_rt with corresponding tolerances in ppm and absolute units respectively find all 
+        features by id_number that have a matching mz and rtime. 
+
+        _extended_summary_
+
+        All search fields are optional but if none are provided then all the features will be considered matching. 
+        The mz tolerance should be in ppm while the rtime tolerance should be provided in rtime units. 
+
+        :param query_mz: the mz to search for, defaults to None
+        :type query_mz: float, optional
+        :param query_rt: the rtime to search for, defaults to None
+        :type query_rt: float, optional
+        :param mz_tolerance: the tolerance in ppm for the mz match, defaults to None
+        :type mz_tolerance: float, optional
+        :param rt_tolerance: the tolerance in absolute units for the rt match, defaults to None
+        :type rt_tolerance: float, optional
+        :return: list of matching feature IDs
+        :rtype: list
+        """        
+        
+        if query_mz and mz_tolerance:
+            mz_matches = set([x.data for x in self.get_mz_tree(mz_tolerance).at(query_mz)])
+            if query_rt is None or rt_tolerance is None:
+                return mz_matches
+        else:
+            mz_matches = None
+        if query_rt and rt_tolerance:
+            rt_matches = set([x.data for x in self.get_rt_tree(rt_tolerance).at(query_rt)])
+            if mz_matches is None or mz_tolerance is None:
+                return rt_matches
+        else:
+            rt_matches = None
+        return list(rt_matches.intersection(mz_matches))
 
 
     def save(self, save_as_moniker=None):
@@ -38,6 +102,7 @@ class empCpds:
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
             json.dump(self.dict_empCpds, out_fh, indent=4)
+        self.experiment.save()
 
     @staticmethod
     def load(moniker, experiment):
@@ -121,7 +186,6 @@ class empCpds:
             KCD.mass_index_list_compounds(json.load(open(source)))
             KCD.build_emp_cpds_index()
             EED.extend_empCpd_annotation(KCD)
-            #EED.annotate_singletons(KCD)
 
         for empCpd in self.dict_empCpds.values():
             if 'mz_only_db_matches' not in empCpd:
@@ -133,127 +197,85 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def AcquireX_annotate(self,
-                          acquireX_path,
-                          msp_file,
-                          rt_tolerance=20,
-                          mz_tolerance=5,
-                          match_threshold=0.60,
-                          min_peaks=3,
-                          similarity_function="cosine_greedy"):
-        for file in os.listdir(acquireX_path):
-            if file.endswith(".mzML"):
-                filepath = os.path.join(acquireX_path, file)
-                for msp_f in msp_file:
-                    self.MS2_annotate(filepath, msp_f, rt_tolerance=rt_tolerance, mz_tolerance=mz_tolerance, match_threshold=match_threshold, min_peaks=min_peaks, similarity_function=similarity_function)
-
-    def MS2_annotate(self, 
-                     DDA_file, 
-                     msp_file, 
-                     rt_tolerance=20, 
-                     mz_tolerance=5, 
-                     match_threshold=0.60, 
-                     min_peaks=3,
-                     similarity_function="cosine_greedy"):
-        """
-        Given the DDA file for the experiment, database entries in MSP format, annotate with MS2 data. 
-
-        Args:
-            DDA_file (str): path to .mzML file for DDA
-            msp_files (list[str]): list of filepaths to msp files for annotation
-            rt_tolerance (int, optional): DDA spectrum rtime must be within +/- this value of a peak's rtime. Defaults to 20.
-            mz_tolerance (int, optional): DDA spectrum precursor m/z must be within +/- this value of a peak's mz in ppm. Defaults to 5.
-            multiplier (int, optional): this determines the bin size, must be power of 10. Defaults to 10.
-            max_mass (int, optional): masses above this value will be ignored in DDA and MSP spectra. Defaults to 2000.
-            match_threshold (float, optional): cosine similarities above this value are considered a match, Defaults to 0.60
-        """
-
+    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='cosine_greedy', min_peaks=3, search_experiment=False):
         similarity_methods = {
             "cosine_greedy": matchms.similarity.CosineGreedy,
             "cosine_hungarian": matchms.similarity.CosineHungarian,
         }
+        similarity_metric = similarity_methods[similarity_method]()
+        observed_precursor_mzs = IntervalTree()
+        observed_precursor_rts = IntervalTree()
+        expMS2_registry = {}
+        ms2_id = 0
+        mzML = []
+        if ms2_files:
+            for directory, _ , files in os.walk(ms2_files):
+                for file in files:
+                    if file.endswith(".mzML"):
+                        mzML.append(os.path.join(os.path.abspath(directory), file))
+        if search_experiment:
+            mzML += [x.mzml_filepath for x in self.experiment.acquisitions if 'dda' in x.mzml_filepath.lower()]
 
-        similarity_metric = similarity_methods[similarity_function]()
-
-        DDA_mz_tree, DDA_rt_tree, DDA_spectral_registry = IntervalTree(), IntervalTree(), {}
-        print("READING: ", DDA_file)
-        for spectrum in matchms.importing.load_from_mzml(DDA_file, metadata_harmonization=False):
-            spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
-            spectrum = matchms.filtering.default_filters(spectrum)
-            spectrum = matchms.filtering.normalize_intensities(spectrum)
-            spectrum = matchms.filtering.add_precursor_mz(spectrum)
-            spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-            if spectrum:
-                precursor_mz, precursor_rt = None, None
-                try:
-                    precursor_mz = float(spectrum.get('precursor_mz'))
-                    precursor_rt = float(spectrum.get('retention_time'))
-                except:
-                    pass
-                if precursor_mz and precursor_rt:
-                    precursor_mz_error = precursor_mz / 1e6 * mz_tolerance
-                    entry_id = len(DDA_spectral_registry)
-                    DDA_spectral_registry[entry_id] = spectrum
-                    DDA_mz_tree.addi(precursor_mz - precursor_mz_error, precursor_mz + precursor_mz_error, entry_id)
-                    DDA_rt_tree.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, entry_id)
-        
-        print("READING: ", msp_file)
-        MS2_matches = {}
-        for i, db_spectrum in enumerate(matchms.importing.load_from_msp(msp_file, metadata_harmonization=False)):
-            precursor_mz = None
+        for mzml_filepath in mzML:
+            print("Extracting: ", mzml_filepath)
             try:
-                precursor_mz = float(db_spectrum.get('precursor_mz'))
+                for spectrum in matchms.importing.load_from_mzml(mzml_filepath, metadata_harmonization=False):
+                    spectrum = matchms.filtering.add_precursor_mz(spectrum)
+                    try:
+                        precursor_mz = float(spectrum.get('precursor_mz'))
+                        spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+                        precursor_rt = float(spectrum.get('retention_time'))
+                        spectrum = matchms.filtering.default_filters(spectrum)
+                        spectrum = matchms.filtering.normalize_intensities(spectrum)
+                        spectrum = matchms.filtering.add_precursor_mz(spectrum)
+                        spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+                        ms2_id = len(expMS2_registry)
+                        expMS2_registry[ms2_id] = {"spectrum": spectrum, 
+                                                   "precursor_mz": precursor_mz, 
+                                                   "precursor_rt": precursor_rt,
+                                                    "origin": mzml_filepath, 
+                                                    "Annotations": []}
+                        observed_precursor_mzs.addi(precursor_mz - precursor_mz / 1e6 * mz_tolerance * 2, precursor_mz + precursor_mz / 1e6 * mz_tolerance * 2, ms2_id)
+                        observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
+                    except:
+                        pass
             except:
                 pass
-            mz_matches = set()
-            
-            if precursor_mz:
-                for match in DDA_mz_tree.at(precursor_mz):
-                    mz_matches.add(match.data)
-            for exp_spec_id, experimental_spectrum in ([x, DDA_spectral_registry[x]] for x in mz_matches):
-                msms_score, n_matches = similarity_metric.pair(db_spectrum, experimental_spectrum).tolist()
-                if msms_score > match_threshold and n_matches > min_peaks:
-                    feature_mz = experimental_spectrum.get("precursor_mz") if experimental_spectrum.get("precursor_mz") else None
-                    feature_rt = experimental_spectrum.get("retention_time") if experimental_spectrum.get("retention_time") else None
-                    match_mz = db_spectrum.get("precursor_mz") if db_spectrum.get("precursor_mz") else None
-                    match_rt = db_spectrum.get("retention_time") if db_spectrum.get("retention_time") else None
-                    try:
-                        match_mz = float(match_mz)
-                    except:
-                        match_mz = None
-                    if exp_spec_id not in MS2_matches:
-                        MS2_matches[exp_spec_id] = []
-                    MS2_matches[exp_spec_id].append({
-                        'msms_score':msms_score,
-                        'matched_peaks':n_matches,
-                        'feature_id': None,
-                        'feature_precursor_mz': feature_mz,
-                        'feature_precursor_rt': feature_rt,
-                        'match_precursor_mz': match_mz,
-                        'match_precursor_rt': match_rt,
-                        'reference_id': db_spectrum.get("compound_name")}
-                    )
-        print("ANNOTATING!")               
-        for empCpd in self.dict_empCpds.values():
-            for peak in empCpd["MS1_pseudo_Spectra"]:
-                peak_rtime = peak['rtime']
-                peak_mz = peak['mz']
-                mz_matches = [x.data for x in DDA_mz_tree.at(peak_mz)]
-                rt_matches = [x.data for x in DDA_rt_tree.at(peak_rtime)]
-                mz_rt_matches = set(mz_matches).intersection(set(rt_matches))
-                for DDA_match in mz_rt_matches:
-                    if DDA_match in MS2_matches:
-                        if "MS2_Annotations" not in empCpd:
-                            empCpd["MS2_Spectra"] = {}
-                            empCpd["MS2_Annotations"] = {}
-                        if DDA_file not in empCpd["MS2_Annotations"]:
-                            empCpd["MS2_Spectra"][DDA_file] = {}
-                            empCpd["MS2_Annotations"][DDA_file] = {}
-                        for MS2_annot_master in MS2_matches[DDA_match]:
-                            MS2_annot = MS2_annot_master.copy()
-                            MS2_annot['feature_id'] = peak['id_number']
-                            empCpd["MS2_Annotations"][DDA_file][DDA_match] = MS2_annot
-    
+        if type(msp_files) is str:
+            msp_files = [msp_files]
+        for msp_file in msp_files:
+            for msp_spectrum in matchms.importing.load_from_msp(msp_file, metadata_harmonization=False):
+                try:
+                    precursor_mz = float(msp_spectrum.get('precursor_mz'))
+                except:
+                    precursor_mz = None
+                if precursor_mz:
+                    for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
+                        msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                        if msms_score > 0.60 and n_matches > min_peaks:
+                            reference_id = msp_spectrum.get("compound_name")
+                            if reference_id:
+                                expMS2_registry[expMS2_id]["Annotations"].append({
+                                    "msms_score": msms_score,
+                                    "matched_peaks": n_matches,
+                                    "feature_id": None,
+                                    "db_precursor_mz": precursor_mz,
+                                    "origin": os.path.basename(msp_file),
+                                    "reference_id": msp_spectrum.get("compound_name")
+                                })
+
+        for expMS2_id, entry in expMS2_registry.items():
+            if entry["Annotations"]:
+                for feature_id in self.search_for_feature(entry["precursor_mz"], entry["precursor_rt"], 2 * mz_tolerance, rt_tolerance):
+                    khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
+                    entry_copy = deepcopy(entry)
+                    entry_copy["Matching_Feature"] = feature_id
+                    entry_copy["spectrum"] = [[x[0], x[1]] for x in spectrum.peaks]
+                    if "MS2_Spectra" not in khipu:
+                        khipu["MS2_Spectra"] = []
+                    khipu["MS2_Spectra"].append(entry_copy)
+
+
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
         """
         Given a list of authentic standards in JMS compliant format, annotate. 

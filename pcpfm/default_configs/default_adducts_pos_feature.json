@@ -1,0 +1,6 @@
+[
+    {"add": "HCl", "z": [-1], "name": "M+HCl"},
+    {"add": "H", "z": [-1], "name": "M+H"},
+    {"add": "K", "z": [-1], "name": "M+K"},
+    {"add": "Na", "z": [-1], "name": "M+Na"}
+]

@@ -1,0 +1,7 @@
+[
+    {"lose": "H", "z": [1], "name": "M-H"},
+    {"lose": "H3O", "z": [1], "name": "M-H20-H"},
+    {"add": "Cl", "z": [1], "name": "M+Cl"},
+    {"add": "Na", "lose": "H2", "z": [1], "name": "M+Na-2H"},
+    {"add": "K", "lose": "H2", "z": [1], "name": "M+K-2H"}
+]
