@@ -270,10 +270,8 @@ def main():
             msp_file = params['msp_files_pos']
         elif experiment.ionization_mode == "neg":
             msp_file = params['msp_files_neg']
-        print(msp_file)
         if 'table_moniker' in params:
             feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
-            print(params['ms2_dir'])
             feature_table.MS2_annotate(
                 msp_file,
                 params['ms2_dir'],

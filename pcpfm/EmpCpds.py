@@ -242,6 +242,8 @@ class empCpds:
             except:
                 pass
         print("Found: ", ms2_id, " spectra!")
+        if ms2_id == 0:
+            return
         hits = 0
         if type(msp_files) is str:
             msp_files = [msp_files]
