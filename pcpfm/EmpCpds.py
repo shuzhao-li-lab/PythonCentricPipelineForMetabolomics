@@ -37,7 +37,7 @@ class empCpds:
             mz_tree = IntervalTree()
             for _, khipu in self.dict_empCpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
-                    mz_tree.addi(peak["mz"] - peak["mz"]/1e6 * mz_tolerance, peak["mz"] + peak["mz"]/1e6 * mz_tolerance, peak['id_number'])
+                    mz_tree.addi(peak["mz"] - (peak["mz"]/1e6 * mz_tolerance), peak["mz"] + (peak["mz"]/1e6 * mz_tolerance), peak['id_number'])
             self.__mz_trees[mz_tolerance] = mz_tree
         return self.__mz_trees[mz_tolerance]
 
@@ -235,12 +235,14 @@ class empCpds:
                                                    "precursor_rt": precursor_rt,
                                                     "origin": mzml_filepath, 
                                                     "Annotations": []}
-                        observed_precursor_mzs.addi(precursor_mz - precursor_mz / 1e6 * mz_tolerance * 2, precursor_mz + precursor_mz / 1e6 * mz_tolerance * 2, ms2_id)
+                        observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
                         observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
                     except:
                         pass
             except:
                 pass
+        print("Found: ", ms2_id, " spectra!")
+        hits = 0
         if type(msp_files) is str:
             msp_files = [msp_files]
         for msp_file in msp_files:
@@ -251,22 +253,28 @@ class empCpds:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
-                        if msms_score > 0.60 and n_matches > min_peaks:
-                            reference_id = msp_spectrum.get("compound_name")
-                            if reference_id:
-                                expMS2_registry[expMS2_id]["Annotations"].append({
-                                    "msms_score": msms_score,
-                                    "matched_peaks": n_matches,
-                                    "feature_id": None,
-                                    "db_precursor_mz": precursor_mz,
-                                    "origin": os.path.basename(msp_file),
-                                    "reference_id": msp_spectrum.get("compound_name")
-                                })
-
+                        try:
+                            msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                            if msms_score > 0.60 and n_matches > min_peaks:
+                                hits += 1
+                                reference_id = msp_spectrum.get("compound_name")
+                                if reference_id:
+                                    expMS2_registry[expMS2_id]["Annotations"].append({
+                                        "msms_score": msms_score,
+                                        "matched_peaks": n_matches,
+                                        "feature_id": None,
+                                        "db_precursor_mz": precursor_mz,
+                                        "origin": os.path.basename(msp_file),
+                                        "reference_id": msp_spectrum.get("compound_name")
+                                    })
+                        except:
+                            pass
+        print("Found: ", hits, " hits")
+        mapped = 0
         for expMS2_id, entry in expMS2_registry.items():
             if entry["Annotations"]:
                 for feature_id in self.search_for_feature(entry["precursor_mz"], entry["precursor_rt"], 2 * mz_tolerance, rt_tolerance):
+                    mapped += 1
                     khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
                     entry_copy = deepcopy(entry)
                     entry_copy["Matching_Feature"] = feature_id
@@ -274,7 +282,7 @@ class empCpds:
                     if "MS2_Spectra" not in khipu:
                         khipu["MS2_Spectra"] = []
                     khipu["MS2_Spectra"].append(entry_copy)
-
+        print("Mapped: ", mapped, " mapped to samples")
 
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
         """

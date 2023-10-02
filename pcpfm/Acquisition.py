@@ -206,12 +206,14 @@ class Acquisition(object):
         if filter:
             for key, rules in filter.items():
                 values_to_filter = self.metadata_tags[key].strip()
+                print(values_to_filter)
                 if "includes" in rules:
                     for must_include in rules["includes"]:
                         passed_filter = passed_filter and must_include in values_to_filter
                 if "lacks" in rules:
                     for not_include in rules["lacks"]:
                         passed_filter = passed_filter and not_include not in values_to_filter
+        print(passed_filter)
         return passed_filter
 
     @functools.lru_cache(1)

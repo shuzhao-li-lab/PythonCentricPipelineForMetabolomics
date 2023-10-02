@@ -39,7 +39,7 @@ def main():
     parser.add_argument('-em', '--empCpd_moniker')
     parser.add_argument('-nm', '--new_moniker')
     parser.add_argument('-cb', '--color_by', default=[])
-    parser.add_argument('-bb', '--by_batch', default=None)
+    parser.add_argument('-bb', '--by_batch')
     parser.add_argument('-mb', '--marker_by', default=[])
     parser.add_argument('-tb', '--text_by', default=[])
     parser.add_argument('--all')
@@ -78,6 +78,7 @@ def main():
     parser.add_argument('--normalize_value')
     parser.add_argument('--feature_retention_percentile')
     parser.add_argument('--interpolation_ratio')
+    parser.add_argument('--ms2_dir')
 
     args = parser.parse_args()
     if args.parameters:
@@ -148,11 +149,12 @@ def main():
         experiment.save()
     elif args.subcommand == "QAQC":
         experiment = Experiment.Experiment.load(params['input'])
+        experiment.parameters = params["experiment_config"]
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         for cosmetic_param in ['color_by', 'text_by', 'marker_by']:
             if cosmetic_param in params:
                 if type(params[cosmetic_param]) is str:
-                    params[cosmetic_param] = json.load(params[cosmetic_param])
+                    params[cosmetic_param] = json.loads(params[cosmetic_param])
                     if type(params[cosmetic_param]) is str:
                         params[cosmetic_param] = list(params[cosmetic_param])
             else:
@@ -266,10 +268,12 @@ def main():
         experiment = Experiment.Experiment.load(params['input'])
         if experiment.ionization_mode == "pos":
             msp_file = params['msp_files_pos']
-        else:
+        elif experiment.ionization_mode == "neg":
             msp_file = params['msp_files_neg']
+        print(msp_file)
         if 'table_moniker' in params:
             feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+            print(params['ms2_dir'])
             feature_table.MS2_annotate(
                 msp_file,
                 params['ms2_dir'],
@@ -295,7 +299,10 @@ def main():
     elif args.subcommand == "retrieve":
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, False)
-        print(feature_table)
+    elif args.subcommand == "log_transform":
+        experiment = Experiment.Experiment.load(params['input'])
+        feature_table = experiment.retrieve(params['table_moniker'], True, False, False) 
+        feature_table.log_transform(params['new_moniker'], params["log_transform_mode"])
 
 
 def CLI():

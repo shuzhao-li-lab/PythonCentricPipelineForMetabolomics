@@ -17,8 +17,6 @@ import re
 from mass2chem.formula import calculate_mass, PROTON, ELECTRON, parse_chemformula_dict
 import csv
 import json
-from khipu.extended import adduct_search_patterns, adduct_search_patterns_neg
-import multiprocessing as mp
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment, moniker):
@@ -262,7 +260,7 @@ class FeatureTable:
                         for x, y, m in zip(X, Y, list(colors[0])):
                             plt.scatter(x, y, marker=m)
                     elif colors and not markers:
-                        for x, y, m in zip(X, Y, list(colors[0])):
+                        for x, y, c in zip(X, Y, list(colors[0])):
                             plt.scatter(x, y, c=c)
                     else:
                         plt.scatter(X, Y)
@@ -450,7 +448,6 @@ class FeatureTable:
         self.feature_table[annotation_column_name] = [annotations[x] for x in self.feature_table['id_number']]
 
     def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, annotation_column_name="ms2_annotations", similarity_method='cosine_greedy', min_peaks=3, search_experiment=True):
-        print(msp_files)
         similarity_methods = {
             "cosine_greedy": matchms.similarity.CosineGreedy,
             "cosine_hungarian": matchms.similarity.CosineHungarian,
@@ -464,7 +461,7 @@ class FeatureTable:
         if ms2_files:
             for directory, _ , files in os.walk(ms2_files):
                 for file in files:
-                    if file.endswith(".mzML") and 'dda' in file.lower():
+                    if file.endswith(".mzML"):
                         mzML.append(os.path.join(os.path.abspath(directory), file))
         if search_experiment:
             mzML += [x.mzml_filepath for x in self.experiment.acquisitions if 'dda' in x.mzml_filepath.lower()]
@@ -483,7 +480,11 @@ class FeatureTable:
                         spectrum = matchms.filtering.add_precursor_mz(spectrum)
                         spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
                         ms2_id = len(expMS2_registry)
-                        expMS2_registry[ms2_id] = {"spectrum": spectrum, "precursor_mz": precursor_mz, "precursor_rt": precursor_rt, "origin": mzml_filepath, "matches": []}
+                        expMS2_registry[ms2_id] = {"spectrum": spectrum, 
+                                                   "precursor_mz": precursor_mz, 
+                                                   "precursor_rt": precursor_rt, 
+                                                   "origin": mzml_filepath, 
+                                                   "Annotations": []}
                         observed_precursor_mzs.addi(precursor_mz - precursor_mz / 1e6 * mz_tolerance * 2, precursor_mz + precursor_mz / 1e6 * mz_tolerance * 2, ms2_id)
                         observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
                     except:
@@ -500,18 +501,21 @@ class FeatureTable:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
-                        if msms_score > 0.60 and n_matches > min_peaks:
-                            reference_id = msp_spectrum.get("compound_name")
-                            if reference_id:
-                                expMS2_registry[expMS2_id]["Annotations"].append({
-                                    "msms_score": msms_score,
-                                    "matched_peaks": n_matches,
-                                    "feature_id": None,
-                                    "db_precursor_mz": precursor_mz,
-                                    "origin": msp_file,
-                                    "reference_id": reference_id,
-                                })
+                        try:
+                            msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                            if msms_score > 0.60 and n_matches > min_peaks:
+                                reference_id = msp_spectrum.get("compound_name")
+                                if reference_id:
+                                    expMS2_registry[expMS2_id]["Annotations"].append({
+                                        "msms_score": msms_score,
+                                        "matched_peaks": n_matches,
+                                        "feature_id": None,
+                                        "db_precursor_mz": precursor_mz,
+                                        "origin": msp_file,
+                                        "reference_id": reference_id,
+                                    })
+                        except:
+                            pass
         if annotation_column_name in self.feature_table.columns:
             annotations = {x: y for x,y in zip(self.feature_table['id_number'], self.feature_table[annotation_column_name])}
         else:
@@ -520,10 +524,8 @@ class FeatureTable:
         for expMS2_id, entry in expMS2_registry.items():
             if entry["Annotations"]:
                 for feature_id in self.search_for_feature(entry["precursor_mz"], entry['precursor_rt'], 2 * mz_tolerance, rt_tolerance):
-                    try:
-                        annotations[feature_id].append(entry["reference_id"] + ", score=" + str(round(msms_score, 3)))
-                    except:
-                        pass
+                    for annot in entry["Annotations"]:
+                        annotations[feature_id].append(annot["reference_id"] + ", score=" + str(msms_score)[:4])
         self.feature_table[annotation_column_name] = [';'.join(annotations[x]) for x in self.feature_table['id_number']]
 
     def median_correlation_outlier_detection(self, figure_params, correlation_type='pearson'):
@@ -1275,7 +1277,7 @@ class FeatureTable:
 
         :param new_moniker: _description_
         :type new_moniker: _type_
-        :param TIC_normalization_percentile: _description_, defaults to 0.90
+        :param TIC_normalization_percentile: _descr iption_, defaults to 0.90
         :type TIC_normalization_percentile: float, optional
         :param by_batch: _description_, defaults to None
         :type by_batch: _type_, optional
@@ -1290,7 +1292,9 @@ class FeatureTable:
             "median": np.median,
             "mean": np.mean,
         }
-        if by_batch:
+        print("BATCH: ", by_batch)
+        if by_batch is not None:
+            print("Here2")
             aggregate_batch_TICs = {}
             for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_name_list = [
@@ -1314,8 +1318,10 @@ class FeatureTable:
                     self.feature_table[sample] = self.feature_table[sample] * \
                         aggregate_batch_TIC_corrections[batch_name]
         else:
+            print("HEREREE")
             sample_names = [x for x in self.feature_table.columns if x in [
                 a.name for a in self.experiment.acquisitions]]
+            print(sample_names)
             self.feature_table["percent_inclusion"] = np.sum(
                 self.feature_table[sample_names] > 0, axis=1) / len(sample_names)
             TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"]
@@ -1326,7 +1332,7 @@ class FeatureTable:
                 self.feature_table[sample] = self.feature_table[sample] * norm_factor
         self.feature_table.drop(columns="percent_inclusion", inplace=True)
 
-    def batch_correct(self, new_moniker, by_batch):
+    def batch_correct(self, by_batch):
         """batch_correct _summary_
 
         _extended_summary_
@@ -1340,7 +1346,7 @@ class FeatureTable:
             batch_idx_map = {}
             for batch_idx, (_, acquisition_list) in enumerate(self.experiment.batches(by_batch).items()):
                 for acquisition in acquisition_list:
-                    batch_idx_map[acquisition.name] = batch_idx
+                    batch_idx_map[acquisition] = batch_idx
             sample_names = [
                 a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
             batches = [batch_idx_map[a.name]
@@ -1349,10 +1355,10 @@ class FeatureTable:
                 self.feature_table[sample_names], batches)
             for column in batch_corrected.columns:
                 self.feature_table[column] = batch_corrected[column]
-            self.save(new_moniker)
+            self.make_nonnegative(fill_value=1)
         else:
             print("Unable to batch correct if only one batch!")
-            self.save(new_moniker)
+            raise Exception()
 
     def log_transform(self, new_moniker, log_mode="log2"):
         """log_transform _summary_
@@ -1381,7 +1387,6 @@ class FeatureTable:
             self.feature_table[sample_name] = log_types[log_mode](
                 self.feature_table[sample_name]+1)
         self.make_nonnegative()
-        self.save(new_moniker)
 
     def drop_missing_features(self, by_batch=None, drop_percentile=0.8, logic_mode="or"):
         """drop_missing_features _summary_
@@ -1538,12 +1543,18 @@ class FeatureTable:
         #    qcqa_result.append(self.check_for_standards(
         #        figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
         if params['pca'] or params['all']:
-            qcqa_result.append(self.PCA(figure_params))
+            try:
+                qcqa_result.append(self.PCA(figure_params))
+            except:
+                pass
         if params['tsne'] or params['all']:
             qcqa_result.append(self.TSNE(figure_params))
         if params['pearson'] or params['all']:
-            qcqa_result.append(self.correlation_heatmap(
-                figure_params, correlation_type='pearson', log_transform=True))
+            try:
+                qcqa_result.append(self.correlation_heatmap(
+                    figure_params, correlation_type='pearson', log_transform=True))
+            except:
+                pass
         if params['kendall'] or params['all']:
             qcqa_result.append(self.correlation_heatmap(
                 figure_params, correlation_type='kendall', log_transform=False))
