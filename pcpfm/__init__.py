@@ -1,1 +1,1 @@
-__version__ = "0.0.4" #cannot be distributed but useful internally
+__version__ = "0.0.4"
