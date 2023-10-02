@@ -467,7 +467,6 @@ class FeatureTable:
             mzML += [x.mzml_filepath for x in self.experiment.acquisitions if 'dda' in x.mzml_filepath.lower()]
 
         for mzml_filepath in mzML:
-            print("Extracting: ", mzml_filepath)
             try:
                 for spectrum in matchms.importing.load_from_mzml(mzml_filepath, metadata_harmonization=False):
                     spectrum = matchms.filtering.add_precursor_mz(spectrum)
@@ -1292,9 +1291,7 @@ class FeatureTable:
             "median": np.median,
             "mean": np.mean,
         }
-        print("BATCH: ", by_batch)
         if by_batch is not None:
-            print("Here2")
             aggregate_batch_TICs = {}
             for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_name_list = [
@@ -1318,10 +1315,8 @@ class FeatureTable:
                     self.feature_table[sample] = self.feature_table[sample] * \
                         aggregate_batch_TIC_corrections[batch_name]
         else:
-            print("HEREREE")
             sample_names = [x for x in self.feature_table.columns if x in [
                 a.name for a in self.experiment.acquisitions]]
-            print(sample_names)
             self.feature_table["percent_inclusion"] = np.sum(
                 self.feature_table[sample_names] > 0, axis=1) / len(sample_names)
             TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"]
@@ -1407,7 +1402,6 @@ class FeatureTable:
         :type type_field: str, optional
         """        
         def __any(row, columns, drop_percentile):
-            #print(row[columns])
             return not np.any(row[columns] >= drop_percentile)
 
         def __all(row, columns, drop_percentile):

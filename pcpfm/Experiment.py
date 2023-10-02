@@ -373,11 +373,9 @@ class Experiment:
         ion_modes = set()
         while len(tested) < num_files_to_check:
             acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
-            print(acquisition.name)
             ionization_mode = acquisition.ionization_mode
             tested.append(acquisition)
             ion_modes.add(ionization_mode)
-            print(ionization_mode)
         if len(ion_modes) == 1:
             self.__ionization_mode = list(ion_modes)[0]
         else:
@@ -456,7 +454,6 @@ class Experiment:
             for key, value in mapping.items():
                 asari_cmd.replace(key, value)
             job = asari_cmd.split(" ")
-        print(job)
         completed_process = subprocess.run(job)
         if completed_process.returncode == 0:
             self.feature_tables['full'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
