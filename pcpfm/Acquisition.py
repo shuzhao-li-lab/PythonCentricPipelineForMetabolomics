@@ -175,7 +175,50 @@ class Acquisition(object):
             pickle.dump(acquisition_data, out_fh)
         return data_path
 
+    def TICz(self, round_val=3):
 
+        import re
+        fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "TICs/")
+        if not os.path.exists(fig_path):
+            os.makedirs(fig_path)
+        name = re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "_", self.name)
+        save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png")
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        if os.path.exists(save_path):
+            return save_path
+        else:
+            bins = {}
+            for spec in pymzml.run.Reader(self.mzml_filepath):
+                rtime = round(spec.scan_time[0], round_val)
+                if rtime not in bins:
+                    bins[rtime] = 0
+                for peak in spec.peaks("centroided"):
+                    bins[rtime] += float(peak[1])
+            import matplotlib.pyplot as plt
+            fig, (ax1, ax2) = plt.subplots(2,1)
+            
+            Xs = []
+            Ys = []
+            Y2s = []
+            for x in sorted(bins):
+                Xs.append(x)
+                Ys.append(bins[x])
+                if bins[x]:
+                    Y2s.append(np.log2(bins[x]))
+                else:
+                    Y2s.append(0)
+
+            plt.suptitle(self.name + " TICs")
+            ax1.plot(Xs, Ys)
+            ax1.set(ylabel="Intensity")
+            ax1.set(xlabel="Rtime (sec)")
+            ax2.plot(Xs, Y2s)
+            ax2.set(ylabel="Log2(Intensity)")
+            ax2.set(xlabel="Rtime (sec)")
+            plt.savefig(save_path)
+            plt.close()
+            return save_path
+        
     def filter(self, filter):
         """
         This method filters acquisition based on their metadata keys. 

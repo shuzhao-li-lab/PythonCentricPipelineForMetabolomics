@@ -148,6 +148,7 @@ class Experiment:
                 acquisition = Acquisition.Acquisition(acquisition_JSON["name"], 
                                          acquisition_JSON["source_filepath"], 
                                          acquisition_JSON["metadata"])
+                print(json.dumps(acquisition_JSON["metadata"], indent=4))
                 acquisition.mzml_filepath = acquisition_JSON["mzml_filepath"]
                 acquisition.raw_filepath = acquisition_JSON["raw_filepath"]
                 acquisition.spectra = acquisition_JSON["spectra"]
@@ -206,6 +207,7 @@ class Experiment:
                 return feature_table_path
         elif empCpds:
             empCpd_path = self.empCpds[moniker]
+            empCpd_path = empCpd_path.replace("empirical", "emprical")
             if as_object:
                 return EmpCpds.empCpds.load(moniker, self)
             else:
@@ -455,8 +457,11 @@ class Experiment:
                 asari_cmd.replace(key, value)
             job = asari_cmd.split(" ")
         completed_process = subprocess.run(job)
+
         if completed_process.returncode == 0:
-            self.feature_tables['full'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "export/full_Feature_table.tsv") 
-            self.feature_tables['preferred'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "preferred_Feature_table.tsv") 
-            self.empCpds['asari'] = os.path.join(self.asari_subdirectory, os.listdir(self.asari_subdirectory)[0], "Annotated_empiricalCompounds.json")
+            for x in os.listdir(self.experiment_directory):
+                if x.startswith("asari_results"):
+                    self.feature_tables['full'] = os.path.join(self.experiment_directory, x, "export/full_feature_table.tsv")
+                    self.feature_tables['preferred'] = os.path.join(self.experiment_directory, x, "preferred_Feature_table.tsv")
+                    self.empCpds['asari'] = os.path.join(self.experiment_directory, x, "Annotated_empiricalCompounds.json")
             

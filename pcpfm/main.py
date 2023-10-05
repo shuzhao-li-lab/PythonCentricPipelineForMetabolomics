@@ -7,7 +7,7 @@ import csv
 from . import Experiment
 from . import EmpCpds
 from . import example_parameters
-
+from . import Report
 
 def main():
     """
@@ -151,6 +151,7 @@ def main():
         experiment = Experiment.Experiment.load(params['input'])
         experiment.parameters = params["experiment_config"]
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        print(feature_table)
         for cosmetic_param in ['color_by', 'text_by', 'marker_by']:
             if cosmetic_param in params:
                 if type(params[cosmetic_param]) is str:
@@ -301,6 +302,10 @@ def main():
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, False) 
         feature_table.log_transform(params['new_moniker'], params["log_transform_mode"])
+    elif args.subcommand == "report":
+        experiment = Experiment.Experiment.load(params['input'])
+        report = Report.Report(experiment)
+        #report.build("/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/report_templates/jmm_default.json")
 
 
 def CLI():
