@@ -13,3 +13,4 @@ matplotlib
 jms-metabolite-services
 matchms
 asari-metabolomics
+fpdf
