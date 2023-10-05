@@ -36,7 +36,6 @@ class FeatureTable:
         self.__mz_trees = {}
         self.__rt_trees = {}
 
-    
     def get_mz_tree(self, mz_tol):
         if mz_tol not in self.__mz_trees:
             mz_tree = intervaltree.IntervalTree()
@@ -52,7 +51,6 @@ class FeatureTable:
                 rt_tree.addi(rtime - rt_tol, rtime + rt_tol, feature_id)
             self.__rt_trees[rt_tol] = rt_tree
         return self.__rt_trees[rt_tol]
-
 
     @property
     def sample_columns(self):
@@ -102,6 +100,14 @@ class FeatureTable:
         :rtype: boolean
         """        
         return self.moniker in self.experiment.log_transformed_feature_tables
+
+    @property
+    def num_features(self):
+        return self.feature_table.shape[0] - 1
+    
+    @property
+    def num_samples(self):
+        return len(self.sample_columns)
 
     @staticmethod
     def load(moniker, experiment):
@@ -1034,7 +1040,16 @@ class FeatureTable:
 
     def drop_samples_by_qaqc(self, qaqc_filter, drop_others=False):
         to_drop = []
-        qaqc_results = {entry["Type"]: entry for entry in self.experiment.QCQA_results[self.moniker]}
+        print(self.experiment.QCQA_results[self.moniker])
+        qaqc_results = {}
+        for x in self.experiment.QCQA_results[self.moniker]:
+            try:
+                print(x)
+                qaqc_results[x["Type"]] = x
+            except:
+                pass
+
+
         for field in qaqc_filter.keys():
             qaqc_results_for_field = qaqc_results[field]["Result"]
             if "GreaterThan" in qaqc_filter[field]["Conditions"]:

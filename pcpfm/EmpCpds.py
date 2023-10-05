@@ -50,6 +50,14 @@ class empCpds:
             self.__rt_trees[rt_tolerance] = rt_tree 
         return self.__rt_trees[rt_tolerance]
 
+    @property
+    def num_khipus(self):
+        return len(self.dict_empCpds)
+    
+    @property
+    def num_features(self):
+        return len(self.feature_id_to_khipu_id)
+
     def search_for_feature(self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None):
         """search_for_feature 
 
@@ -87,7 +95,6 @@ class empCpds:
             rt_matches = None
         return list(rt_matches.intersection(mz_matches))
 
-
     def save(self, save_as_moniker=None):
         """
         This method saves the empirical compound dictionary to the annotation_subdirectory. 
@@ -116,7 +123,9 @@ class empCpds:
         Returns:
             empCpds: the empCpds object for the specified moniker
         """        
-        return empCpds(json.load(open(experiment.empCpds[moniker])), experiment, moniker)
+        path = experiment.empCpds[moniker]
+        #path = path.replace("empirical", "emprical")
+        return empCpds(json.load(open(path)), experiment, moniker)
 
     @staticmethod
     def construct_empCpds_from_feature_table(experiment, isotopes=isotope_search_patterns, adducts=None, extended_adducts=extended_adducts, feature_table_moniker='full', empCpd_moniker='default', add_singletons=False, rt_search_window=2, mz_tolerance=5, charges=[1,2,3]):
