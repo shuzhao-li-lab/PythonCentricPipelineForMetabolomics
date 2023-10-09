@@ -1040,7 +1040,6 @@ class FeatureTable:
 
     def drop_samples_by_qaqc(self, qaqc_filter, drop_others=False):
         to_drop = []
-        print(self.experiment.QCQA_results[self.moniker])
         qaqc_results = {}
         for x in self.experiment.QCQA_results[self.moniker]:
             try:
@@ -1206,22 +1205,21 @@ class FeatureTable:
         def __all_logical(row, columns):
             return np.all(row[columns] == True)
 
-        blank_names = {x for x in self.experiment.filter_samples({query_field: {"includes": [blank_value]}}) if x in self.sample_columns}
-        sample_names = {x for x in self.experiment.filter_samples({query_field: {"includes": [sample_value]}}) if x in self.sample_columns}
+        blank_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [blank_value]}}) if x.name in self.sample_columns]
+        sample_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [sample_value]}}) if x.name in self.sample_columns]
+        
         blank_mask_columns = []
         if by_batch:
             for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
                 batch_blanks = [x for x in batch_name_list if x in blank_names]
                 batch_samples = [
                     x for x in batch_name_list if x in sample_names]
-                blank_means = self.feature_table.apply(
-                    __non_zero_mean, axis=1, args=(batch_blanks,))
-                sample_means = self.feature_table.apply(
-                    __non_zero_mean, axis=1, args=(batch_samples,))
+                blank_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(batch_blanks,))
+                sample_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(batch_samples,))
                 to_filter = []
                 for blank_mean, sample_mean in zip(blank_means, sample_means):
-                    to_filter.append(
-                        blank_mean * blank_intensity_ratio > sample_mean)
+                    to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
+                    print("batch", blank_mean, sample_mean, blank_mean * blank_intensity_ratio > sample_mean)
                 blank_mask_column = "blank_masked_" + batch_name
                 blank_mask_columns.append(blank_mask_column)
                 self.feature_table[blank_mask_column] = to_filter
@@ -1236,12 +1234,12 @@ class FeatureTable:
             sample_means = self.feature_table.apply(__non_zero_mean, axis=1, args=(list(sample_names),))
             to_filter = []
             for blank_mean, sample_mean in zip(blank_means, sample_means):
+                print("nobatch", blank_mean, sample_mean, blank_mean * blank_intensity_ratio > sample_mean)
                 to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
             blank_mask_column = "mask_feature"
             self.feature_table["mask_feature"] = to_filter
         self.feature_table = self.feature_table[self.feature_table["mask_feature"] == False]
         self.feature_table.drop(columns="mask_feature", inplace=True)
-
 
     def interpolate_missing_features(self, ratio=0.5, by_batch=None, method="min"):
         """interpolate_missing_features _summary_
@@ -1268,8 +1266,7 @@ class FeatureTable:
             else:
                 return 0
 
-        sample_names = [
-            a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
+        sample_names = [a.name for a in self.experiment.acquisitions if a.name in self.feature_table.columns]
         if by_batch:
             for _, batch_name_list in self.experiment.batches(by_batch).items():
                 filtered_batch_name_list = [
@@ -1475,20 +1472,21 @@ class FeatureTable:
         texts = [[] for _ in textby]
         color_legend = {}
         marker_legend = {}
-        for acquisition in self.experiment.acquisitions:
-            if acquisition.name in self.feature_table.columns:
-                for i, x in enumerate(colorby):
-                    colors[i].append(combined_cosmetic_map[(
-                        'color', acquisition.metadata_tags[x])])
-                    color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
-                        'color', acquisition.metadata_tags[x])]
-                for i, x in enumerate(markerby):
-                    markers[i].append(combined_cosmetic_map[(
-                        'marker', acquisition.metadata_tags[x])])
-                    marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
-                        'marker', acquisition.metadata_tags[x])]
-                for i, x in enumerate(textby):
-                    texts[i].append(acquisition.metadata_tags[x])
+        for sample_name in self.sample_columns:
+            for acquisition in self.experiment.acquisitions:
+                if acquisition.name == sample_name:
+                    for i, x in enumerate(colorby):
+                        colors[i].append(combined_cosmetic_map[(
+                            'color', acquisition.metadata_tags[x])])
+                        color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
+                            'color', acquisition.metadata_tags[x])]
+                    for i, x in enumerate(markerby):
+                        markers[i].append(combined_cosmetic_map[(
+                            'marker', acquisition.metadata_tags[x])])
+                        marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
+                            'marker', acquisition.metadata_tags[x])]
+                    for i, x in enumerate(textby):
+                        texts[i].append(acquisition.metadata_tags[x])
         return colors, markers, texts, color_legend, marker_legend
 
     def overlay_TICs(self):
@@ -1564,12 +1562,12 @@ class FeatureTable:
                     figure_params, correlation_type='pearson', log_transform=True))
             except:
                 pass
-        if params['kendall'] or params['all']:
-            qcqa_result.append(self.correlation_heatmap(
-                figure_params, correlation_type='kendall', log_transform=False))
-        if params['spearman'] or params['all']:
-            qcqa_result.append(self.correlation_heatmap(
-                figure_params, correlation_type='spearman', log_transform=False))
+        #if params['kendall'] or params['all']:
+        #    qcqa_result.append(self.correlation_heatmap(
+        #        figure_params, correlation_type='kendall', log_transform=False))
+        #if params['spearman'] or params['all']:
+        #    qcqa_result.append(self.correlation_heatmap(
+        #        figure_params, correlation_type='spearman', log_transform=False))
         if params['missing_feature_percentiles'] or params['all']:
             qcqa_result.append(self.missing_feature_percentiles(figure_params))
         if params['missing_feature_distribution'] or params['all']:

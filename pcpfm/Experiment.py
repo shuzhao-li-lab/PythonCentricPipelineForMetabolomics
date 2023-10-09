@@ -148,7 +148,6 @@ class Experiment:
                 acquisition = Acquisition.Acquisition(acquisition_JSON["name"], 
                                          acquisition_JSON["source_filepath"], 
                                          acquisition_JSON["metadata"])
-                print(json.dumps(acquisition_JSON["metadata"], indent=4))
                 acquisition.mzml_filepath = acquisition_JSON["mzml_filepath"]
                 acquisition.raw_filepath = acquisition_JSON["raw_filepath"]
                 acquisition.spectra = acquisition_JSON["spectra"]
