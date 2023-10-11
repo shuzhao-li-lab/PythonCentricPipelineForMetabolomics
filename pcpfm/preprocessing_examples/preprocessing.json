@@ -1,0 +1,52 @@
+{
+"mappings":
+    {
+    "instrument":
+        {
+            "IDX": {
+                "substrings": ["IDX"],
+                "search": ["Instrument Method"],
+                "else": "HFX"
+            }
+        },
+    "sample_type":
+        {
+        "qstd": {
+            "substrings": ["qstd", "QSTD", "Qstd"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "nist": {
+            "substrings": ["nist", "NIST"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "pooled": {
+            "substrings": ["pooled", "Pooled"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "blank": {
+            "substrings": ["blank", "Blank"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "sol": {
+            "substrings": ["sol", "solvent", "Sol", "Solvent"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "process": {
+            "substrings": ["process", "Process"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "dda": {
+            "substrings": ["dda", "DDA"],
+            "search": ["File Name", "Sample ID"]
+            },
+        "standard": {
+            "substrings": ["_IS", "STD", "_is", "std", "Std"],
+            "search": ["File Name", "Sample ID"]                
+            },
+        "unknown": {
+            "substrings": ["cellpellets"],
+            "search": ["File Name", "Sample ID", "Sample Type"]                
+            }
+        }
+    }
+}
