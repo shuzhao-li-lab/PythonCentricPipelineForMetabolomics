@@ -37,8 +37,11 @@ class Report():
         self.max_width = round(self.report.line_width * 1000,0)
         
         for section in style["sections"]:
-            self.__getattribute__(section["section"])(section)
-            self.end_section()
+            try:
+                self.__getattribute__(section["section"])(section)
+                self.end_section()
+            except:
+                pass
 
 
 
