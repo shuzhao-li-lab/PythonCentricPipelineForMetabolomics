@@ -21,29 +21,33 @@ class ReportPDF(FPDF):
 
 
 class Report():
-    default_style = json.load(open("/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/report_templates/jmm_default.json"))
-    for section in default_style["sections"]:
-        if "text" in section:
-            section["text"] = default_style["texts"][section["text"]]
-        else:
-            section["text"] = None
-    default_font = ['Arial', '', 12]
-
-    def __init__(self, experiment, style=default_style) -> None:
-        global HEADER
+    def __init__(self, experiment, style) -> None:
         self.experiment = experiment
+        global HEADER
         HEADER += self.experiment.experiment_directory.split("/")[-1]
+        default_font = ['Arial', '', 12]
         self.report = self.initialize_report()
         self.max_width = round(self.report.line_width * 1000,0)
-        
-        for section in style["sections"]:
-            try:
-                self.__getattribute__(section["section"])(section)
-                self.end_section()
-            except:
-                pass
+        self.style = self.preprocess_style(style)
 
+    def initialize_report(self):
+        report = ReportPDF()
+        report.add_page()
+        report.set_font(self.default_font[0], self.default_font[1], self.default_font[2])
+        return report
+    
+    @staticmethod
+    def preprocess_style(style):
+        for section in style:
+            if "text" in section:
+                section["text"] = style["texts"][section["text"]]
+            else:
+                section["text"] = None
+        return section
 
+    def create_report(self):
+        for section in self.style:
+            self.__getattribute__(section["section"], section)
 
     def all_TICs(self, section_desc):
         for acquisition in self.experiment.acquisitions:
@@ -52,13 +56,6 @@ class Report():
                 self.report.image(tic_path, w=self.max_width)
             except:
                 pass
-
-
-    def initialize_report(self):
-        report = ReportPDF()
-        report.add_page()
-        report.set_font(self.default_font[0], self.default_font[1], self.default_font[2])
-        return report
 
     def reset_font(self):
         self.report.set_font(self.default_font[0], self.default_font[1], self.default_font[2])

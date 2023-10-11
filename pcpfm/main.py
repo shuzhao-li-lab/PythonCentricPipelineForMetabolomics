@@ -79,6 +79,7 @@ def main():
     parser.add_argument('--feature_retention_percentile')
     parser.add_argument('--interpolation_ratio')
     parser.add_argument('--ms2_dir')
+    parser.add_argument('--report_config')
 
     args = parser.parse_args()
     if args.parameters:
@@ -304,8 +305,7 @@ def main():
         feature_table.log_transform(params['new_moniker'], params["log_transform_mode"])
     elif args.subcommand == "report":
         experiment = Experiment.Experiment.load(params['input'])
-        report = Report.Report(experiment)
-        #report.build("/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/report_templates/jmm_default.json")
+        report = Report.Report(experiment, params['report_config'])
 
 
 def CLI():
