@@ -2,7 +2,7 @@ import os
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
 
 PARAMETERS = {
-    "preprocessing_config": "preprocessing.json",
+    "preprocessing_config": "preprocessing_exaamples/defaultpreprocessing.json",
     "annot_mz_tolerance": 5,
     "annot_rt_tolerance": 10,
     "khipu_mz_tolerance": 5,
