@@ -2,7 +2,7 @@ import os
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
 
 PARAMETERS = {
-    "preprocessing_config": "preprocessing.json",
+    "preprocessing_config": "preprocessing_exaamples/defaultpreprocessing.json",
     "annot_mz_tolerance": 5,
     "annot_rt_tolerance": 10,
     "khipu_mz_tolerance": 5,
@@ -19,6 +19,7 @@ PARAMETERS = {
     "khipu_isotopes": "default_configs/default_isotopes.json",
     "khipu_charges": "default_configs/default_charges.json",
     "auto_drop": "default_configs/default_auto_drop.json",
+    "report_config": "report_templates/default.json",
     "moniker": "default",
     "multicores": 4,
     "conversion_command": ['/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono', 
@@ -71,7 +72,7 @@ PARAMETERS = {
     "drop_value": None,
     "TIC_normalization_percentile": 0.90,
     "normalize_value": "median",
-    "feature_retention_percentile": 0.80,
+    "feature_retention_percentile": 0.50,
     "feature_drop_logic": 'or',
     "interpolation_ratio": 0.5,
     "interpolate_method": "min",
