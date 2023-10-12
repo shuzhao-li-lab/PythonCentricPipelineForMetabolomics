@@ -265,7 +265,7 @@ class Experiment:
         addition_modes = {
             "copy": shutil.copy,
             "link": os.link,
-        }
+        } 
         if os.path.exists(acquisition.source_filepath):
             if acquisition.source_filepath.endswith(".mzML"):
                 acquisition.mzml_filepath = acquisition.source_filepath
