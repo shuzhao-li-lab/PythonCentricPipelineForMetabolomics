@@ -6,7 +6,8 @@
         "acquisition_data": "acquisitions/",
         "annotations": "annotations/",
         "filtered_feature_tables": "filtered_feature_tables/",
-        "qaqc_figs": "QAQC_figs/"
+        "qaqc_figs": "QAQC_figs/",
+        "MS2": "MS2/"
     },
     "banned_colors": [
         "snow", "beige", "honeydew", "azure", 

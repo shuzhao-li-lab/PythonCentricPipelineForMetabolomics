@@ -14,8 +14,6 @@ from . import EmpCpds
 
 
 class Experiment:
-
-
     def __init__(self, 
                  experiment_name, 
                  experiment_directory,
@@ -97,6 +95,10 @@ class Experiment:
         self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["raw"])
         self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["annotations"])
         self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["filtered_feature_tables"])
+        self.MS2_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["MS2"])
+
+        self.MS2_methods = set()
+        self.MS1_only_methods = set()
 
     @property
     def ionization_mode(self):
@@ -157,6 +159,7 @@ class Experiment:
                 acquisition.__max_rt = acquisition_JSON["__max_rt"]
                 acquisition.__TIC = acquisition_JSON["__TIC"] if "__TIC" in acquisition_JSON else None
                 acquisition.data_path = acquisition_JSON["data_path"] if "data_path" in acquisition_JSON else None
+                acquisition.__has_ms2 = acquisition_JSON["__has_ms2"] if "__has_ms2" in acquisition_JSON else None
                 acquisitions.append(acquisition)
             #JSON_repr = defaultdict(JSON_repr, None)
             experiment = Experiment(JSON_repr["experiment_name"], 
@@ -180,7 +183,7 @@ class Experiment:
             for acquisition in experiment.acquisitions:
                 acquisition.experiment = experiment
         return experiment
-        
+            
     def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
         """
         Given a moniker for a feature table or empCpds, delete the entry on disk and in the object
@@ -260,9 +263,29 @@ class Experiment:
         }
         if os.path.exists(acquisition.source_filepath):
             if acquisition.source_filepath.endswith(".mzML"):
-                target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
-                acquisition.mzml_filepath = target_path
-                acquisition.raw_filepath = None
+                acquisition.mzml_filepath = acquisition.source_filepath
+                method = acquisition.metadata_tags.get("Instrument Method", None)
+                has_MS2 = False
+                if method:
+                    if method in self.MS1_only_methods:
+                        pass
+                    elif method in self.MS2_methods:
+                        has_MS2 = True
+                    else:
+                        has_MS2 = acquisition.has_MS2
+
+                if has_MS2:
+                    target_path = os.path.join(self.MS2_subdirectory, os.path.basename(acquisition.source_filepath))
+                    acquisition.mzml_filepath = target_path
+                    acquisition.raw_filepath = None
+                    if "Instrument Method" in acquisition.metadata_tags:
+                        self.MS2_methods.add(acquisition.metadata_tags["Instrument Method"])
+                else:
+                    target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+                    acquisition.mzml_filepath = target_path
+                    acquisition.raw_filepath = None
+                    if "Instrument Method" in acquisition.metadata_tags:
+                        self.MS1_only_methods.add(acquisition.metadata_tags["Instrument Method"])
             elif acquisition.source_filepath.endswith(".raw"):
                 target_path = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
                 acquisition.mzml_filepath = None
@@ -303,10 +326,8 @@ class Experiment:
             elif type(conversion_command is str):
                 conversion_command = conversion_command.replace("$RAW_PATH", input_filepath)
                 conversion_command = conversion_command.replace("$OUT_PATH", output_filepath) 
-        print(jobs)
         workers = mp.Pool(mp.cpu_count())
         for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
-            print(output_path)
             raw_acquisition.mzml_filepath = output_path
             
 
@@ -350,6 +371,8 @@ class Experiment:
                     acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
                     if name_field not in acquisition_info or path_field not in acquisition_info:
                         raise Exception()
+                    if '___' in acquisition_info[name_field]:
+                        acquisition_info[name_field] = acquisition_info[name_field].split('___')[-1]
                     acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                     acquisition.experiment = experiment
                     if acquisition.filter(filter):

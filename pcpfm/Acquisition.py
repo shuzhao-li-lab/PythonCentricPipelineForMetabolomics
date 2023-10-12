@@ -39,6 +39,7 @@ class Acquisition(object):
         self.__max_rt = None
         self._ionization_mode = None
         self.__TIC = None
+        self.__has_ms2 = None
 
     @property
     @functools.lru_cache(10)
@@ -137,9 +138,21 @@ class Acquisition(object):
             "__max_rt": self.__max_rt,
             "__ionization_mode": self._ionization_mode,
             "__TIC": self.__TIC,
-            "data_path": self.data_path
+            "data_path": self.data_path,
+            "__has_ms2": self.__has_ms2
         }
     
+    @property
+    def has_MS2(self):
+        if self.__has_ms2 is None:
+            self.__has_ms2 = False
+            reader = pymzml.run.Reader(self.mzml_filepath)
+            for spec in reader:
+                if spec.ms_level == 2:
+                    self.__has_ms2 = True
+                    break
+        return self.__has_ms2    
+
     @staticmethod
     def extract_acquisition(acquisition):
         reader = pymzml.run.Reader(acquisition.mzml_filepath)
@@ -255,6 +268,9 @@ class Acquisition(object):
                 if "lacks" in rules:
                     for not_include in rules["lacks"]:
                         passed_filter = passed_filter and not_include not in values_to_filter
+                if "equals" in rules:
+                    for must_include in rules["equals"]:
+                        passed_filter = passed_filter and must_include == values_to_filter
         return passed_filter
 
     @functools.lru_cache(1)
