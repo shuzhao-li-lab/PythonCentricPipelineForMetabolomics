@@ -86,7 +86,8 @@ PARAMETERS = {
     "ms2_dir": None,
     "ms2_similarity_metric": "cosine_greedy",
     "ms2_min_peaks": 3,
-    "find_experiment_ms2": True
+    "find_experiment_ms2": True,
+    "requirements_txt": "requirements.txt"
 }
 
 new_target_files = []

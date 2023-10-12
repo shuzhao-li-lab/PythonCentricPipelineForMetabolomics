@@ -305,7 +305,7 @@ def main():
         feature_table.log_transform(params['new_moniker'], params["log_transform_mode"])
     elif args.subcommand == "report":
         experiment = Experiment.Experiment.load(params['input'])
-        report = Report.Report(experiment, params['report_config'])
+        report = Report.Report(experiment, params)
 
 
 def CLI():

@@ -1,9 +1,9 @@
 from fpdf import FPDF
 import datetime
-import json
 import textwrap
 import os
-import numpy as np
+import subprocess
+import platform
 
 HEADER = 'PCPFM Report - '
 
@@ -19,16 +19,17 @@ class ReportPDF(FPDF):
         self.set_y(15)
         self.set_font('Arial', 'I', 8)
 
-
 class Report():
-    def __init__(self, experiment, style) -> None:
+    def __init__(self, experiment, parameters) -> None:
         self.experiment = experiment
+        self.parameters = parameters
+
         global HEADER
         HEADER += self.experiment.experiment_directory.split("/")[-1]
-        default_font = ['Arial', '', 12]
+        self.default_font = ['Arial', '', 12]
         self.report = self.initialize_report()
         self.max_width = round(self.report.line_width * 1000,0)
-        self.style = self.preprocess_style(style)
+        self.style = self.preprocess_style(self.paramaters["requirements_txt"])
 
     def initialize_report(self):
         report = ReportPDF()
@@ -164,6 +165,7 @@ class Report():
                 self.section_line(", ".join([str(x) for x in [table, feature_table.num_samples, feature_table.num_features]]))
             except:
                 pass
+
     def empcpd_summary(self, section_desc):
         self.section_head("empCpd Table Summary")
         if 'text' in section_desc: 
@@ -175,6 +177,32 @@ class Report():
                 self.section_line(", ".join([str(x) for x in [empcpd, empcpd_object.num_khipus, empcpd_object.num_features]]))
             except:
                 pass
+            
+    def command_history(self, section_desc):
+        self.section_head("Command History")
+        for command in self.experiment.command_history:
+            self.section_line(command)
+
+    def version_summary(self, section_desc):
+        self.section_head("Software Version Summary")
+        with open(self.parameters["requirements_txt"]) as req:
+            for line in req:
+                line = line.strip()
+                output = subprocess.run(["pip", "show", line.rstrip()], capture_output=True, text=True)
+                version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
+                self.section_line(":".join([line, version]))
+            try:
+                output = subprocess.run(["pip", "show", "pcpfm"], capture_output=True, text=True)
+                version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
+                self.section_line(": ".join(["pcpfm", version]))
+            except:
+                pass
+        self.section_line()
+        self.section_line("OS: ", platform.system())
+        self.section_line("Python Version: " + platform.python_version())
+        self.section_line("Architecture: " + platform.machine())
+        self.section_line("Uname: " + " ".join(platform.uname()))
+
 
     def timestamp(self, section_desc):
         timestamp_string = 'Report generated on ' + str(datetime.datetime.now())
