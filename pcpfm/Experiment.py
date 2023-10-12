@@ -7,6 +7,7 @@ import matplotlib.colors as mcolors
 import multiprocessing as mp
 import pandas as pd
 import random
+import sys
 
 from . import Acquisition
 from . import FeatureTable
@@ -32,7 +33,8 @@ class Experiment:
                  cosmetics=None,
                  used_cosmetics=None,
                  extracted=None,
-                 sub_dirs=None):
+                 sub_dirs=None,
+                 command_history=None):
         """
         The Experiment object represents the set of acquisitions in an experiment and associated metadata.
 
@@ -95,8 +97,8 @@ class Experiment:
         self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["raw"])
         self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["annotations"])
         self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["filtered_feature_tables"])
+        self.command_history = command_history
         self.MS2_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["MS2"])
-
         self.MS2_methods = set()
         self.MS1_only_methods = set()
 
@@ -178,7 +180,8 @@ class Experiment:
                                     cosmetics=JSON_repr["cosmetics"] if "cosmetics" in JSON_repr else None,
                                     used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None,
                                     extracted=None,
-                                    sub_dirs=JSON_repr['subdirectories'] #JSON_repr["extracted"] if "extracted" in JSON_repr else None
+                                    sub_dirs=JSON_repr['subdirectories'],
+                                    command_history=JSON_repr['command_history'] if 'command_history' in JSON_repr else [] #JSON_repr["extracted"] if "extracted" in JSON_repr else None
                                     )
             for acquisition in experiment.acquisitions:
                 acquisition.experiment = experiment
@@ -220,6 +223,7 @@ class Experiment:
         Serialize the experiment and acquisitions and store it on disk
         """        
         save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
+        self.command_history.append(" ".join(sys.argv))
         with open(os.path.join(self.experiment_directory, "experiment.json.tmp"), "w") as save_filehandle:
             JSON_repr = {
                 "experiment_directory": self.experiment_directory,
@@ -237,7 +241,8 @@ class Experiment:
                 "cosmetics": self.cosmetics,
                 "used_cosmetics": self.used_cosmetics,
                 "extracted": self.extracted,
-                "subdirectories": self.subdirectories
+                "subdirectories": self.subdirectories,
+                'command_history': self.command_history
             }
             try:
                 JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
