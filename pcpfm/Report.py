@@ -4,6 +4,9 @@ import textwrap
 import os
 import subprocess
 import platform
+import csv
+import json
+from mass2chem.formula import calculate_mass, PROTON
 
 HEADER = 'PCPFM Report - '
 
@@ -29,7 +32,8 @@ class Report():
         self.default_font = ['Arial', '', 12]
         self.report = self.initialize_report()
         self.max_width = round(self.report.line_width * 1000,0)
-        self.style = self.preprocess_style(self.paramaters["requirements_txt"])
+        self.style = self.preprocess_style(self.parameters["report_config"])
+        self.create_report()
 
     def initialize_report(self):
         report = ReportPDF()
@@ -39,16 +43,17 @@ class Report():
     
     @staticmethod
     def preprocess_style(style):
-        for section in style:
+        for section in style["sections"]:
             if "text" in section:
                 section["text"] = style["texts"][section["text"]]
             else:
                 section["text"] = None
-        return section
+        return style
 
     def create_report(self):
-        for section in self.style:
-            self.__getattribute__(section["section"], section)
+        for section in self.style["sections"]:
+            self.__getattribute__(section["section"])(section)
+
 
     def all_TICs(self, section_desc):
         for acquisition in self.experiment.acquisitions:
@@ -56,7 +61,24 @@ class Report():
                 tic_path = acquisition.TICz()
                 self.report.image(tic_path, w=self.max_width)
             except:
-                pass
+                print(section_desc)
+
+    def standards(self, section_desc):
+        for entry in csv.DictReader(open(section_desc["standards"])):
+            print(entry)
+            if "Name" in entry:
+                name = entry["Name"]
+            else:
+                name = entry["\ufeffName"]
+            isotope_dictionary = json.loads(entry["Isotope Dictionary"])
+            standard_mass = calculate_mass(isotope_dictionary)
+            if self.experiment.ionization_mode == "pos":
+                ion_mass = standard_mass + PROTON
+            else:
+                ion_mass = standard_mass - PROTON
+            for acquisition in self.experiment.acquisitions:
+                TIC = acquisition.TICz(mz=ion_mass, ppm=5, title=name + "_[H+]")
+                self.report.image(TIC, w=self.max_width)
 
     def reset_font(self):
         self.report.set_font(self.default_font[0], self.default_font[1], self.default_font[2])
@@ -147,7 +169,7 @@ class Report():
                         num_annotated_ms1 += 1
                     if "MS2_Spectra" in khipu and khipu["MS2_Spectra"]:
                         for spectrum in khipu["MS2_Spectra"]:
-                            if "Annotations" in spectrum:
+                            if "Annotations" in spectrum and spectrum["Annotations"]:
                                 is_MS2_annotated = True
                     if is_MS2_annotated:
                         num_annotated_ms2 += 1
@@ -181,7 +203,7 @@ class Report():
     def command_history(self, section_desc):
         self.section_head("Command History")
         for command in self.experiment.command_history:
-            self.section_line(command)
+            self.section_text(command)
 
     def version_summary(self, section_desc):
         self.section_head("Software Version Summary")
@@ -197,11 +219,30 @@ class Report():
                 self.section_line(": ".join(["pcpfm", version]))
             except:
                 pass
-        self.section_line()
-        self.section_line("OS: ", platform.system())
-        self.section_line("Python Version: " + platform.python_version())
-        self.section_line("Architecture: " + platform.machine())
-        self.section_line("Uname: " + " ".join(platform.uname()))
+        self.section_text("OS: ", platform.system())
+        self.section_text("Python Version: " + platform.python_version())
+        self.section_text("Architecture: " + platform.machine())
+        self.section_text("Uname: " + " ".join(platform.uname()))
+
+    def computational_performance(self, section_desc):
+        times = []
+        commands = []
+        for x, command in enumerate(self.experiment.command_history):
+            times.append(float(command.split(":")[0]))
+            commands.append(command.split("bin/pcpfm")[-1].split()[0] + str(x))
+
+        print(len(self.experiment.acquisitions))
+
+
+        import matplotlib.pyplot as plt
+        deltas = []
+        for i, t in enumerate(times):
+            if i == 0:
+                pass
+            else:
+                deltas.append((times[i] - times[i-1])/60)
+        plt.bar(commands[1:], deltas)
+        plt.show()
 
 
     def timestamp(self, section_desc):

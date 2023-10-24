@@ -30,11 +30,21 @@ class FeatureTable:
         self.feature_table_filepath = feature_table_filepath
         self.experiment = experiment
         self.moniker = moniker
-        self.feature_table = pd.read_csv(
-            feature_table_filepath, delimiter="\t")
+        self.feature_table = pd.read_csv(feature_table_filepath, delimiter="\t")
+        self.clean_columns()
 
         self.__mz_trees = {}
         self.__rt_trees = {}
+
+    def clean_columns(self):
+        for column in self.feature_table.columns:
+            if '___' in column:
+                new_column = column.split('___')[-1]
+                self.feature_table[new_column] = self.feature_table[column]
+                self.feature_table.drop(columns=column, inplace=True)
+            else:
+                pass
+            
 
     def get_mz_tree(self, mz_tol):
         if mz_tol not in self.__mz_trees:
@@ -67,7 +77,7 @@ class FeatureTable:
         :return: sample_columns
         :rtype: list
         """        
-        return [x for x in self.feature_table.columns if x in [a.name for a in self.experiment.acquisitions]]
+        return [x for x in self.feature_table.columns if x.split('___')[-1] in [a.name for a in self.experiment.acquisitions]]
 
     @property
     def non_sample_columns(self):
@@ -1206,6 +1216,10 @@ class FeatureTable:
             return np.all(row[columns] == True)
 
         blank_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [blank_value]}}) if x.name in self.sample_columns]
+        print(blank_names)
+        exit()
+        
+        
         sample_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [sample_value]}}) if x.name in self.sample_columns]
         
         blank_mask_columns = []
@@ -1473,6 +1487,7 @@ class FeatureTable:
         color_legend = {}
         marker_legend = {}
         for sample_name in self.sample_columns:
+            sample_name = sample_name.split('___')[-1]
             for acquisition in self.experiment.acquisitions:
                 if acquisition.name == sample_name:
                     for i, x in enumerate(colorby):
@@ -1550,24 +1565,18 @@ class FeatureTable:
         #    qcqa_result.append(self.check_for_standards(
         #        figure_params, "/Users/mitchjo/Datasets/Standards/extraction_buffer_standards_with_lipidomix.csv"))
         if params['pca'] or params['all']:
-            try:
-                qcqa_result.append(self.PCA(figure_params))
-            except:
-                pass
+            qcqa_result.append(self.PCA(figure_params))
         if params['tsne'] or params['all']:
             qcqa_result.append(self.TSNE(figure_params))
         if params['pearson'] or params['all']:
-            try:
-                qcqa_result.append(self.correlation_heatmap(
-                    figure_params, correlation_type='pearson', log_transform=True))
-            except:
-                pass
-        #if params['kendall'] or params['all']:
-        #    qcqa_result.append(self.correlation_heatmap(
-        #        figure_params, correlation_type='kendall', log_transform=False))
-        #if params['spearman'] or params['all']:
-        #    qcqa_result.append(self.correlation_heatmap(
-        #        figure_params, correlation_type='spearman', log_transform=False))
+            qcqa_result.append(self.correlation_heatmap(
+                figure_params, correlation_type='pearson', log_transform=True))
+        if params['kendall'] or params['all']:
+            qcqa_result.append(self.correlation_heatmap(
+                figure_params, correlation_type='kendall', log_transform=False))
+        if params['spearman'] or params['all']:
+            qcqa_result.append(self.correlation_heatmap(
+                figure_params, correlation_type='spearman', log_transform=False))
         if params['missing_feature_percentiles'] or params['all']:
             qcqa_result.append(self.missing_feature_percentiles(figure_params))
         if params['missing_feature_distribution'] or params['all']:
