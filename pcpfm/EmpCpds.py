@@ -2,7 +2,7 @@ from khipu.epdsConstructor import epdsConstructor
 from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
 from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
 from jms.io import read_table_to_peaks
-from mass2chem.formula import PROTON
+from mass2chem.formula import PROTON, parse_chemformula_dict, calculate_formula_mass
 import matchms
 import json
 from intervaltree import IntervalTree
@@ -105,6 +105,7 @@ class empCpds:
         Args:
             save_as_moniker (str, optional): an alternative moniker to which to save the table. Defaults to None. 
         """
+        print("saving")
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
@@ -144,10 +145,22 @@ class empCpds:
             adducts = adduct_search_patterns
         elif experiment.ionization_mode == 'neg' and adducts is None:
             adducts = adduct_search_patterns_neg
-        peaklist = read_table_to_peaks(experiment.feature_tables[feature_table_moniker], has_header=True, mz_col=1, rtime_col=2, feature_id=0)
+        peaklist = read_table_to_peaks(experiment.feature_tables[feature_table_moniker], has_header=True, mz_col=1, rtime_col=2, feature_id=0, full_extract=True)
         for p in peaklist:
             p['id'] = p['id_number']
             p['representative_intensity'] = None
+        to_delete = set()
+        for p in peaklist:
+            for field in [k for k in p.keys()]:
+                if '___' in field:
+                    new_field = field.split('___')[-1]
+                    p[new_field] = p[field]
+                    to_delete.add(field)
+        for p in peaklist:
+            for field in to_delete:
+                del p[field]
+
+
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empCpds = ECCON.peaks_to_epdDict(
             isotopes,
@@ -155,7 +168,7 @@ class empCpds:
             extended_adducts,
             mz_tolerance_ppm=mz_tolerance,
             rt_tolerance=rt_search_window,
-            charges=charges
+            charges=charges,
         )
         all_feature_ids = set()
         for empCpd in dict_empCpds.values():
@@ -173,6 +186,35 @@ class empCpds:
         empCpd.save()
         return empCpd
 
+    def underivatize(self, ref_sample, deriv_formula):
+        deriv_dict = parse_chemformula_dict(deriv_formula)
+        deriv_mass = calculate_formula_mass(deriv_formula)
+        for empCpd in self.dict_empCpds.values():
+            M0_intensities = {}
+            for x in empCpd["MS1_pseudo_Spectra"]:
+                if x["isotope"] == "M0" and float(x[ref_sample]) > 0:
+                    M0_intensities[x["modification"]] = float(x[ref_sample])
+            num_deriv = 0 
+            if M0_intensities:
+                for modification in M0_intensities.keys():
+                    M0_intensity = M0_intensities[modification]
+                    for num_groups, iso in zip([1,2,3], ["13C/12C*2", "13C/12C*4", "13C/12C*6"]):
+                        for x in empCpd["MS1_pseudo_Spectra"]:
+                            if x["isotope"] == iso and x["modification"] == modification:
+                                if .67 < float(x[ref_sample]) / float(M0_intensity) < 1.5 and num_groups * deriv_mass < empCpd['neutral_formula_mass']:
+                                    num_deriv = max(num_deriv, num_groups)
+
+                empCpd["neutral_formula_mass"] -= num_deriv * deriv_mass
+                if empCpd["neutral_formula"]:
+                    neutral_formula = parse_chemformula_dict(empCpd['inferred_neutral_formula'])
+                    inferred_neutral_formula = {}
+                    for k, v in neutral_formula.items():
+                        inferred_neutral_formula[k] = neutral_formula[k] - num_groups * deriv_dict[k]
+                    empCpd["neutral_formula"] = inferred_neutral_formula
+                else:
+                    empCpd["neutral_formula"] = None                
+                empCpd["num_derivatized_groups"] = num_deriv
+
     def MS1_annotate(self, annotation_sources, rt_tolerance=5):
         """
         Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula 
@@ -181,7 +223,7 @@ class empCpds:
         Args:
             annotation_sources (list[str]): list of filepaths to annotation sources in JSON format
             rt_tolerance (int, optional): the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
-        """        
+        """
         EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance)
         EED.build_from_list_empCpds(list(self.dict_empCpds.values()))
 
@@ -206,7 +248,7 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='cosine_greedy', min_peaks=3, search_experiment=False):
+    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='cosine_greedy', min_peaks=3):
         similarity_methods = {
             "cosine_greedy": matchms.similarity.CosineGreedy,
             "cosine_hungarian": matchms.similarity.CosineHungarian,
@@ -222,77 +264,88 @@ class empCpds:
                 for file in files:
                     if file.endswith(".mzML"):
                         mzML.append(os.path.join(os.path.abspath(directory), file))
-        if search_experiment:
-            mzML += [x.mzml_filepath for x in self.experiment.acquisitions if 'dda' in x.mzml_filepath.lower()]
+
+        for x in self.experiment.acquisitions:
+            try:
+                if x.has_MS2:
+                    mzML.append(x.mzml_filepath)
+            except:
+                pass
 
         for mzml_filepath in mzML:
             print("Extracting: ", mzml_filepath)
-            try:
-                for spectrum in matchms.importing.load_from_mzml(mzml_filepath, metadata_harmonization=False):
-                    spectrum = matchms.filtering.add_precursor_mz(spectrum)
-                    try:
-                        precursor_mz = float(spectrum.get('precursor_mz'))
-                        spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
-                        precursor_rt = float(spectrum.get('retention_time'))
-                        spectrum = matchms.filtering.default_filters(spectrum)
-                        spectrum = matchms.filtering.normalize_intensities(spectrum)
-                        spectrum = matchms.filtering.add_precursor_mz(spectrum)
-                        spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-                        ms2_id = len(expMS2_registry)
-                        expMS2_registry[ms2_id] = {"spectrum": spectrum, 
-                                                   "precursor_mz": precursor_mz, 
-                                                   "precursor_rt": precursor_rt,
-                                                    "origin": mzml_filepath, 
-                                                    "Annotations": []}
-                        observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
-                        observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
-                    except:
-                        pass
-            except:
-                pass
+            i = 0
+            for spectrum in matchms.importing.load_from_mzml(mzml_filepath, metadata_harmonization=False):
+                i += 1
+                spectrum = matchms.filtering.add_precursor_mz(spectrum)
+                spectrum = matchms.filtering.default_filters(spectrum)
+                spectrum = matchms.filtering.normalize_intensities(spectrum)
+                spectrum = matchms.filtering.add_precursor_mz(spectrum)
+                spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+                try:
+                    precursor_mz = float(spectrum.get('precursor_mz'))
+                    spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+                    precursor_rt = float(spectrum.get('retention_time'))
+                    ms2_id = len(expMS2_registry)
+                    expMS2_registry[ms2_id] = {"exp_spectrum": spectrum, 
+                                                "precursor_mz": precursor_mz, 
+                                                "precursor_rt": float(spectrum.get('retention_time')),
+                                                "origin": mzml_filepath, 
+                                                "Annotations": []}
+                    observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
+                    observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
+                except:
+                    pass
+            print("\tFound: ", i, "spectra!")
         print("Found: ", ms2_id, " spectra!")
         if ms2_id == 0:
             return
         hits = 0
         if type(msp_files) is str:
             msp_files = [msp_files]
+        x = 0
         for msp_file in msp_files:
+            file_origin = os.path.basename(msp_file)
             for msp_spectrum in matchms.importing.load_from_msp(msp_file, metadata_harmonization=False):
+                x += 1
                 try:
                     precursor_mz = float(msp_spectrum.get('precursor_mz'))
+                    spectrum = matchms.filtering.default_filters(msp_spectrum)
+                    spectrum = matchms.filtering.normalize_intensities(msp_spectrum)
+                    spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
                 except:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        try:
-                            msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
-                            if msms_score > 0.60 and n_matches > min_peaks:
-                                hits += 1
+                        msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
+                        if msms_score > 0.60 and n_matches > min_peaks:
+                            hits += 1
+                            try:
                                 reference_id = msp_spectrum.get("compound_name")
-                                if reference_id:
-                                    expMS2_registry[expMS2_id]["Annotations"].append({
-                                        "msms_score": msms_score,
-                                        "matched_peaks": n_matches,
-                                        "feature_id": None,
-                                        "db_precursor_mz": precursor_mz,
-                                        "origin": os.path.basename(msp_file),
-                                        "reference_id": msp_spectrum.get("compound_name")
-                                    })
-                        except:
-                            pass
+                            except:
+                                reference_id = "spec_no." + str(x)
+                            if reference_id:
+                                expMS2_registry[expMS2_id]["Annotations"].append({
+                                    "msms_score": msms_score,
+                                    "matched_peaks": n_matches,
+                                    "db_precursor_mz": precursor_mz,
+                                    "origin": file_origin,
+                                    "reference_id": msp_spectrum.get("compound_name"),
+                                    "db_spectrum": [[x[0], x[1]] for x in msp_spectrum.peaks]
+                                })
+
         print("Found: ", hits, " hits")
         mapped = 0
         for expMS2_id, entry in expMS2_registry.items():
-            if entry["Annotations"]:
-                for feature_id in self.search_for_feature(entry["precursor_mz"], entry["precursor_rt"], 2 * mz_tolerance, rt_tolerance):
-                    mapped += 1
-                    khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
-                    entry_copy = deepcopy(entry)
-                    entry_copy["Matching_Feature"] = feature_id
-                    entry_copy["spectrum"] = [[x[0], x[1]] for x in spectrum.peaks]
-                    if "MS2_Spectra" not in khipu:
-                        khipu["MS2_Spectra"] = []
-                    khipu["MS2_Spectra"].append(entry_copy)
+            for feature_id in self.search_for_feature(entry["precursor_mz"], entry["precursor_rt"], 2 * mz_tolerance, rt_tolerance):
+                mapped += 1
+                khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
+                entry_copy = deepcopy(entry)
+                entry_copy["Matching_Feature"] = feature_id
+                entry_copy["exp_spectrum"] = [[x[0], x[1]] for x in entry["exp_spectrum"].peaks]
+                if "MS2_Spectra" not in khipu:
+                    khipu["MS2_Spectra"] = []
+                khipu["MS2_Spectra"].append(entry_copy)
         print("Mapped: ", mapped, " mapped to samples")
 
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):

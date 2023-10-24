@@ -77,7 +77,7 @@ PARAMETERS = {
     "interpolation_ratio": 0.5,
     "interpolate_method": "min",
     "log_transform_mode": "log2",
-    "targets": ["annotation_sources/HMDB.json", "annotation_sources/LMSD.json"],
+    "targets": ["annotation_sources/hmdb_metabolites.json", "annotation_sources/LMSD.json"],
     "search_isotopologues": False,
     "MS1_annotation_name": "MS1_annotations",
     "MS2_annotation_name": "MS2_annotations",
@@ -87,7 +87,10 @@ PARAMETERS = {
     "ms2_similarity_metric": "cosine_greedy",
     "ms2_min_peaks": 3,
     "find_experiment_ms2": True,
-    "requirements_txt": "requirements.txt"
+    "requirements_txt": "../requirements.txt",
+    "report_config": "report_templates/default.json",
+    "sample_for_ratio": None,
+    "deriv_formula": None
 }
 
 new_target_files = []
@@ -96,5 +99,5 @@ for v in PARAMETERS['targets']:
 PARAMETERS['targets'] = new_target_files
 
 for k, v in PARAMETERS.items():
-    if type(v) is str and (v.endswith(".json") or v.endswith(".msp")):
+    if type(v) is str and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
         PARAMETERS[k] = os.path.join(this_abs_dir, v)

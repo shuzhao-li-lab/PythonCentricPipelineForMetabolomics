@@ -3,6 +3,7 @@ import json
 import multiprocessing as mp
 import argparse
 import csv
+import time
 
 from . import Experiment
 from . import EmpCpds
@@ -80,9 +81,13 @@ def main():
     parser.add_argument('--interpolation_ratio')
     parser.add_argument('--ms2_dir')
     parser.add_argument('--report_config')
+    parser.add_argument('--sample_for_ratio')
+    parser.add_argument('--deriv_formula')
+
 
     args = parser.parse_args()
     if args.parameters:
+        print(args.parameters)
         params.update(
             json.load(open(args.parameters))
         )
@@ -93,13 +98,14 @@ def main():
 
     for k,v in params.items():
         if type(v) is str and v.endswith(".json"):
+            print(v)
             params[k] = json.load(open(v))
+
 
     if args.subcommand != "preprocess" and args.subcommand != "assemble":
         if type(params['input']) is str:
             if not params['input'].endswith(".json"):
                 params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
-
 
     if args.subcommand == "preprocess":
         preprocess_config = params['preprocessing_config']
@@ -138,7 +144,7 @@ def main():
             filter=params['filter'],
             name_field=params['name_field'],
             path_field=params['path_field'],
-            exp_config=params['experiment_config']
+            exp_config=params['experiment_config'],
         )
     elif args.subcommand == "convert":
         experiment = Experiment.Experiment.load(params['input'])
@@ -294,8 +300,15 @@ def main():
                 params["annot_rt_tolerance"],
                 params["ms2_similarity_metric"],
                 params["ms2_min_peaks"],
-                params["find_experiment_ms2"])
+            )
             empCpd.save(params["new_moniker"])
+    elif args.subcommand == "underivatize":
+        experiment = Experiment.Experiment.load(params['input'])
+        if 'empCpd_moniker' in params and "sample_for_ratio" in params and "deriv_formula" in params:
+            if params['empCpd_moniker'] and params['sample_for_ratio'] and params['deriv_formula']:
+                empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+                empCpd.underivatize(params["sample_for_ratio"], params["deriv_formula"])
+                empCpd.save(params["new_moniker"])
     elif args.subcommand == "retrieve":
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, False)

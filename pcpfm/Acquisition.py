@@ -4,6 +4,9 @@ import bisect
 import os
 import pickle
 import functools
+import re
+import matplotlib.pyplot as plt
+
 
 class Acquisition(object):
     def __init__(self, name, source_filepath, metadata_dict):
@@ -188,26 +191,35 @@ class Acquisition(object):
             pickle.dump(acquisition_data, out_fh)
         return data_path
 
-    def TICz(self, round_val=3):
-
-        import re
+    def TICz(self, round_val=3, mz=None, ppm=None, title=None):
         fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "TICs/")
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
         name = re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "_", self.name)
-        save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png")
+        if mz is None and ppm is None:
+            title = "TIC"
+            min_mass = -np.inf
+            max_mass = np.inf
+            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png")
+        else:
+            if title is None:
+                title = str(mz(round, 4))
+            min_mass = mz - mz / 1e6 * ppm
+            max_mass = mz + mz / 1e6 * ppm
+            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + "_" + str(mz) + "_" + str(ppm) + ".png")
+
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         if os.path.exists(save_path):
             return save_path
         else:
             bins = {}
             for spec in pymzml.run.Reader(self.mzml_filepath):
-                rtime = round(spec.scan_time[0], round_val)
+                rtime = round(spec.scan_time[0] * 60, round_val)
                 if rtime not in bins:
                     bins[rtime] = 0
                 for peak in spec.peaks("centroided"):
-                    bins[rtime] += float(peak[1])
-            import matplotlib.pyplot as plt
+                    if min_mass < peak[0] < max_mass:
+                        bins[rtime] += float(peak[1])
             fig, (ax1, ax2) = plt.subplots(2,1)
             
             Xs = []
@@ -221,10 +233,9 @@ class Acquisition(object):
                 else:
                     Y2s.append(0)
 
-            plt.suptitle(self.name + " TICs")
+            plt.suptitle(self.name + "\n" + title)
             ax1.plot(Xs, Ys)
             ax1.set(ylabel="Intensity")
-            ax1.set(xlabel="Rtime (sec)")
             ax2.plot(Xs, Y2s)
             ax2.set(ylabel="Log2(Intensity)")
             ax2.set(xlabel="Rtime (sec)")

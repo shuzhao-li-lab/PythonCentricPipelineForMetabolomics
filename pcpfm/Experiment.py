@@ -8,6 +8,7 @@ import multiprocessing as mp
 import pandas as pd
 import random
 import sys
+import time
 
 from . import Acquisition
 from . import FeatureTable
@@ -97,6 +98,8 @@ class Experiment:
         self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["raw"])
         self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["annotations"])
         self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["filtered_feature_tables"])
+        if command_history is None:
+            command_history = []
         self.command_history = command_history
         self.MS2_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["MS2"])
         self.MS2_methods = set()
@@ -223,7 +226,7 @@ class Experiment:
         Serialize the experiment and acquisitions and store it on disk
         """        
         save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
-        self.command_history.append(" ".join(sys.argv))
+        self.command_history.append(str(time.time()) + ":" + " ".join(sys.argv))
         with open(os.path.join(self.experiment_directory, "experiment.json.tmp"), "w") as save_filehandle:
             JSON_repr = {
                 "experiment_directory": self.experiment_directory,
@@ -246,11 +249,12 @@ class Experiment:
             }
             try:
                 JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
-                test = json.dumps(JSON_repr)
+                json.dumps(JSON_repr)
                 json.dump(JSON_repr, save_filehandle, indent=4)
                 shutil.move(save_path, save_path.replace(".tmp",''))
             except:
                 pass
+
 
     def add_acquisition(self, acquisition, mode="link"):
         """
@@ -370,7 +374,7 @@ class Experiment:
         """        
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
             filter = {} if filter is None else filter
-            experiment = Experiment('', experiment_directory, sub_dirs=exp_config["experiment_subdirectories"])
+            experiment = Experiment('', experiment_directory, sub_dirs=exp_config["experiment_subdirectories"], command_history=[str(time.time()) + ":start_analysis"])
             with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
                 for acquisition_info in csv.DictReader(CSV_fh):
                     acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
