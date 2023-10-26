@@ -1,0 +1,27 @@
+{
+    "sections":
+    [
+        {
+            "section": "timestamp"
+        },
+        {
+            "section": "command_history"
+        },
+        {
+            "section": "computational_performance"
+        },
+        {
+            "section": "version_summary"
+        },
+        {
+            "section": "save",
+            "report_name": "report.pdf"
+        }
+    ],
+    "texts":
+    {
+        "table_summary": "A feature denotes a region of a spectrum believed to represent a ion of a compound with a retention time and a mass-to-charge ratio. Multiple features often represent the same metabolite due to isotopologues, adduct, multiple charges etc. and thus, the number of features is only a rough proxy for the number of detected metabolites. Due to noise, artifacts, rare metabolites, etc. the number of features often increases with the number of samples.",
+        "empcpd_summary": "Empirical compounds are computational intermediates representing sets of features suspected to correspond to the same compound. Each empirical compound is a khipu, thus, the number of khipus is an estimateof the number of detected metabolites. Each khipu represents multiple features; however, unless singletons were added to the khipu during construction, the number of features grouped captured by empCpds is less thanthe number of features.",
+        "annotation_summary": "Annotations are mappings of features / empCpds to suspected chemical entities. Annotations can be higher or lower confidence depending on the origin in which they are generated. In general, MS1 annotated features are lower confidence than MS2 annotated features."
+    }
+}

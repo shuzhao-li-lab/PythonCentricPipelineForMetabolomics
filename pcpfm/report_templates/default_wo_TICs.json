@@ -162,11 +162,6 @@
             "table": "batch_corrected",
             "name": "_Feature_Counts.png"
         },
-
-        {
-            "section": "all_TICs"
-        },
-
         {
             "section": "save",
             "report_name": "report.pdf"
