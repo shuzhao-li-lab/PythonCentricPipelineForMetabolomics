@@ -4,6 +4,8 @@ import multiprocessing as mp
 import argparse
 import csv
 import time
+import requests as r
+import gdown
 
 from . import Experiment
 from . import EmpCpds
@@ -101,6 +103,55 @@ def main():
             print(v)
             params[k] = json.load(open(v))
 
+    if args.subcommand == "download_extras":
+        warning = '''
+        Pcpfm extras are not actively maintained by the developers of pcpfm and are redistributed forms of third party
+        publically available tools. Any issues encountered with these extras may or may not be a problem of pcpfm; 
+        however, feel free to raise an issue for us to evaluate. 
+
+        These extras include a JMS-compliant version of the HMDB, LMSD, MoNA.msp files, and the ThermoRawFileParser. 
+
+        All use of these extras are subject to the terms and conditions outlined by their owners. Notably, the HMDB is 
+        NOT available for commercial use without a license so please do not use this verison of it for commercial use. 
+
+        Additionally, please cite the original publications for these tools if you use them in your project:
+
+        HMDB - https://hmdb.ca/
+
+        Please cite:
+            Wishart DS, Tzur D, Knox C, et al., HMDB: the Human Metabolome Database. Nucleic Acids Res. 2007 Jan;35(Database issue):D521-6. 17202168
+            Wishart DS, Knox C, Guo AC, et al., HMDB: a knowledgebase for the human metabolome. Nucleic Acids Res. 2009 37(Database issue):D603-610. 18953024
+            Wishart DS, Jewison T, Guo AC, Wilson M, Knox C, et al., HMDB 3.0 — The Human Metabolome Database in 2013. Nucleic Acids Res. 2013. Jan 1;41(D1):D801-7. 23161693
+            Wishart DS, Feunang YD, Marcu A, Guo AC, Liang K, et al., HMDB 4.0 — The Human Metabolome Database for 2018. Nucleic Acids Res. 2018. Jan 4;46(D1):D608-17. 29140435
+            Wishart DS, Guo AC, Oler E, et al., HMDB 5.0: the Human Metabolome Database for 2022. Nucleic Acids Res. 2022. Jan 7;50(D1):D622–31. 34986597 
+
+        LMSD - https://www.lipidmaps.org/databases/lmsd/overview
+        Please cite:
+            LMSD: LIPID MAPS® structure databas, Sud M, Fahy E, Cotter D, Brown A, Dennis EA, Glass CK, Merrill AH Jr, Murphy RC, Raetz CR, Russell DW, Subramaniam S., Nucleic Acids Research, 2007, 35: p. D527-32., DOI: 10.1093/nar/gkl838 , PMID: 17098933
+            LIPID MAPS® online tools for lipid research, Fahy E, Sud M, Cotter D & Subramaniam S., Nucleic Acids Research, 2007, 35: p. W606-12., DOI: 10.1093/nar/gkm324 , PMID: 17584797
+            LIPID MAPS: update to databases and tools for the lipidomics community, Conroy MJ, Andrews RM, Andrews S, Cockayne L, Dennis, EA, Fahy E, Gaud C, Griffiths WJ, Jukes G, Kolchin M, Mendivelso K, Lopez-Clavijo AF, Ready C, Subramaniam S, O'Donnell, VB, Nucleic Acids Research, 2023, DOI: 10.1093/nar/gkad896 , PMID: 37855672 
+        
+        MoNA - https://mona.fiehnlab.ucdavis.edu/
+        Plase cite:
+            https://mona.fiehnlab.ucdavis.edu/
+
+        ThermoRawFileParser - 
+            Please cite: Niels Hulstaert, Jim Shofstahl, Timo Sachsenberg, Mathias Walzer, Harald Barsnes, Lennart Martens, and Yasset Perez-Riverol Journal of Proteome Research 2020 19 (1), 537-542 DOI: 10.1021/acs.jproteome.9b00328 
+        
+        By downloading these extras you agree to the terms of their licenses. 
+
+        Please type 'yes' to acknowledge. 
+        
+        '''
+        print(warning)
+        user_input = input()
+        if user_input == "yes":
+            this_dir = os.path.abspath(os.path.dirname(__file__))
+            gdown.download_folder("https://drive.google.com/drive/folders/14GjoEqOI6yZHrVEvp08A_54mN6-m8rMM?usp=sharing", output=os.path.join(this_dir, "ThermoRawFileConverter"))
+            gdown.download_folder("https://drive.google.com/drive/folders/1Y_sAuGoQ_Vnn6xqm-P9JWPsnIeX0d0Wl?usp=sharing", output=os.path.join(this_dir, "annotation_sources"))
+            os.system("curl -L https://download.mono-project.com/archive/6.12.0/macos-10-universal/MonoFramework-MDK-6.12.0.199.macos10.xamarin.universal.pkg -o mono.pkg")
+            os.system("/usr/sbin/installer mono.pkg")
+        exit()
 
     if args.subcommand != "preprocess" and args.subcommand != "assemble":
         if type(params['input']) is str:
