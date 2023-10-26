@@ -1,5 +1,4 @@
 import os
-this_abs_dir = os.path.abspath(os.path.dirname(__file__))
 
 PARAMETERS = {
     "preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
@@ -22,8 +21,8 @@ PARAMETERS = {
     "report_config": "report_templates/default.json",
     "moniker": "default",
     "multicores": 4,
-    "conversion_command": ['/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono', 
-                           '/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/ThermoRawFileParser/ThermoRawFileParser.exe', 
+    "conversion_command": ['$(which mono)', 
+                           '/ThermoRawFileParser/ThermoRawFileParser.exe', 
                            '-f=1', 
                            '-i', 
                            '$RAW_PATH', 
@@ -93,10 +92,15 @@ PARAMETERS = {
     "deriv_formula": None
 }
 
+this_abs_dir = os.path.abspath(os.path.dirname(__file__))
+
 new_target_files = []
 for v in PARAMETERS['targets']:
     new_target_files.append(os.path.join(this_abs_dir, v))
 PARAMETERS['targets'] = new_target_files
+
+if PARAMETERS["conversion_command"][1] == '/ThermoRawFileParser/ThermoRawFileParser.exe':
+    PARAMETERS["conversion_command"][1] = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
 
 for k, v in PARAMETERS.items():
     if type(v) is str and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
