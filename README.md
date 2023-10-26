@@ -2,6 +2,8 @@
 
 Thanks for your interest in the PCPFM! his project is still an alpha. While I'm not aware of any issues that could cause data quality issues, use at your at your own risk!
 
+Note that while the LMSD, HMDB, and other databases are free for public non-commercial use, their size prohibits redistributing them in the git repo. There will be a command added to enable their download to the appropriate directory in the pcpfm shortly. 
+
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 ## Overview
