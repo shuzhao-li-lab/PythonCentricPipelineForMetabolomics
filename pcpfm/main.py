@@ -85,7 +85,7 @@ def main():
     parser.add_argument('--report_config')
     parser.add_argument('--sample_for_ratio')
     parser.add_argument('--deriv_formula')
-
+    parser.add_argument('--msp_files')
 
     args = parser.parse_args()
     if args.parameters:
@@ -325,7 +325,14 @@ def main():
             empCpd.save(params['new_moniker'])
     elif args.subcommand == "MS2_annotate":
         experiment = Experiment.Experiment.load(params['input'])
-        if experiment.ionization_mode == "pos":
+        if 'msp_files' in params:
+            try:
+                msp_file = json.loads(params['msp_files'])
+            except:
+                msp_file = params['msp_files']
+                if type(msp_file) is str:
+                    msp_file = [msp_file]
+        elif experiment.ionization_mode == "pos":
             msp_file = params['msp_files_pos']
         elif experiment.ionization_mode == "neg":
             msp_file = params['msp_files_neg']
