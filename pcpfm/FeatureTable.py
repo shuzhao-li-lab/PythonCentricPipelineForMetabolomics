@@ -1215,11 +1215,7 @@ class FeatureTable:
         def __all_logical(row, columns):
             return np.all(row[columns] == True)
 
-        blank_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [blank_value]}}) if x.name in self.sample_columns]
-        print(blank_names)
-        exit()
-        
-        
+        blank_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [blank_value]}}) if x.name in self.sample_columns]        
         sample_names = [x.name for x in self.experiment.filter_samples({query_field: {"includes": [sample_value]}}) if x.name in self.sample_columns]
         
         blank_mask_columns = []
