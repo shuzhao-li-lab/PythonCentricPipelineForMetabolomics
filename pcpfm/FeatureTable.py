@@ -463,12 +463,19 @@ class FeatureTable:
                             pass
         self.feature_table[annotation_column_name] = [annotations[x] for x in self.feature_table['id_number']]
 
-    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, annotation_column_name="ms2_annotations", similarity_method='cosine_greedy', min_peaks=3, search_experiment=True):
-        similarity_methods = {
-            "cosine_greedy": matchms.similarity.CosineGreedy,
-            "cosine_hungarian": matchms.similarity.CosineHungarian,
-        }
-        similarity_metric = similarity_methods[similarity_method]()
+    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, annotation_column_name="ms2_annotations", similarity_method='CosineGreedy', min_peaks=3, search_experiment=True):
+        def __get_parser(file_extension):
+            try:
+                return matchms.importing.__getattribute__("load_from_" + file_extension)
+            except:
+                raise Exception("no matching parser for file type: ", file_extension)
+
+        def __get_similarity_method(method_name):
+            try:
+                return matchms.similarity.__getattribute__(method_name)
+            except:
+                return Exception("no matching similarity method named: ", method_name)
+
         observed_precursor_mzs = intervaltree.IntervalTree()
         observed_precursor_rts = intervaltree.IntervalTree()
         expMS2_registry = {}
@@ -479,12 +486,17 @@ class FeatureTable:
                 for file in files:
                     if file.endswith(".mzML"):
                         mzML.append(os.path.join(os.path.abspath(directory), file))
-        if search_experiment:
-            mzML += [x.mzml_filepath for x in self.experiment.acquisitions if 'dda' in x.mzml_filepath.lower()]
+       
+        for x in self.experiment.acquisitions:
+            try:
+                if x.has_MS2:
+                    mzML.append(x.mzml_filepath)
+            except:
+                pass
 
         for mzml_filepath in mzML:
             try:
-                for spectrum in matchms.importing.load_from_mzml(mzml_filepath, metadata_harmonization=False):
+                for spectrum in __get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
                     spectrum = matchms.filtering.add_precursor_mz(spectrum)
                     try:
                         precursor_mz = float(spectrum.get('precursor_mz'))
@@ -509,7 +521,7 @@ class FeatureTable:
         if type(msp_files) is str:
             msp_files = [msp_files]
         for msp_file in msp_files:
-            for msp_spectrum in matchms.importing.load_from_msp(msp_file, metadata_harmonization=False):
+            for msp_spectrum in __get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=False):
                 try:
                     precursor_mz = float(msp_spectrum.get('precursor_mz'))
                 except:
@@ -517,7 +529,7 @@ class FeatureTable:
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
                         try:
-                            msms_score, n_matches = similarity_metric.pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                            msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
                             if msms_score > 0.60 and n_matches > min_peaks:
                                 reference_id = msp_spectrum.get("compound_name")
                                 if reference_id:
