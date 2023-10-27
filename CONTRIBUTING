@@ -1,0 +1,11 @@
+The python centric pipeline for metabolomics (pcpfm) is a community-first tool and as such we welcome any and all suggestions and feature requests. 
+
+If you would like to contribute this project, please do so by cloning this repository, creating a local branch, developing on said local branch, and then submitting the pull request. For examples on how to do this, take a look at numpy's guidelines: https://numpy.org/doc/stable/dev/index.html
+
+Currently there are no strict coding style guidelines but please consider the following soft rules:
+
+1. Pep8 coding conventions should be followed when possible.
+2. Readability > performance, unless strictly necessary keep code less optimized but easier to follow
+3. Consider edge cases and please add tests to your contributions. 
+
+If you have questions, please contact me at joshua.mitchell@jax.org.
