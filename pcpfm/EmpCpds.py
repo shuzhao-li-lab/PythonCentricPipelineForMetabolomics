@@ -8,6 +8,7 @@ import json
 from intervaltree import IntervalTree
 import os
 from copy import deepcopy
+from . import utils 
 
 class empCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
@@ -248,19 +249,7 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='cosine_greedy', min_peaks=3):
-        def __get_parser(file_extension):
-            try:
-                return matchms.importing.__getattribute__("load_from_" + file_extension)
-            except:
-                raise Exception("no matching parser for file type: ", file_extension)
-
-        def __get_similarity_method(method_name):
-            try:
-                return matchms.similarity.__getattribute__(method_name)
-            except:
-                return Exception("no matching similarity method named: ", method_name)
-
+    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='CosineGreedy', min_peaks=3):
         observed_precursor_mzs = IntervalTree()
         observed_precursor_rts = IntervalTree()
         expMS2_registry = {}
@@ -282,7 +271,7 @@ class empCpds:
         for mzml_filepath in mzML:
             print("Extracting: ", mzml_filepath)
             i = 0
-            for spectrum in __get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
+            for spectrum in utils.get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
                 i += 1
                 spectrum = matchms.filtering.add_precursor_mz(spectrum)
                 spectrum = matchms.filtering.default_filters(spectrum)
@@ -313,7 +302,7 @@ class empCpds:
         x = 0
         for msp_file in msp_files:
             file_origin = os.path.basename(msp_file)
-            for msp_spectrum in __get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=False):
+            for msp_spectrum in utils.get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=False):
                 x += 1
                 try:
                     precursor_mz = float(msp_spectrum.get('precursor_mz'))
@@ -324,7 +313,7 @@ class empCpds:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                        msms_score, n_matches = utils.get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
                         if msms_score > 0.60 and n_matches > min_peaks:
                             hits += 1
                             try:
