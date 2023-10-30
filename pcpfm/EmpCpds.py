@@ -251,7 +251,7 @@ class empCpds:
     def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='cosine_greedy', min_peaks=3):
         def __get_parser(file_extension):
             try:
-                return matchms.importing.__getattribute__("load_from_" + file_extension)
+                return matchms.importing.__getattribute__("load_from_" + file_extension.lower())
             except:
                 raise Exception("no matching parser for file type: ", file_extension)
 
