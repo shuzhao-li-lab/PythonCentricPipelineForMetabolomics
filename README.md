@@ -21,7 +21,7 @@ Other fields are supported and can be used during an analysis. As a basic recomm
 The output from PCPFM is intended to be immediately usable by existing tools such as MetaboAnalyst. This includes feature tables that are optionally blank masked, normalized, batch corrected, annotated or otherwise curated by PCPFM and empirical compounds as a JSON file representing putative metabolites that can be annotated with MS1, MS2, or authentic standards. 
 
 The organization of the outputs is as such:
-
+```
   Experiment Directory/
       annotations/
           empCpd.json
@@ -53,7 +53,7 @@ The organization of the outputs is as such:
           sample2.raw
           ...
       experiment.json
-
+```
 ## Installation
 
 The preferred installation mechanism is pip:
@@ -73,7 +73,7 @@ optionally, download the MoNAfiles for LC-MS-MS_Negative_Mode and Positive_Mode 
 Some instruments do not allow all values for all fields in a sequence file. This can be fixed by pre-processing the sequence file. 
 
 Here a dictionary is used that contains various fields that need to be standardized under the heading "mappings". For each such field there can be multiple values, each a key in a sub directionary containing multiple key: value pairs indicating what substrings when observed in any of the specified csv fields should result in that field being populated with the specified value. 
-
+```
 For example: 
 
     "sample_type":
@@ -83,7 +83,7 @@ For example:
             "search": ["File Name", "Sample ID"]
             },
         ...
-
+```
 Would result in the "sample_type" field being populated with "qstd" if any of the substrings are observed in either the "File Name" or "Sample ID" fields
 in the csv file. 
 
@@ -245,14 +245,14 @@ To annotate the preferred feature table:
 `pcpfm MS1_annotate --table_moniker preferred --new_moniker MS1_annotated -i ./my_experiment`
 
 Options can be provided including:
-
+```
 --annot_mz_tolerance: the ppm tolerance for mz matches
 --annot_rt_tolerance: the absolute seconds tolerance for rt matches
 --search_isotopologues: when true, search for all m+13Cn isotopologues
 --MS1_annoation_name: the column name to save the annoation to in the table
 --feature_adducts_pos: a path to .json file containing adduct information for positive mode
 --feature_adducts_neg: a path to .json file containing adduct information for negative mode
-
+```
 #### MS2_Annotations
 
 MS2 annotations can be generated as follows using any .msp file as reference. 
@@ -262,7 +262,7 @@ MS2 annotations can be generated as follows using any .msp file as reference.
 or 
 
 `pcpfm MS2_annotate --table_moniker MS1_annotated --new_moniker MS2_MS1_annotated -i ./my_experiment`
-
+```
 --msp_files_neg: path to msp file for negative mode
 --msp_files_pos: path to msp file for pos mode
 --ms2_dir: directory containing other ms2 spectra to annotate with (AcquireX)
@@ -270,7 +270,7 @@ or
 --ms2_similarity_metric: specify alterantive similarity metric
 --ms2_min_peaks: number of peaks ms2 spectra must have to be searched and matched to be reported as annoation. 
 --find_experiment_ms2: it True, search for ms2 spectra in the experiment's acquisitions.
-
+```
 ### Managing Feature Tables and empCpds
 
 To see the set of all monikers and their corresponding paths in an experiment:
