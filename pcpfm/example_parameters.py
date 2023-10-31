@@ -83,7 +83,7 @@ PARAMETERS = {
     "msp_files_pos": "annotation_sources/MoNA-export-LC-MS-MS_Positive_Mode.msp",
     "msp_files_neg": "annotation_sources/MoNA-export-LC-MS-MS_Negative_Mode.msp",
     "ms2_dir": None,
-    "ms2_similarity_metric": "cosine_greedy",
+    "ms2_similarity_metric": "CosineGreedy",
     "ms2_min_peaks": 3,
     "find_experiment_ms2": True,
     "requirements_txt": "../requirements.txt",
