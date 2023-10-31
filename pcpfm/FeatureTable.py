@@ -466,7 +466,7 @@ class FeatureTable:
     def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, annotation_column_name="ms2_annotations", similarity_method='CosineGreedy', min_peaks=3, search_experiment=True):
         def __get_parser(file_extension):
             try:
-                return matchms.importing.__getattribute__("load_from_" + file_extension)
+                return matchms.importing.__getattribute__("load_from_" + file_extension.lower())
             except:
                 raise Exception("no matching parser for file type: ", file_extension)
 
