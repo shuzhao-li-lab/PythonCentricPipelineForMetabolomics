@@ -325,7 +325,7 @@ class empCpds:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        msms_score, n_matches = utils.get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                        msms_score, n_matches = utils.get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
                         if msms_score > 0.60 and n_matches > min_peaks:
                             hits += 1
                             try:
