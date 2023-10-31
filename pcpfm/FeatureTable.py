@@ -464,18 +464,6 @@ class FeatureTable:
         self.feature_table[annotation_column_name] = [annotations[x] for x in self.feature_table['id_number']]
 
     def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, annotation_column_name="ms2_annotations", similarity_method='CosineGreedy', min_peaks=3, search_experiment=True):
-        def __get_parser(file_extension):
-            try:
-                return matchms.importing.__getattribute__("load_from_" + file_extension.lower())
-            except:
-                raise Exception("no matching parser for file type: ", file_extension)
-
-        def __get_similarity_method(method_name):
-            try:
-                return matchms.similarity.__getattribute__(method_name)
-            except:
-                return Exception("no matching similarity method named: ", method_name)
-
         observed_precursor_mzs = intervaltree.IntervalTree()
         observed_precursor_rts = intervaltree.IntervalTree()
         expMS2_registry = {}
@@ -507,7 +495,7 @@ class FeatureTable:
                         spectrum = matchms.filtering.add_precursor_mz(spectrum)
                         spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
                         ms2_id = len(expMS2_registry)
-                        expMS2_registry[ms2_id] = {"spectrum": spectrum, 
+                        expMS2_registry[ms2_id] = {"exp_spectrum": spectrum, 
                                                    "precursor_mz": precursor_mz, 
                                                    "precursor_rt": precursor_rt, 
                                                    "origin": mzml_filepath, 
@@ -528,21 +516,21 @@ class FeatureTable:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        try:
-                            msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
-                            if msms_score > 0.60 and n_matches > min_peaks:
+                        msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
+                        if msms_score > 0.60 and n_matches > min_peaks:
+                            try:
                                 reference_id = msp_spectrum.get("compound_name")
-                                if reference_id:
-                                    expMS2_registry[expMS2_id]["Annotations"].append({
-                                        "msms_score": msms_score,
-                                        "matched_peaks": n_matches,
-                                        "feature_id": None,
-                                        "db_precursor_mz": precursor_mz,
-                                        "origin": msp_file,
-                                        "reference_id": reference_id,
-                                    })
-                        except:
-                            pass
+                            except:
+                                reference_id = "spec_no." + str(x)                            
+                            if reference_id:
+                                expMS2_registry[expMS2_id]["Annotations"].append({
+                                    "msms_score": msms_score,
+                                    "matched_peaks": n_matches,
+                                    "feature_id": None,
+                                    "db_precursor_mz": precursor_mz,
+                                    "origin": msp_file,
+                                    "reference_id": reference_id,
+                                })
         if annotation_column_name in self.feature_table.columns:
             annotations = {x: y for x,y in zip(self.feature_table['id_number'], self.feature_table[annotation_column_name])}
         else:

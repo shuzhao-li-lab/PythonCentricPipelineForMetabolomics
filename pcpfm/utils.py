@@ -8,7 +8,7 @@ def get_parser(file_extension):
 
 def get_similarity_method(method_name):
     try:
-        return matchms.similarity.__getattribute__(method_name)
+        return matchms.similarity.__getattribute__(method_name)()
     except:
         raise Exception("no matching similarity method named: ", method_name)
 
