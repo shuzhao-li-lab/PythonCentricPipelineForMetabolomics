@@ -17,6 +17,7 @@ import re
 from mass2chem.formula import calculate_mass, PROTON, ELECTRON, parse_chemformula_dict
 import csv
 import json
+from .utils import get_parser, get_similarity_method
 
 class FeatureTable:
     def __init__(self, feature_table_filepath, experiment, moniker):
@@ -484,7 +485,7 @@ class FeatureTable:
 
         for mzml_filepath in mzML:
             try:
-                for spectrum in __get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
+                for spectrum in get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
                     spectrum = matchms.filtering.add_precursor_mz(spectrum)
                     try:
                         precursor_mz = float(spectrum.get('precursor_mz'))
@@ -509,14 +510,14 @@ class FeatureTable:
         if type(msp_files) is str:
             msp_files = [msp_files]
         for msp_file in msp_files:
-            for msp_spectrum in __get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=False):
+            for msp_spectrum in get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=False):
                 try:
                     precursor_mz = float(msp_spectrum.get('precursor_mz'))
                 except:
                     precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                        msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
+                        msms_score, n_matches = get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
                         if msms_score > 0.60 and n_matches > min_peaks:
                             try:
                                 reference_id = msp_spectrum.get("compound_name")
