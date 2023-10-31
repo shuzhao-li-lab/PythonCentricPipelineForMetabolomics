@@ -529,7 +529,7 @@ class FeatureTable:
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
                         try:
-                            msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["spectrum"], msp_spectrum).tolist()
+                            msms_score, n_matches = __get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
                             if msms_score > 0.60 and n_matches > min_peaks:
                                 reference_id = msp_spectrum.get("compound_name")
                                 if reference_id:
