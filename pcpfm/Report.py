@@ -52,8 +52,11 @@ class Report():
 
     def create_report(self):
         for section in self.style["sections"]:
-            self.__getattribute__(section["section"])(section)
-
+            try:
+                self.__getattribute__(section["section"])(section)
+            except:
+                print("Failed: ", section["section"])
+                pass
 
     def all_TICs(self, section_desc):
         for acquisition in self.experiment.acquisitions:
