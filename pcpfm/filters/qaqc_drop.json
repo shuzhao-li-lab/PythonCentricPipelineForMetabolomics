@@ -2,8 +2,8 @@
     "FeatureCountZScores": {
         "Action": "Drop",
         "Conditions": {
-            "GreaterThan": 2,
-            "LessThan": -2
+            "GreaterThan": 2.5,
+            "LessThan": -2.5
         }
     }
 }
