@@ -23,7 +23,7 @@ process() {
     pcpfm MS1_annotate -i $experiment -em masked_preferred_unknowns -nm HMDB_LMSD_annotated_masked_preferred_unknowns
     pcpfm MS2_annotate -i $experiment -em HMDB_LMSD_annotated_masked_preferred_unknowns -nm MoNA_HMDB_LMSD_annotated_masked_preferred_unknowns --ms2_dir=$4
     
-    pcpfm report -i $experiment --report_config=
+    pcpfm report -i $experiment --report_config=/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/report_templates/for_yuanye_11_1_23.json
 }
 
 process $1 $2 $3 $4
