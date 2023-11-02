@@ -27,21 +27,20 @@ for id, cpd in empcpd.items():
             else:
                 possible_hits.append(x["primary_id"])
         cpd_names = ";".join(possible_hits)
-    MS2_matches = {}
+    
+    l2s = []
     for x in cpd["MS2_Spectra"]:
         feature_id = x["Matching_Feature"]
-        l2s = []
         for y in x["Annotations"]:
             msms_score = round(y["msms_score"],3)
             id = y["reference_id"]
-            l2s.append(str(msms_score) + "_" + id)
-        MS2_matches[feature_id] = ",".join(l2s)
+            l2s.append(str(msms_score) + "_" + id + "_" + feature_id)
+    l2annots = ";".join(l2s)
     for p in cpd["MS1_pseudo_Spectra"]:
         p_id = p["id_number"]
         annotations[p_id]["AnnotFormulas"].append(cpd_formula)
         annotations[p_id]["AnnotL4"].append(cpd_names)
-        if p_id in MS2_matches:
-            annotations[p_id]["AnnotL2"].append(MS2_matches[p_id])
+        annotations[p_id]["AnnotL2"].append(l2annots)
 
 AnnotFormulas = []
 AnnotL4 = []
