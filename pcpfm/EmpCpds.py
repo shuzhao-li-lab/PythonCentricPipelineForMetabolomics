@@ -304,12 +304,14 @@ class empCpds:
         for msp_file in msp_files:
             file_origin = os.path.basename(msp_file)
             for msp_spectrum in utils.get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=True):
-                x += 1
-                precursor_mz = float(msp_spectrum.get('precursor_mz'))
-                spectrum = matchms.filtering.default_filters(msp_spectrum)
-                spectrum = matchms.filtering.normalize_intensities(msp_spectrum)
-                spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-
+                try: 
+                    x += 1
+                    precursor_mz = float(msp_spectrum.get('precursor_mz'))
+                    spectrum = matchms.filtering.default_filters(msp_spectrum)
+                    spectrum = matchms.filtering.normalize_intensities(msp_spectrum)
+                    spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+                except:
+                    precursor_mz = None
                 if precursor_mz:
                     for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
                         msms_score, n_matches = utils.get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
