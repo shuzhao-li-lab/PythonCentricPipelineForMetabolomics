@@ -9,7 +9,7 @@ process() {
     pcpfm blank_masking --table_moniker preferred --new_moniker=preferred_blank_masked --blank_value blank --sample_value unknown --query_field "Sample Type" --blank_intensity_ratio 3 -i $experiment 
     pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker masked_preferred_unknowns_intermediate --drop_value unknown --drop_field "Sample Type" --drop_others true -i $experiment 
     pcpfm QAQC --color_by='["Sample Type"]' --marker_by='["Sample Type"]'  --text_by='["file_no"]'  --table_moniker masked_preferred_unknowns_intermediate  -i $experiment 
-    pcpfm drop_samples --table_moniker masked_preferred_unknowns_intermediate --new_moniker masked_preferred_unknowns --filter /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/filters/qaqc_drop.json -i $experiment
+    pcpfm drop_samples --table_moniker masked_preferred_unknowns_intermediate --new_moniker masked_preferred_unknowns --qaqc_filter /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/filters/qaqc_drop.json -i $experiment
     pcpfm QAQC --color_by='["Sample Type"]' --marker_by='["Sample Type"]'  --text_by='["file_no"]'  --table_moniker masked_preferred_unknowns  -i $experiment 
     pcpfm normalize --table_moniker masked_preferred_unknowns --new_moniker pref_normalized --TIC_normalization_percentile 0.90 -i $experiment 
     pcpfm QAQC --color_by='["Sample Type"]' --marker_by='["Sample Type"]'  --text_by='["file_no"]'  --table_moniker pref_normalized  -i $experiment 
