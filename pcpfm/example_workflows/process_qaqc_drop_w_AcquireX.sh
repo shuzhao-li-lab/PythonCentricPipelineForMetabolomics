@@ -19,9 +19,9 @@ process() {
     pcpfm MS1_annotate -i $experiment -em preferred -nm HMDB_LMSD_annotated_preferred
     pcpfm MS2_annotate -i $experiment -em HMDB_LMSD_annotated_preferred -nm MoNA_HMDB_LMSD_annotated_preferred --ms2_dir=$4
 
-    pcpfm build_empCpds -i $experiment -tm masked_preferred_unknowns -em masked_preferred_unknowns 
-    pcpfm MS1_annotate -i $experiment -em masked_preferred_unknowns -nm HMDB_LMSD_annotated_masked_preferred_unknowns
-    pcpfm MS2_annotate -i $experiment -em HMDB_LMSD_annotated_masked_preferred_unknowns -nm MoNA_HMDB_LMSD_annotated_masked_preferred_unknowns --ms2_dir=$4
+    pcpfm build_empCpds -i $experiment -tm pref_normalized -em pref_normalized 
+    pcpfm MS1_annotate -i $experiment -em pref_normalized -nm HMDB_LMSD_annotated_pref_normalized
+    pcpfm MS2_annotate -i $experiment -em HMDB_LMSD_annotated_pref_normalized -nm MoNA_HMDB_LMSD_annotated_pref_normalized --ms2_dir=$4
     
     pcpfm report -i $experiment --report_config=/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/pcpfm/report_templates/for_yuanye_11_1_23.json
 }
