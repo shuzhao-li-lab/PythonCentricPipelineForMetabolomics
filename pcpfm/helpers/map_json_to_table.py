@@ -14,6 +14,9 @@ for feature_id in ft["id_number"]:
     }
 
 for id, cpd in empcpd.items():
+    cpd_formula = ''
+    cpd_names = ''
+    l2annots = ''
     if "list_matches" in cpd:
         formulas = []
         for x in cpd["list_matches"]:
