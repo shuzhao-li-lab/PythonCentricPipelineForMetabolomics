@@ -278,19 +278,20 @@ class empCpds:
                 spectrum = matchms.filtering.normalize_intensities(spectrum)
                 spectrum = matchms.filtering.add_precursor_mz(spectrum)
                 spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-
-                precursor_mz = float(spectrum.get('precursor_mz'))
-                spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
-                precursor_rt = float(spectrum.get('retention_time'))
-                ms2_id = len(expMS2_registry)
-                expMS2_registry[ms2_id] = {"exp_spectrum": spectrum, 
-                                            "precursor_mz": precursor_mz, 
-                                            "precursor_rt": float(spectrum.get('retention_time')),
-                                            "origin": mzml_filepath, 
-                                            "Annotations": []}
-                observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
-                observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
-
+                try:
+                    precursor_mz = float(spectrum.get('precursor_mz'))
+                    spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+                    precursor_rt = float(spectrum.get('retention_time'))
+                    ms2_id = len(expMS2_registry)
+                    expMS2_registry[ms2_id] = {"exp_spectrum": spectrum, 
+                                                "precursor_mz": precursor_mz, 
+                                                "precursor_rt": float(spectrum.get('retention_time')),
+                                                "origin": mzml_filepath, 
+                                                "Annotations": []}
+                    observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
+                    observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
+                except:
+                    pass
             print("\tFound: ", i, "spectra!")
         print("Found: ", ms2_id, " spectra!")
         if ms2_id == 0:
