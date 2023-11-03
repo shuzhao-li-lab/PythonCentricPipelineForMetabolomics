@@ -4,7 +4,7 @@ import os
 import multiprocessing as mp
 import re
 
-def process(raw, output_dir, existing, delete=True, cleanup=True, add_directory_name=True):
+def process(raw, output_dir, existing, delete=False, cleanup=False, add_directory_name=True):
     os.makedirs(output_dir, exist_ok=True)
     try:
         mzML_name = os.path.basename(raw).replace(".raw", ".mzML")
