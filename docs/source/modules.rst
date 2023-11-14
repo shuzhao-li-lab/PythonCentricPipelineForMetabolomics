@@ -9,4 +9,3 @@ Module Index
     pcpfm_empcpds
     pcpfm_experiment
     pcpfm_featuretable
-    pcpfm_report
