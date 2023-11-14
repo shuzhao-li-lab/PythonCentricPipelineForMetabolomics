@@ -2,9 +2,10 @@ import csv
 import multiprocessing as mp
 import sys
 import subprocess
+import os
 
 def process_job(job):
-    subprocess.run(["/Users/mitchjo/Projects/Atlas_10_12_23/process.sh", job["Sequence"], job["Moniker"], job["Filter"], job["MS2_Path"]])
+    subprocess.run([os.path.abspath(sys.argv[2]), job["Sequence"], job["Moniker"], job["Filter"], job["MS2_Path"]])
 
 def main():
     jobs = []
