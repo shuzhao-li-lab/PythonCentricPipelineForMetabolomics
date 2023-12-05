@@ -86,6 +86,7 @@ def main():
     parser.add_argument('--sample_for_ratio')
     parser.add_argument('--deriv_formula')
     parser.add_argument('--msp_files')
+    parser.add_argument('--skip_list')
 
     args = parser.parse_args()
     if args.parameters:
@@ -196,6 +197,7 @@ def main():
             name_field=params['name_field'],
             path_field=params['path_field'],
             exp_config=params['experiment_config'],
+            sample_skip_list_fp=params['skip_list']
         )
     elif args.subcommand == "convert":
         experiment = Experiment.Experiment.load(params['input'])
