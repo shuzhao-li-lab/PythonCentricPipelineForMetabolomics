@@ -256,7 +256,7 @@ class Experiment:
                 pass
 
 
-    def add_acquisition(self, acquisition, mode="link"):
+    def add_acquisition(self, acquisition, mode="link", sample_skip_list=None):
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
         and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
@@ -270,6 +270,8 @@ class Experiment:
             "copy": shutil.copy,
             "link": os.link,
         } 
+
+
         if os.path.exists(acquisition.source_filepath):
             if acquisition.source_filepath.endswith(".mzML"):
                 acquisition.mzml_filepath = acquisition.source_filepath
@@ -285,7 +287,8 @@ class Experiment:
 
                 if has_MS2:
                     target_path = os.path.join(self.MS2_subdirectory, os.path.basename(acquisition.source_filepath))
-                    acquisition.mzml_filepath = target_path
+                    acquisition.mzml_filepath = target_pathlist
+
                     acquisition.raw_filepath = None
                     if "Instrument Method" in acquisition.metadata_tags:
                         self.MS2_methods.add(acquisition.metadata_tags["Instrument Method"])
@@ -357,7 +360,8 @@ class Experiment:
         else:
             return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
-    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath', exp_config=None):
+
+    def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath', exp_config=None, sample_skip_list_fp=None):
         """
         For a given sequence file, create the experiment object, including the addition of acquisitions
 
@@ -372,6 +376,11 @@ class Experiment:
         Returns:
             experiment: the experiment object
         """        
+        sample_skip_list = set()
+        if sample_skip_list_fp:
+            if sample_skip_list_fp.endwith(".txt"):
+                sample_skip_list = set([x.strip() for x in open(sample_skip_list_fp).readlines()])
+
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
             filter = {} if filter is None else filter
             experiment = Experiment('', experiment_directory, sub_dirs=exp_config["experiment_subdirectories"], command_history=[str(time.time()) + ":start_analysis"])
@@ -384,7 +393,7 @@ class Experiment:
                         acquisition_info[name_field] = acquisition_info[name_field].split('___')[-1]
                     acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                     acquisition.experiment = experiment
-                    if acquisition.filter(filter):
+                    if acquisition.filter(filter) and acquisition.name not in sample_skip_list:
                         experiment.add_acquisition(acquisition)
             if experiment.acquisitions:
                 if exp_config:

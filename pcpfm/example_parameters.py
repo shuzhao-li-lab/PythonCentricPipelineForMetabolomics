@@ -89,7 +89,8 @@ PARAMETERS = {
     "requirements_txt": "../requirements.txt",
     "report_config": "report_templates/default.json",
     "sample_for_ratio": None,
-    "deriv_formula": None
+    "deriv_formula": None,
+    "skip_list": None,
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
