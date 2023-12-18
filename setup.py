@@ -36,7 +36,7 @@ setup(
   packages=find_packages(
     include=['*', '']
   ),
-  #include_package_data=True,
+  include_package_data=True,
   #zip_safe=True,
   entry_points = {
         'console_scripts': ['pcpfm=pcpfm.main:CLI'],

@@ -87,6 +87,8 @@ def main():
     parser.add_argument('--deriv_formula')
     parser.add_argument('--msp_files')
     parser.add_argument('--skip_list')
+    parser.add_argument('--add_singletons')
+    parser.add_argument('--extra_asari', default=None)
 
     args = parser.parse_args()
     if args.parameters:
@@ -205,7 +207,11 @@ def main():
         experiment.save()
     elif args.subcommand == "asari":
         experiment = Experiment.Experiment.load(params['input'])
-        experiment.asari(params['asari_command'])
+        asari_command = params['asari_command']
+        if params['extra_asari']:
+            print(params['extra_asari'])
+            asari_command.extend(params['extra_asari'].split(" "))
+        experiment.asari(asari_command)
         experiment.save()
     elif args.subcommand == "QAQC":
         experiment = Experiment.Experiment.load(params['input'])
@@ -237,7 +243,7 @@ def main():
                                                              params['khipu_extended_adducts'],
                                                              params['table_moniker'],
                                                              params['empCpd_moniker'],
-                                                             False,
+                                                             params['add_singletons'],
                                                              params['khipu_rt_tolerance'],
                                                              params['ppm'],
                                                              params['khipu_charges'])
