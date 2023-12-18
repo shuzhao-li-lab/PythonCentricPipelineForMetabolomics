@@ -277,17 +277,16 @@ class Experiment:
                 acquisition.mzml_filepath = acquisition.source_filepath
                 method = acquisition.metadata_tags.get("Instrument Method", None)
                 has_MS2 = False
-                if method:
-                    if method in self.MS1_only_methods:
-                        pass
-                    elif method in self.MS2_methods:
-                        has_MS2 = True
-                    else:
-                        has_MS2 = acquisition.has_MS2
+                if method in self.MS1_only_methods:
+                    pass
+                elif method in self.MS2_methods:
+                    has_MS2 = True
+                else:
+                    has_MS2 = acquisition.has_MS2
 
                 if has_MS2:
                     target_path = os.path.join(self.MS2_subdirectory, os.path.basename(acquisition.source_filepath))
-                    acquisition.mzml_filepath = target_pathlist
+                    acquisition.mzml_filepath = target_path
 
                     acquisition.raw_filepath = None
                     if "Instrument Method" in acquisition.metadata_tags:
@@ -378,7 +377,7 @@ class Experiment:
         """        
         sample_skip_list = set()
         if sample_skip_list_fp:
-            if sample_skip_list_fp.endwith(".txt"):
+            if sample_skip_list_fp.endswith(".txt"):
                 sample_skip_list = set([x.strip() for x in open(sample_skip_list_fp).readlines()])
 
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
@@ -393,6 +392,7 @@ class Experiment:
                         acquisition_info[name_field] = acquisition_info[name_field].split('___')[-1]
                     acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                     acquisition.experiment = experiment
+                    print(acquisition.name in sample_skip_list)
                     if acquisition.filter(filter) and acquisition.name not in sample_skip_list:
                         experiment.add_acquisition(acquisition)
             if experiment.acquisitions:
@@ -489,6 +489,7 @@ class Experiment:
             '$ASARI_SUBDIR': self.asari_subdirectory
         }
         job = []
+        print(asari_cmd)
         if type(asari_cmd) is list:
             for field in asari_cmd:
                 job.append(mapping.get(field, field))
@@ -496,6 +497,7 @@ class Experiment:
             for key, value in mapping.items():
                 asari_cmd.replace(key, value)
             job = asari_cmd.split(" ")
+        print(job)
         completed_process = subprocess.run(job)
 
         if completed_process.returncode == 0:

@@ -38,6 +38,10 @@ class FeatureTable:
         self.__rt_trees = {}
 
     def clean_columns(self):
+        _d = {}
+        for acquistion in self.experiment.acquisitions:
+            #_d[acquistion.name] = os.path.basename(acquistion.mzml_filepath).rstrip(".mzML")
+            _d[os.path.basename(acquistion.mzml_filepath).rstrip(".mzML")] = acquistion.name
         for column in self.feature_table.columns:
             if '___' in column:
                 new_column = column.split('___')[-1]
@@ -45,6 +49,11 @@ class FeatureTable:
                 self.feature_table.drop(columns=column, inplace=True)
             else:
                 pass
+        for column in self.feature_table.columns:
+            if column in _d:
+                self.feature_table[_d[column]] = self.feature_table[column]
+                self.feature_table.drop(columns=column, inplace=True)
+        print(self.feature_table.columns)
             
 
     def get_mz_tree(self, mz_tol):
@@ -1035,6 +1044,7 @@ class FeatureTable:
             self.feature_table.drop(columns=drop_name, inplace=True)
 
     def drop_samples_by_filter(self, filter, drop_others=False):
+        print(self.feature_table.columns)
         to_drop = []
         for acquisition in self.experiment.filter_samples(filter):
             if acquisition.name in self.sample_columns:

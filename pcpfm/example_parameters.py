@@ -1,7 +1,7 @@
 import os
 
 PARAMETERS = {
-    "preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
+    #"preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
     "annot_mz_tolerance": 5,
     "annot_rt_tolerance": 10,
     "khipu_mz_tolerance": 5,
@@ -69,6 +69,7 @@ PARAMETERS = {
     "drop_others": None,
     "qaqc_filter": None,
     "drop_value": None,
+    "add_singletons": False,
     "TIC_normalization_percentile": 0.90,
     "normalize_value": "median",
     "feature_retention_percentile": 0.50,
@@ -91,6 +92,7 @@ PARAMETERS = {
     "sample_for_ratio": None,
     "deriv_formula": None,
     "skip_list": None,
+    "extra_asari": None,
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
