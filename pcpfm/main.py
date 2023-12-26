@@ -3,110 +3,132 @@ import json
 import multiprocessing as mp
 import argparse
 import csv
-import time
-import requests as r
-import gdown
 
 from . import Experiment
 from . import EmpCpds
 from . import example_parameters
 from . import Report
 
-def main():
-    """
-    This is the main function for the pipeline that implements the CLI using docopt
+class Main():
+    @staticmethod
+    def process_params():
+        """
+        This process parses the command line arguments and returns the 
+        parameters in a dictionary. Default parameters are specified in 
+        the example_parameters.py file and some are read dynamically from
+        .json files as specified in that file. Note that any parameters 
+        given as .json files will be assumed to be a file path to a json
+        file and read as such. This allows complex datastructures to be 
+        specified for some parameters. 
 
-    Args:
-        args (dict): the args generated from doctopt
-    """    
+        :return: parameters dictionary
+        """
+        
+        params = example_parameters.PARAMETERS
+        parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing')
+        parser.add_argument('subcommand', metavar='subcommand', help='one of the subcommands: _____')
+        parser.add_argument('-p', '--parameters')
+        parser.add_argument('-m', '--mode', default=None)
+        parser.add_argument('--ppm', default=5, type=int)
+        parser.add_argument('-s', '--sequence')
+        parser.add_argument('-c', '--cores', type=int)
+        parser.add_argument('-MS2_dir')
+        parser.add_argument('-f', '--filter')
+        parser.add_argument('-j', '--project')
+        parser.add_argument('-o', '--output')
+        parser.add_argument('-i', '--input')
+        parser.add_argument('--name_field', default='Name')
+        parser.add_argument('--path_field', default='Filepath')
+        parser.add_argument('--asari_command')
+        parser.add_argument('-tm', '--table_moniker')
+        parser.add_argument('-em', '--empCpd_moniker')
+        parser.add_argument('-nm', '--new_moniker')
+        parser.add_argument('-cb', '--color_by', default=[])
+        parser.add_argument('-bb', '--by_batch')
+        parser.add_argument('-mb', '--marker_by', default=[])
+        parser.add_argument('-tb', '--text_by', default=[])
+        parser.add_argument('--all')
+        parser.add_argument('--pca')
+        parser.add_argument('--tsne')
+        parser.add_argument('--spearman'),
+        parser.add_argument('--kendall'),
+        parser.add_argument('--missing_feature_distribution')
+        parser.add_argument('--missing_feature_percentiles')
+        parser.add_argument('--median_correlation_outlier_detection')
+        parser.add_argument('--missing_feature_outlier_detection')
+        parser.add_argument('--intensity_analysis')
+        parser.add_argument('--feature_distribution')
+        parser.add_argument('--feature_outlier_detection')
+        parser.add_argument('--interactive_plots', default=False)
+        parser.add_argument('--save_plots', default=False)
+        parser.add_argument('--khipu_isotopes')
+        parser.add_argument('--khipu_charges')
+        parser.add_argument('--khipu_extended_adducts')
+        parser.add_argument('--khipu_adducts_pos')
+        parser.add_argument('--khipu_adducts_neg')
+        parser.add_argument('--khipu_rt_tolerance')
+        parser.add_argument('--blank_value')
+        parser.add_argument('--sample_value')
+        parser.add_argument('--query_field')
+        parser.add_argument('--blank_intensity_ratio')
+        parser.add_argument('--drop_name')
+        parser.add_argument('--drop_field')
+        parser.add_argument('--drop_value')
+        parser.add_argument('--drop_others')
+        parser.add_argument('--qaqc_filter')
+        parser.add_argument('--conversion_command')
+        parser.add_argument('--preprocessing_config')
+        parser.add_argument('--new_csv_path')
+        parser.add_argument('--TIC_normalization_percentile')
+        parser.add_argument('--normalize_value')
+        parser.add_argument('--feature_retention_percentile')
+        parser.add_argument('--interpolation_ratio')
+        parser.add_argument('--ms2_dir')
+        parser.add_argument('--report_config')
+        parser.add_argument('--sample_for_ratio')
+        parser.add_argument('--deriv_formula')
+        parser.add_argument('--msp_files')
+        parser.add_argument('--skip_list')
+        parser.add_argument('--add_singletons')
+        parser.add_argument('--extra_asari', default=None)
 
-    params = example_parameters.PARAMETERS
+        args = parser.parse_args()
+        if args.parameters:
+            params.update(
+                json.load(open(args.parameters))
+            )
+        for k, v in args.__dict__.items():
+            if v:
+                params[k] = v
+        params['multicores'] = min(mp.cpu_count(), params['multicores'])
 
-    parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing')
-    parser.add_argument('subcommand', metavar='subcommand',
-                        help='one of the subcommands: _____')
-    parser.add_argument('-p', '--parameters')
-    parser.add_argument('-m', '--mode', default=None)
-    parser.add_argument('--ppm', default=5, type=int)
-    parser.add_argument('-s', '--sequence')
-    parser.add_argument('-c', '--cores', type=int)
-    parser.add_argument('-MS2_dir')
-    parser.add_argument('-f', '--filter')
-    parser.add_argument('-j', '--project')
-    parser.add_argument('-o', '--output')
-    parser.add_argument('-i', '--input')
-    parser.add_argument('--name_field', default='Name')
-    parser.add_argument('--path_field', default='Filepath')
-    parser.add_argument('--asari_command')
-    parser.add_argument('-tm', '--table_moniker')
-    parser.add_argument('-em', '--empCpd_moniker')
-    parser.add_argument('-nm', '--new_moniker')
-    parser.add_argument('-cb', '--color_by', default=[])
-    parser.add_argument('-bb', '--by_batch')
-    parser.add_argument('-mb', '--marker_by', default=[])
-    parser.add_argument('-tb', '--text_by', default=[])
-    parser.add_argument('--all')
-    parser.add_argument('--pca')
-    parser.add_argument('--tsne')
-    parser.add_argument('--spearman'),
-    parser.add_argument('--kendall'),
-    parser.add_argument('--missing_feature_distribution')
-    parser.add_argument('--missing_feature_percentiles')
-    parser.add_argument('--median_correlation_outlier_detection')
-    parser.add_argument('--missing_feature_outlier_detection')
-    parser.add_argument('--intensity_analysis')
-    parser.add_argument('--feature_distribution')
-    parser.add_argument('--feature_outlier_detection')
-    parser.add_argument('--interactive_plots', default=False)
-    parser.add_argument('--save_plots', default=False)
-    parser.add_argument('--khipu_isotopes')
-    parser.add_argument('--khipu_charges')
-    parser.add_argument('--khipu_extended_adducts')
-    parser.add_argument('--khipu_adducts_pos')
-    parser.add_argument('--khipu_adducts_neg')
-    parser.add_argument('--khipu_rt_tolerance')
-    parser.add_argument('--blank_value')
-    parser.add_argument('--sample_value')
-    parser.add_argument('--query_field')
-    parser.add_argument('--blank_intensity_ratio')
-    parser.add_argument('--drop_name')
-    parser.add_argument('--drop_field')
-    parser.add_argument('--drop_value')
-    parser.add_argument('--drop_others')
-    parser.add_argument('--qaqc_filter')
-    parser.add_argument('--conversion_command')
-    parser.add_argument('--preprocessing_config')
-    parser.add_argument('--new_csv_path')
-    parser.add_argument('--TIC_normalization_percentile')
-    parser.add_argument('--normalize_value')
-    parser.add_argument('--feature_retention_percentile')
-    parser.add_argument('--interpolation_ratio')
-    parser.add_argument('--ms2_dir')
-    parser.add_argument('--report_config')
-    parser.add_argument('--sample_for_ratio')
-    parser.add_argument('--deriv_formula')
-    parser.add_argument('--msp_files')
-    parser.add_argument('--skip_list')
-    parser.add_argument('--add_singletons')
-    parser.add_argument('--extra_asari', default=None)
+        for k,v in params.items():
+            if type(v) is str and v.endswith(".json"):
+                params[k] = json.load(open(v))
+        try:
+            if type(params['input']) is str:
+                if not params['input'].endswith(".json"):
+                    params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
+        except:
+            pass
 
-    args = parser.parse_args()
-    if args.parameters:
-        print(args.parameters)
-        params.update(
-            json.load(open(args.parameters))
-        )
-    for k, v in args.__dict__.items():
-        if v:
-            params[k] = v
-    params['multicores'] = min(mp.cpu_count(), params['multicores'])
+        return params
+    
+    @staticmethod
+    def download_extras(params):
+        """
+        This method will download the MoNA LC MS/MS library, and the HMDBv5
+        and LMSD in a JMS-compliant format. Currently this downloads from my 
+        google drive (I know not ideal). Will be fixed in the future. 
 
-    for k,v in params.items():
-        if type(v) is str and v.endswith(".json"):
-            print(v)
-            params[k] = json.load(open(v))
+        By using this method you agree to the terms and conditions laid 
+        forth in the licenses for each of those repositories
 
-    if args.subcommand == "download_extras":
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
+
+        import gdown
         warning = '''
         Pcpfm extras are not actively maintained by the developers of pcpfm and are redistributed forms of third party
         publically available tools. Any issues encountered with these extras may or may not be a problem of pcpfm; 
@@ -152,16 +174,20 @@ def main():
             this_dir = os.path.abspath(os.path.dirname(__file__))
             gdown.download_folder("https://drive.google.com/drive/folders/14GjoEqOI6yZHrVEvp08A_54mN6-m8rMM?usp=sharing", output=os.path.join(this_dir, "ThermoRawFileConverter"))
             gdown.download_folder("https://drive.google.com/drive/folders/1Y_sAuGoQ_Vnn6xqm-P9JWPsnIeX0d0Wl?usp=sharing", output=os.path.join(this_dir, "annotation_sources"))
-            os.system("curl -L https://download.mono-project.com/archive/6.12.0/macos-10-universal/MonoFramework-MDK-6.12.0.199.macos10.xamarin.universal.pkg -o mono.pkg")
-            os.system("/usr/sbin/installer mono.pkg")
-        exit()
+            #os.system("curl -L https://download.mono-project.com/archive/6.12.0/macos-10-universal/MonoFramework-MDK-6.12.0.199.macos10.xamarin.universal.pkg -o mono.pkg")
+            #os.system("/usr/sbin/installer mono.pkg")
+    
+    @staticmethod
+    def preprocess(params):
+        """
+        Using the mappings in the preprocessing config, this will alter
+        a provided sequence file and add the extra fields. 
 
-    if args.subcommand != "preprocess" and args.subcommand != "assemble":
-        if type(params['input']) is str:
-            if not params['input'].endswith(".json"):
-                params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
+        <<TODO>>
 
-    if args.subcommand == "preprocess":
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         preprocess_config = params['preprocessing_config']
         params["sequence"] = os.path.abspath(params["sequence"])
         with open(params['new_csv_path'], 'w+') as out_csv_fh:
@@ -190,7 +216,30 @@ def main():
                     writer = csv.DictWriter(out_csv_fh, fieldnames=entry.keys())
                     writer.writeheader()
                 writer.writerow(entry)
-    elif args.subcommand == "assemble":
+
+    @staticmethod
+    def assemble(params):
+        """
+        This is the first command in any pcpfm analysis. Starting with a 
+        sequence file, specified by '-s', an output directory by '-o'
+        and a project name specified by '-j', this will create the 
+        experiment directory and initialize the experiment.json. 
+
+        Additional arguments include the ability to add a filter on 
+        sequence file entries using the '--filter' option and a JSON
+        dictionaries.
+
+        <<TODO>>
+
+        Additionally, the --name_field, and --path_field options will 
+        allow the user to specify what field name should be used for the
+        name and filepath of the acquisitions. Also using --skip_list and 
+        a .txt formatted file containing sample_names to ignore, entries 
+        can be excluded from an analysis. 
+        
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.construct_experiment_from_CSV(
             os.path.join(os.path.abspath(params['output']), str(params['project'])),
             params['sequence'],
@@ -201,65 +250,183 @@ def main():
             exp_config=params['experiment_config'],
             sample_skip_list_fp=params['skip_list']
         )
-    elif args.subcommand == "convert":
+        experiment.save()
+
+    @staticmethod
+    def convert(params):
+        """
+        This will convert all .raw files to .mzML using a specified 
+        command. To provide the command, you can either modify the 
+        config file OR pass the command using the --conversion_command. 
+        for this use case, use whatever command will do the conversion but 
+        where the .raw file path would be, substitute with $RAW_PATH and 
+        where the output would go, put $OUT_PATH. 
+
+        This requires passing -i with the experiment's path.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         experiment.convert_raw_to_mzML(params['conversion_command'])
         experiment.save()
-    elif args.subcommand == "asari":
+
+    @staticmethod
+    def asari(params):
+        """
+        Perform asari on the experiment's acquisitions. They must be have
+        been converted or provided in .mzML format first. 
+
+        The command by default assumes a ppm of 5 and the ionization mode 
+        of the experiment will be automatically inferred. If extra 
+        arguments are desired for asari, they can be provided using
+        --extra_asari on the command line. 
+
+        This requires passing -i with the experiment's path.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         asari_command = params['asari_command']
         if params['extra_asari']:
-            print(params['extra_asari'])
             asari_command.extend(params['extra_asari'].split(" "))
         experiment.asari(asari_command)
         experiment.save()
-    elif args.subcommand == "QAQC":
+
+    @staticmethod
+    def QAQC(params):
+        """
+        This will perform various QAQC metrics on the indicated feature
+        table. By default "all" QAQC metrics are performed which are 
+        detailed in the feature table object. 
+
+        This requires passing -i with the experiment's path. 
+        The feature table on which to perform the procedures must be given
+        as well using either --table_moniker or -tm.
+
+        TODO: this will be deprecated in the future and performed on lazily
+        either during report generation or qa/qc filtering. 
+
+        The fields --color_by, --text_by, --marker_by can specify how
+        to generate the figures this method generates. For each of these 
+        commands, a JSON-formatted list of sequence file fields on which
+        to generate the corresponding cosmetic item. These are optional. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         experiment.parameters = params["experiment_config"]
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
-        print(feature_table)
-        for cosmetic_param in ['color_by', 'text_by', 'marker_by']:
-            if cosmetic_param in params:
-                if type(params[cosmetic_param]) is str:
-                    params[cosmetic_param] = json.loads(params[cosmetic_param])
-                    if type(params[cosmetic_param]) is str:
-                        params[cosmetic_param] = list(params[cosmetic_param])
-            else:
-                params[cosmetic_param] = []
-        for display_option in ['interactive_plots', 'save_plots']:
-            if display_option not in params:
-                params[display_option] = False
-        experiment.QCQA_results[params['table_moniker']] = feature_table.QAQC(params)
+        if params['table_moniker'] not in experiment.qcqa_results:     
+            experiment.qcqa_results[params['table_moniker']] = {}
+        for qaqc_result in feature_table.QAQC(params):
+            experiment.qcqa_results[params['table_moniker']][qaqc_result["Type"]] = qaqc_result
         experiment.save()
-    elif args.subcommand == "summarize":
+
+    @staticmethod
+    def summarize(params):
+        """
+        Print the list of empirical compounds and feature tables registered
+        wiht the experiment object.
+
+        This requires passing -i with the experiment's path. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         experiment.summarize()
-    elif args.subcommand == "build_empCpds":
+
+    @staticmethod
+    def build_empCpds(params):
+        """
+        For a given feature table, generate empirical compounds from its 
+        features. This uses a user-defined set of isotopes and adducts. 
+
+        These can be overwritten, along with other parameters using the 
+        follwoing options:
+
+        --khipu_isotopes specifies the isotopes to use
+        --khipu_adducts specifies which adducts to use
+        --khipu_extended_adducts specifies which extended adducts to use
+        --khipu_adducts_neg specifies which adducts to use if mode is neg
+        --khipu_adducts_pos specifies which adducts to use if mode is pos
+        --add_singletons specifies if we should include single features in 
+        the empCpds, i.e., just one peak.
+        --khipu_rt_tolerance the rtime range for which to build khipus
+        --ppm, the mass tolerance for which to build khipus
+        --khipu_charges specifies which charges to consider (absolute Z)
+
+        For details on these parameters, please see Khipu's documentation
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the moniker of feature table
+        This requires passing -em with the desired empcpd moniker
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         params['khipu_adducts'] = params['khipu_adducts_pos'] if experiment.ionization_mode == "pos" else params['khipu_adducts_neg']
         EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment,
-                                                             params['khipu_isotopes'],
-                                                             params['khipu_adducts'],
-                                                             params['khipu_extended_adducts'],
-                                                             params['table_moniker'],
-                                                             params['empCpd_moniker'],
-                                                             params['add_singletons'],
-                                                             params['khipu_rt_tolerance'],
-                                                             params['ppm'],
-                                                             params['khipu_charges'])
+                                                                params['khipu_isotopes'],
+                                                                params['khipu_adducts'],
+                                                                params['khipu_extended_adducts'],
+                                                                params['table_moniker'],
+                                                                params['empCpd_moniker'],
+                                                                params['add_singletons'],
+                                                                params['khipu_rt_tolerance'],
+                                                                params['ppm'],
+                                                                params['khipu_charges'])
         experiment.save()
-    elif args.subcommand == "blank_masking":
+
+    @staticmethod
+    def blank_masking(params):
+        """
+        Print the list of empirical compounds and feature tables registered
+        wiht the experiment object.
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.blank_mask(params['blank_value'],
-                                 params['sample_value'],
-                                 params['query_field'],
-                                 params['filter'], 
-                                 float(params['blank_intensity_ratio']), 
-                                 params['by_batch'],
-                                 params['batch_blanking_logic'])
+                                    params['sample_value'],
+                                    params['query_field'],
+                                    params['filter'], 
+                                    float(params['blank_intensity_ratio']), 
+                                    params['by_batch'],
+                                    params['batch_blanking_logic'])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "drop_samples":
+
+    @staticmethod
+    def drop_samples(params):
+        """
+        This method drop samples from a feature table. There are 
+        different modes to use this command in. 
+
+        --drop_name will drop a sample with a given name
+        --filter will drop samples using a JSON formatted filter
+        --qaqc_filter drops samples using a JSON filter based on qaqc 
+            filters
+        --drop_field + --drop_value will drop all samples with a given
+        value for a given field in the sequence file.
+
+        Optionally each command can be augmented by passing the option
+        --drop_others which will reverse the logic of the drop.
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         if params['drop_name']:
@@ -267,11 +434,44 @@ def main():
         elif params['filter']:
             feature_table.drop_samples_by_filter(params['filter'], params['drop_others'])
         elif params['qaqc_filter']:
-            feature_table.drop_samples_by_qaqc(params['qaqc_filter'], params['drop_others'])
+            feature_table.drop_samples_by_qaqc(params['qaqc_filter'], params['drop_others'], params=params)
         elif params['drop_field'] and params['drop_value']:
             feature_table.drop_samples_by_field(params['drop_value'], params['drop_field'], params['drop_others'])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "normalize":
+
+    @staticmethod
+    def finish(params):
+        """
+        This command is a no-op command for marking the end of an 
+        anlysis in the command history. 
+
+        This requires passing -i with the experiment's path. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
+        experiment = Experiment.Experiment.load(params['input'])
+        experiment.save()
+
+    @staticmethod
+    def normalize(params):
+        """
+        Normalize a feature table based on the TIC of the features 
+        present in over a certain percentile of samples. 
+
+        --TIC_normalization_percentile defines this cutoff
+        --by_batch designates the field to group into batches, if 
+           provided, normalization will be done within batches first
+        --normalize_value can be 'mean' or 'median', this will be the 
+           value to which the TICs will be normalized
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+        This requires passing -nm with the new feature table's moniker
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         if params["TIC_normalization_percentile"]:
@@ -279,37 +479,143 @@ def main():
                                         params["by_batch"],
                                         params["normalize_value"])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "drop_missing_features":
+
+    @staticmethod
+    def drop_missing_features(params):
+        """
+        Drop samples below a given percentile of inclusion. 
+
+        --feature_retention_percentile defines this cutoff
+        --by_batch designates the field to group into batches, if 
+           provided, the percentile is caluclated per batch first
+        --feature_drop_logic can be "or" or "and" and specifies how 
+           handle the various batches. For example, if "or", a feature
+           will be dropped if it is below the cutoff in any batch.
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+        This requires passing -nm with the new feature table's moniker.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.drop_missing_features(params["by_batch"], 
                                             float(params["feature_retention_percentile"]),
                                             params["feature_drop_logic"])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "interpolate":
+
+    @staticmethod
+    def interpolate(params):
+        """
+        Replace remaining missing values with a value to aid statistics
+        
+        --interpolation_ratio this value specifies what to multiply the 
+          value generated by the interpolate_method before replacement
+        --interpolate_method currently limited to only min
+        --by_batch this field specifies what field to group samples by 
+          and interpolates within each group (probably a bad idea)
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+        This requires passing -nm with the new feature table's moniker.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.interpolate_missing_features(float(params['interpolation_ratio']),
-                                                   params['by_batch'],
-                                                   params['interpolate_method'])
+                                                    params['by_batch'],
+                                                    params['interpolate_method'])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "batch_correct":
+
+    @staticmethod
+    def batch_correct(params):
+        """
+        Use pyCombat to correct for batch effects using the specified batch
+        identifier.
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the feature table's moniker.
+        This requires passing -nm with the new feature table's moniker.
+        This requires passing --by_batch with the field specifying the 
+            batch on which to correct
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.batch_correct(params['by_batch'])
         feature_table.save(params['new_moniker'])
-    elif args.subcommand == "delete":
+
+    @staticmethod
+    def delete(params):
+        """
+        Delete a specified feature table or empCpd list by moniker.
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the table's moniker to delete
+                                   or
+        This requires passing -em with the empcpd's moniker to delete
+
+        Note: you *cannot* delete the feature tables generated by 
+        asari using this method. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         if params["table_moniker"]:
-            experiment.delete(args["table_moniker"], True, False)
+            experiment.delete(params["table_moniker"], True, False)
         elif params['empCpd_moniker']:
-            experiment.delete(args["empCpd_moniker"], True, False)
-    elif args.subcommand == "log_transform":
+            experiment.delete(params["empCpd_moniker"], True, False)
+
+    @staticmethod
+    def log_transform(params):
+        """
+        Log transform a given table, by default, log2
+
+        --log_transform_mode can be log10 or log2
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the table's moniker to transform
+        This requires passing -nm with the new feature table's moniker
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.log_transform(params['log_transform_mode'])
         feature_table.save(params["new_moniker"])
-    elif args.subcommand == "MS1_annotate":
+
+    @staticmethod
+    def MS1_annotate(params):
+        """
+        This will generate MS1 annotations on a provided feature table
+        or empcpd list. 
+
+        --log_transform_mode can be log10 or log2
+        --targets will specify what compounds to annotate, must be a
+            JMS-compliant JSON file
+        --annot_mz_tolerance this is the ppm cutoff for the search
+        --annot_rt_tolerance this is the rtime cutoff, in sec, for
+            the search
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the table's moniker to annotate
+                                   or
+        This requires passing -em with the empCpd's moniker to annotate
+        This requires passing -nm with the new moniker for the table or 
+            empcpd list.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
+
         experiment = Experiment.Experiment.load(params['input'])
         if 'table_moniker' in params:
             if experiment.ionization_mode == "pos":
@@ -331,7 +637,34 @@ def main():
             empCpd.MS1_annotate(params['targets'], 
                                 float(params['annot_rt_tolerance']))
             empCpd.save(params['new_moniker'])
-    elif args.subcommand == "MS2_annotate":
+
+    @staticmethod
+    def MS2_annotate(params):
+        """
+        This will generate MS2 annotations on a provided feature table
+        or empcpd list. 
+
+        --msp_files to designate the path to the msp files to use
+        --ms2_dir to specify the path with MS2 acquisitions
+        --annot_mz_tolerance this is the ppm cutoff for the precursor 
+            ion search
+        --annot_rt_tolerance this is the rtime cutoff, in sec, for
+            the precursor ion search
+        --ms2_similarity_metric the name of any matchms method for
+            comparing MS2 spectra
+        --ms2_min_peak minimum number of matching peaks for an MS2
+            match
+
+        This requires passing -i with the experiment's path. 
+        This requires passing -tm with the table's moniker to annotate
+                                   or
+        This requires passing -em with the empCpd's moniker to annotate
+        This requires passing -nm with the new moniker for the table or 
+            empcpd list.
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
         if 'msp_files' in params:
             try:
@@ -368,31 +701,146 @@ def main():
                 params["ms2_min_peaks"],
             )
             empCpd.save(params["new_moniker"])
-    elif args.subcommand == "underivatize":
+
+    @staticmethod
+    def underivatize(params):
+        raise NotImplemented
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params and "sample_for_ratio" in params and "deriv_formula" in params:
             if params['empCpd_moniker'] and params['sample_for_ratio'] and params['deriv_formula']:
                 empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
                 empCpd.underivatize(params["sample_for_ratio"], params["deriv_formula"])
                 empCpd.save(params["new_moniker"])
-    elif args.subcommand == "retrieve":
+
+    @staticmethod
+    def report(params):
+        """
+        This will generate a pdf report using a JSON template 
+
+        --report_config will override the default template
+
+        This requires passing -i with the experiment's path. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, False)
-    elif args.subcommand == "log_transform":
+        Report.Report(experiment, params)
+
+    def generate_output(params):
+        """
+        This command generates the three table output for downstream
+        analysis. This includes a feature table, an annotation table,
+        and finally the sample metadata. All results are stored in the
+        results subdirectory according to the specified moniker. 
+
+        This requires passing -i with the experiment's path.
+        This requires passing -tm for the table moniker to include
+        This requires passing -em for the empcpd moniker to include
+        This requires passing -nm for the new moniker to save 
+            generated results using. 
+
+        :param params: This is the master configuration file generated by 
+        parsing the command line arguments plus the defaults. 
+        """
+        import pandas as pd
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, False) 
-        feature_table.log_transform(params['new_moniker'], params["log_transform_mode"])
-    elif args.subcommand == "report":
-        experiment = Experiment.Experiment.load(params['input'])
-        report = Report.Report(experiment, params)
+        empCpds = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        new_moniker = params['new_moniker']
+        matches = []
+        output = experiment.experiment_directory + "/results/"
+        for _, cpd in empCpds.items():
+            for peak in cpd["MS1_pseudo_Spectra"]:
+                for match in cpd["mz_only_db_matches"]:
+                    peak_match = {"annotation_level": 4}
+                    if 'SMILES' in match:
+                        match['smiles'] = match['SMILES']
+                        del match['SMILES']
+                    if 'neutral_formula' in match:
+                        if 'chemical_formula' not in match:
+                            match['chemical_formula'] = match['neutral_formula']
+                        del match['neutral_formula']
+                    peak_match.update({k: v for k, v in peak.items()})
+                    if 'isotope' not in peak_match or peak_match['isotope'] is None:
+                        peak_match['isotope'] = "Assume M0"
+                    if 'modification' not in peak_match or peak_match['modification'] is None:
+                        if "neg" in dir:
+                            peak_match["modification"] = "Assume M-H-"
+                        else:
+                            peak_match["modification"] = "Assume M+H+"
+                    if 'ion_relation' not in peak_match or peak_match['ion_relation'] is None:
+                        peak_match['ion_relation'] = peak_match['isotope'] + "," + peak_match['modification']
+
+                    peak_match.update(match)
+                    matches.append(peak_match)
+            if "MS2_Spectra" in cpd: 
+                for MS2_spectrum in cpd["MS2_Spectra"]:
+                        MS2_data = {k: v for k, v in MS2_spectrum.items() if k not in {"Annotations", "exp_spectrum"}}                    
+                        if "Annotations" in MS2_spectrum:
+                            for annotation in MS2_spectrum["Annotations"]:
+                                annotation["primary_db"] = annotation["origin"]
+                                annotation["name"] = annotation["reference_id"]
+                                del annotation["origin"]
+                                del annotation["reference_id"]
+                                MS2_match = {"annotation_level": 2}
+                                MS2_match.update(MS2_data)
+                                MS2_match.update({k: v for k, v in annotation.items() if k not in {"db_spectrum"}})
+                                for peak in cpd["MS1_pseudo_Spectra"]:
+                                    MS2_match_copy = {k: v for k, v in MS2_match.items()}
+                                    MS2_match_copy.update({k: v for k, v in peak.items()})
+                                    matches.append(MS2_match_copy)
+            df = pd.DataFrame(matches)
+            df.drop(columns="other_ids", inplace=True)
+            
+            pd.DataFrame(matches).to_csv(output + new_moniker + "_annotation_table.tsv", index=False)
+            pd.DataFrame(feature_table.feature_table).to_csv(output + new_moniker + "_feature_table.tsv", index=False)
+            sample_table = []
+            for acquisition in experiment.acquisitions:
+                if acquisition.name in feature_table.sample_columns:
+                    acq_dict = {}
+                    for k, v in acquisition.__dict__:
+                        if type(v) is dict:
+                            for k2, v2 in v.items():
+                                acq_dict[k2] = v2
+                        else:
+                            if type(v) in [str, float, int, list]:
+                                acq_dict[k] = v
+                    sample_table.append(acq_dict)
+            pd.DataFrame(sample_table).to_csv(output + new_moniker + "_sample_metadata.tsv", index=False)
 
 
+def main():
+    """
+    This is the main function for the pipeline
+    """    
+    try:
+        params = Main.process_params()
+    except Exception as e:
+        print("FAILURE PARSING COMMAND LINE ARGUMENTS")
+        print(e)
+    
+    if params['subcommand'] not in dir(Main):
+        print(params['subcommand'] + " is not a valid subcommand")
+        print("valid commands include:")
+        for method in dir(Main):
+            if not method.startswith('__'):
+                print("\t", method)
+        raise Exception(params['subcommand'] + " is not a valid subcommand")
+    else:
+        function = getattr(Main, params['subcommand'])
+        function(params)
+        #try:
+        #    function(params)
+        #except Exception as e:
+        #    print("Error executing: " + params['subcommand'])
+        #    print(function.__doc__)
+        #    print(e)
+            
 def CLI():
-    #args = docopt(__doc__)
     main()
 
 if __name__ == '__main__':
-    #args = docopt(__doc__)
     main()
 
     

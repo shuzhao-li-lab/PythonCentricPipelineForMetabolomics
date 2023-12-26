@@ -1,195 +1,146 @@
-import csv
-import shutil
-import json
 import os
 import random
-import matplotlib.colors as mcolors
-import multiprocessing as mp
-import pandas as pd
-import random
-import sys
 import time
-
+import json
+from .utils import recursive_encoder, file_operations
 from . import Acquisition
-from . import FeatureTable
-from . import EmpCpds
-
 
 class Experiment:
-    def __init__(self, 
-                 experiment_name, 
-                 experiment_directory,
-                 acquisitions=None, 
-                 skip_subdirectory_initialization=False, 
-                 full_feature_table_path=None, 
-                 preferred_feature_table_path=None,
-                 qcqa_results=None,
-                 drop_results=None,
-                 ionization_mode=None,
-                 organized_samples=None,
-                 log=None,
-                 feature_tables=None,
-                 empCpds=None,
-                 log_transformed_feature_tables=None,
-                 cosmetics=None,
-                 used_cosmetics=None,
-                 extracted=None,
-                 sub_dirs=None,
-                 command_history=None):
+    """
+    The experiment object represents a set of acquisitions.
+    """
+    subdirectories =  {
+                "converted_subdirectory": "converted_acquisitions/",
+                "raw_subdirectory": "raw_acquisitions/",
+                "acquisition_data": "acquisitions/",
+                "annotation_subdirectory": "annotations/",
+                "filtered_feature_tables_subdirectory": "filtered_feature_tables/",
+                "ms2_directory": "ms2_acquisitions/",
+                "qaqc_figs": "QAQC_figs/"
+            }
+    def __init__(self, __d):
+        for k, v in __d.items():
+            setattr(self, k, v) 
+
+    @staticmethod
+    def create_experiment(experiment_name, experiment_directory, ionization_mode=None):
         """
-        The Experiment object represents the set of acquisitions in an experiment and associated metadata.
+        This is the main constructor for an experiment object. 
 
-        Args:
-            experiment_name (str): a moniker for naming the experiment
-            experiment_directory (str): path to the directory to store the experiment data and processing intermediates
+        This requires a name for the experiment, the directory to which
+        to write intermediates and optionally the ionization mode.
 
-            The following are used ONLY when loading an existing experiment
+        :param experiment_name: a moniker for the experiment
+        :param experiment_directory: where to store the results
+        :param ionization_mode: the ionization mode of the acquisitions
+            can be 'pos', 'neg', or None for auto-detection. 
 
-            acquisitions (list[Acquistions], optional): this is a list of Acquisition objects for the experiment. Defaults to None.
-            skip_subdirectory_initialization (bool, optional): if True, do not create subdirectories for experiment. Defaults to False.
-            full_feature_table_path (str, optional): path to full feature table #DEPRECATED - REMOVE. Defaults to None.
-            preferred_feature_table_path (str, optional): path to preferred feature table #DEPRECATED - REMOVE. Defaults to None.
-            qcqa_results (dict, optional): stores QCQA results per feature table. Defaults to None.
-            drop_results (dict, optional): stores information needed to drop acquisitions during processing. Defaults to None.
-            ionization_mode (str, optional): pos or neg, specifies the ionization mode of the MS for the experiment. Defaults to None.
-            organized_samples (dict, optional): dictionary of acquisitions organized into types of samples #DEPRECATED - REMOVE. Defaults to None.
-            log (logging_object, optional): logging instance, #DEPRECATED - REMOVE. Defaults to None.
-            feature_tables (dict, optional): mapping of feature table monikers to feature tables on disk. Defaults to None.
-            empCpds (dict, optional): mapping of empCpd monikers to empCpds on disk. Defaults to None.
-        """        
-        self.subdirectories =  {
-            "asari_results": "asari_results/",
-            "converted": "converted_acquisitions/",
-            "raw": "raw_acquisitions/",
-            "acquisition_data": "acquisitions/",
-            "annotations": "annotations/",
-            "filtered_feature_tables": "filtered_feature_tables/",
-            "qaqc_figs": "QAQC_figs/"
+        :return: experiment object
+        """
+        
+        exp_dict = {
+            "experiment_name": experiment_name,
+            "experiment_directory": os.path.abspath(experiment_directory),
+            "acquisitions": [],
+            "qcqa_results": {},
+            "_ionization_mode": ionization_mode,
+            "feature_tables": {},
+            "empCpds": {},
+            "log_transformed_feature_tables": [],
+            "cosmetics": {},
+            "used_cosmetics": [],
+            "extracted": [],
+            "method_has_MS2": {},
+            "MS2_methods": set(),
+            "MS1_only_methods": set(),
+            "command_history": [str(time.time()) + ':start_analysis'],
+            "_acq_names": None
         }
+        for k, v in Experiment.initialize_subdirectories(Experiment.subdirectories, experiment_directory).items():
+            exp_dict[k] = v
+        return Experiment(exp_dict)
 
-        # provided parameters
-        self.experiment_name = experiment_name
-        self.experiment_directory = os.path.abspath(experiment_directory)
-        self.acquisitions = [] if acquisitions is None else acquisitions
-        self.QCQA_results = {} if qcqa_results is None else qcqa_results
-        self.organized_samples = {} if organized_samples is None else organized_samples
-        self.drop_results = drop_results
-        self.full_feature_table_path = full_feature_table_path
-        self.preferred_feature_table_path = preferred_feature_table_path
-        self.log = '' if log is None else log
-        self.feature_tables = {} if feature_tables is None else feature_tables
-        self.empCpds = {} if empCpds is None else empCpds
-        self.log_transformed_feature_tables = [] if log_transformed_feature_tables is None else log_transformed_feature_tables
-        self.cosmetics = {} if cosmetics is None else cosmetics
-        self.used_cosmetics = [] if used_cosmetics is None else used_cosmetics
-        self.extracted = [] if extracted is None else extracted
-        self.__ionization_mode = ionization_mode
-        if sub_dirs is not None:
-            self.subdirectories = sub_dirs
-        # generate subdirectories
-        if not skip_subdirectory_initialization:
-            if sub_dirs:
-                self.subdirectories = sub_dirs
-            self.initialize_subdirectories()
-
-        # always computed
-        self.asari_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["asari_results"])
-        self.converted_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["converted"])
-        self.raw_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["raw"])
-        self.annotation_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["annotations"])
-        self.filtered_feature_tables_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["filtered_feature_tables"])
-        if command_history is None:
-            command_history = []
-        self.command_history = command_history
-        self.MS2_subdirectory = os.path.join(os.path.abspath(self.experiment_directory), self.subdirectories["MS2"])
-        self.MS2_methods = set()
-        self.MS1_only_methods = set()
-
-    @property
-    def ionization_mode(self):
-        if self.__ionization_mode is None:
-            self.__ionization_mode = self.determine_ionization_mode()
-        return self.__ionization_mode
-
-    def initialize_subdirectories(self):
+    def save(self):
         """
-        This function creates the subdirectories for the expriment. 
+        This saves the experiment object as a JSON object inside the 
+        experiment directory. 
 
-        The set of subdirectories to create is determiend by the class variable "subdirectories"
-        """        
-        to_create = [os.path.abspath(self.experiment_directory)]
-        to_create += [os.path.join(to_create[0], subdir) for subdir in self.subdirectories.values()]
-        for subdirectory_full_path in to_create:
-            if not os.path.isdir(subdirectory_full_path):
-                os.makedirs(subdirectory_full_path)
-
-    def extract_all_acquisitions(self):
-        workers = mp.Pool(mp.cpu_count())
-        for data_path, acquisition in zip(workers.map(Acquisition.Acquisition.extract_acquisition, self.acquisitions), [x for x in self.acquisitions if x.name not in self.extracted]):
-            if data_path is None:
-                pass
-            else:
-                acquisition.data_path = data_path
-                self.extracted.append(acquisition.name)
-        self.save()
-
-    @property
-    def acquisition_datapath(self):
-        return os.path.join(self.experiment_directory, self.subdirectories["acquisition_data"])
-
+        """
+        import sys
+        save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
+        self.command_history.append(str(time.time()) + ':' + ";".join(sys.argv))
+        try:
+            with open(os.path.join(save_path), "w") as save_filehandle:
+                json.dump(recursive_encoder(self.__dict__), save_filehandle, indent=4)
+            file_operations["move"](save_path, save_path.replace(".tmp",''))
+        except Exception as e:
+            print("Unable to save experiment!\n" + e)
+            raise e
+        
     @staticmethod
     def load(experiment_json_filepath):
         """
         Reconstitute the experiment object from a saved JSON file representing the object
 
-        Args:
-            experiment_json_filepath (str): path to the JSON file
+        :param experiment_json_filepath: path to the JSON file
+        :returns: an experiment object
 
-        Returns:
-            Experiment: an experiment object
         """        
-        with open(experiment_json_filepath) as experiment_json_filehandle:
-            JSON_repr = json.load(experiment_json_filehandle)
-            acquisitions = []
-            for acquisition_JSON in JSON_repr["acquisitions"]:
-                acquisition = Acquisition.Acquisition(acquisition_JSON["name"], 
-                                         acquisition_JSON["source_filepath"], 
-                                         acquisition_JSON["metadata"])
-                acquisition.mzml_filepath = acquisition_JSON["mzml_filepath"]
-                acquisition.raw_filepath = acquisition_JSON["raw_filepath"]
-                acquisition.spectra = acquisition_JSON["spectra"]
-                acquisition.__min_mz = acquisition_JSON["__min_mz"]
-                acquisition.__max_mz = acquisition_JSON["__max_mz"]
-                acquisition.__min_rt = acquisition_JSON["__min_rt"]
-                acquisition.__max_rt = acquisition_JSON["__max_rt"]
-                acquisition.__TIC = acquisition_JSON["__TIC"] if "__TIC" in acquisition_JSON else None
-                acquisition.data_path = acquisition_JSON["data_path"] if "data_path" in acquisition_JSON else None
-                acquisition.__has_ms2 = acquisition_JSON["__has_ms2"] if "__has_ms2" in acquisition_JSON else None
-                acquisitions.append(acquisition)
-            #JSON_repr = defaultdict(JSON_repr, None)
-            experiment = Experiment(JSON_repr["experiment_name"], 
-                                    JSON_repr["experiment_directory"], 
-                                    acquisitions=acquisitions, 
-                                    skip_subdirectory_initialization=True,
-                                    full_feature_table_path=JSON_repr["full_feature_table_path"],
-                                    preferred_feature_table_path=JSON_repr["preferred_feature_table_path"],
-                                    qcqa_results=JSON_repr["qcqa_results"],
-                                    drop_results=JSON_repr["drop_results"],
-                                    ionization_mode=JSON_repr["__ionization_mode"],
-                                    organized_samples=JSON_repr["organized_samples"],
-                                    feature_tables=JSON_repr["feature_tables"] if "feature_tables" in JSON_repr else None,
-                                    empCpds=JSON_repr["empCpds"] if "empCpds" in JSON_repr else None,
-                                    log_transformed_feature_tables=JSON_repr["log_transformed_feature_tables"] if "log_transformed_feature_tables" in JSON_repr else None,
-                                    cosmetics=JSON_repr["cosmetics"] if "cosmetics" in JSON_repr else None,
-                                    used_cosmetics=JSON_repr["used_cosmetics"] if "used_cosmetics" in JSON_repr else None,
-                                    extracted=None,
-                                    sub_dirs=JSON_repr['subdirectories'],
-                                    command_history=JSON_repr['command_history'] if 'command_history' in JSON_repr else [] #JSON_repr["extracted"] if "extracted" in JSON_repr else None
-                                    )
-            for acquisition in experiment.acquisitions:
-                acquisition.experiment = experiment
-        return experiment
-            
+        decoded_JSON = json.load(open(experiment_json_filepath))
+        decoded_JSON["acquisitions"] = [Acquisition.Acquisition(x) for x in decoded_JSON["acquisitions"]]
+        return Experiment(decoded_JSON)
+
+    @property
+    def MS2_acquisitions(self):
+        """
+        This returns all acquisitions in the experiment that have MS2. 
+        Lazily evaluated. 
+
+        :return: list of acquisitions with MS2
+        """
+        if self._MS2_acquisitions is None:
+            self._MS2_acquisitions = [acq for acq in self.acquisitions if acq.has_MS2]
+        else:
+            return self._MS2_acquisitions 
+
+    @property
+    def sample_names(self):
+        """
+        This returns the name of all acquisitions in the experiment
+        Lazily evaluated. 
+
+        :return: names of all samples in the experiment
+        """
+        if self._acq_names is None:
+            self._acq_names = [acq.name for acq in self.acquisitions]
+        return self._acq_names
+
+    @property
+    def ionization_mode(self):
+        """
+        This returns the user-specified or determined ionization mode
+        of the experiment's acquisitions.
+        Lazily evaluated. 
+
+        :return: the ionization mode 'pos' or 'neg'
+        """
+        if self._ionization_mode is None:
+            self._ionization_mode = self.determine_ionization_mode()
+        return self._ionization_mode
+
+    @staticmethod
+    def initialize_subdirectories(subdirectories, experiment_directory):
+        """
+        This function creates the subdirectories for the expriment. 
+
+        The set of subdirectories to create is determiend by the class variable "subdirectories"
+        """        
+        to_create = [os.path.abspath(experiment_directory)]
+        to_create += [os.path.join(to_create[0], subdir) for subdir in subdirectories.values()]
+        for subdirectory_full_path in to_create:
+            os.makedirs(subdirectory_full_path, exist_ok=True)
+        return {k: path for k, path in zip(subdirectories.keys(), to_create[1:])}
+
     def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
         """
         Given a moniker for a feature table or empCpds, delete the entry on disk and in the object
@@ -198,111 +149,72 @@ class Experiment:
             moniker (str): the moniker to be deleted
             delete_feature_table (bool, optional): if True, delete the corresponding feature table. Defaults to False.
             delete_empCpds (bool, optional): if True, delete the corresponding empCpd. Defaults to False.
-        """        
+        """
         if delete_feature_table:
-            os.remove(self.feature_tables[moniker])
-            del self.feature_tables[moniker]
+            to_delete = self.feature_tables
         elif delete_empCpds:
-            os.remove(self.empCpds[moniker])
-            del self.empCpds[moniker]
+            to_delete = self.empCpds
+        os.remove(to_delete[moniker])
+        del to_delete[moniker]
 
     def retrieve(self, moniker, feature_table=False, empCpds=False, as_object=False):
-        if feature_table:
-            feature_table_path = self.feature_tables[moniker]
-            if as_object:
-                return FeatureTable.FeatureTable(feature_table_path, self, moniker)
-            else:
-                return feature_table_path
-        elif empCpds:
-            empCpd_path = self.empCpds[moniker]
-            empCpd_path = empCpd_path.replace("empirical", "emprical")
-            if as_object:
-                return EmpCpds.empCpds.load(moniker, self)
-            else:
-                return empCpd_path
-
-    def save(self):
         """
-        Serialize the experiment and acquisitions and store it on disk
-        """        
-        save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
-        self.command_history.append(str(time.time()) + ":" + " ".join(sys.argv))
-        with open(os.path.join(self.experiment_directory, "experiment.json.tmp"), "w") as save_filehandle:
-            JSON_repr = {
-                "experiment_directory": self.experiment_directory,
-                "experiment_name": self.experiment_name,
-                "acquisitions": [],
-                "full_feature_table_path": self.full_feature_table_path,
-                "preferred_feature_table_path": self.preferred_feature_table_path,
-                "qcqa_results": self.QCQA_results,
-                "drop_results": self.drop_results,
-                "__ionization_mode": self.__ionization_mode,
-                "organized_samples": self.organized_samples,
-                "feature_tables": self.feature_tables,
-                "empCpds": self.empCpds,
-                "log_tranformed_feature_tables": self.log_transformed_feature_tables,
-                "cosmetics": self.cosmetics,
-                "used_cosmetics": self.used_cosmetics,
-                "extracted": self.extracted,
-                "subdirectories": self.subdirectories,
-                'command_history': self.command_history
-            }
-            try:
-                JSON_repr['acquisitions'] = [acquisition.JSON_repr for acquisition in self.acquisitions]
-                json.dumps(JSON_repr)
-                json.dump(JSON_repr, save_filehandle, indent=4)
-                shutil.move(save_path, save_path.replace(".tmp",''))
-            except:
-                pass
+        Given a moniker return either the feature table or empCpd list
+        for that moniker. By default, this returns the path, needs the
+        as_object field to be true to return the object. 
 
+        TODO: this is more complicated than necessary.
 
-    def add_acquisition(self, acquisition, mode="link", sample_skip_list=None):
+        :param moniker: which moniker to return, string
+        :param feature_table: if true, return feature table w/moniker
+        :param empCpds: if true, return empCpds w/moniker
+        :param as_object: if true, return the object, not path
+
+        :return: path or object for the feature table or emp cpd for 
+            the moniker
+        """
+        from . import FeatureTable
+        from . import EmpCpds
+        if as_object:
+            if feature_table:
+                to_construct = FeatureTable.FeatureTable
+            elif empCpds:
+                to_construct = EmpCpds.empCpds
+            return to_construct.load(moniker, self)
+        else:
+            if feature_table:
+                to_retrieve = self.feature_tables
+            elif empCpds:
+                to_retrieve = self.empCpds
+            return to_retrieve[moniker]
+
+    def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method"):
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
         and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
 
-        Args:
-            acquisition (Acquisition object): the object representing an acquistiion
-            override (bool, optional): if True, duplicate names or source paths are allowed. Defaults to False.
-            mode (str, optional): if 'link', use symlink, if 'copy' copy the .raw file. Defaults to "link".
+        :param acquisition: an Acquistiion object
+        :param mode: how to move acquisitions into the experiment, default "link", can be "copy"
+        :param method_field: this is the field to check for the method name, used to shortcircuit MS2 
+            determination
         """        
-        addition_modes = {
-            "copy": shutil.copy,
-            "link": os.link,
-        } 
-
-
         if os.path.exists(acquisition.source_filepath):
+            method = acquisition.metadata_tags.get(method_field, None)
             if acquisition.source_filepath.endswith(".mzML"):
-                acquisition.mzml_filepath = acquisition.source_filepath
-                method = acquisition.metadata_tags.get("Instrument Method", None)
-                has_MS2 = False
-                if method in self.MS1_only_methods:
-                    pass
-                elif method in self.MS2_methods:
-                    has_MS2 = True
-                else:
+                has_MS2 = self.method_has_MS2.get(method, None)
+                if has_MS2 is None:
                     has_MS2 = acquisition.has_MS2
-
+                    self.method_has_MS2[method] = has_MS2
                 if has_MS2:
                     target_path = os.path.join(self.MS2_subdirectory, os.path.basename(acquisition.source_filepath))
-                    acquisition.mzml_filepath = target_path
-
-                    acquisition.raw_filepath = None
-                    if "Instrument Method" in acquisition.metadata_tags:
-                        self.MS2_methods.add(acquisition.metadata_tags["Instrument Method"])
                 else:
                     target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
-                    acquisition.mzml_filepath = target_path
-                    acquisition.raw_filepath = None
-                    if "Instrument Method" in acquisition.metadata_tags:
-                        self.MS1_only_methods.add(acquisition.metadata_tags["Instrument Method"])
+                acquisition.mzml_filepath = target_path
             elif acquisition.source_filepath.endswith(".raw"):
                 target_path = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
-                acquisition.mzml_filepath = None
                 acquisition.raw_filepath = target_path
             if not os.path.exists(target_path):
-                addition_modes[mode](acquisition.source_filepath, target_path)
+                file_operations[mode](acquisition.source_filepath, target_path)
                 self.acquisitions.append(acquisition)
             else:
                 print("Target already exists: ", acquisition.name, acquisition.source_filepath)
@@ -313,68 +225,71 @@ class Experiment:
         """
         Convert all raw files to mzML
 
-        Args:
-            mono_path (str): path to mono executable
-            exe_path (str): path to converter executable
+        :param conversion_command: This specifies the command to call
+            to perform the conversion. Can be list or space-delimited
+            string. Must contain $RAW_PATH and $OUT_PATH where the 
+            input and output file names will go. 
         """ 
-        raw_acquisitions = [acquisition for acquisition in self.acquisitions if acquisition.mzml_filepath is None]
+        import multiprocessing as mp
         jobs = []
         output_paths = []
+        raw_acquisitions = [acq for acq in self.acquisitions if acq.mzml_filepath is None]
         for acquisition in raw_acquisitions:
-            input_filepath = acquisition.raw_filepath
             output_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.raw_filepath)).replace(".raw", ".mzML")
             output_paths.append(output_filepath)
             new_job = []
             if type(conversion_command) is list:
                 for element in conversion_command:
                     if element == "$RAW_PATH":
-                        new_job.append(input_filepath)
+                        new_job.append(acquisition.raw_filepath)
                     elif element == "$OUT_PATH":
                         new_job.append(output_filepath)
                     else:
                         new_job.append(element)
                 jobs.append(new_job)
             elif type(conversion_command is str):
-                conversion_command = conversion_command.replace("$RAW_PATH", input_filepath)
+                conversion_command = conversion_command.replace("$RAW_PATH", acquisition.raw_filepath)
                 conversion_command = conversion_command.replace("$OUT_PATH", output_filepath) 
         workers = mp.Pool(mp.cpu_count())
         for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
             raw_acquisition.mzml_filepath = output_path
+            if raw_acquisition.has_MS2:
+                MS2_path = os.path.join(self.ms2_directory, os.path.basename(raw_acquisition.mzml_filepath))
+                file_operations["move"](raw_acquisition.mzml_filepath, MS2_path)
+                raw_acquisition.mzml_filepath = MS2_path
             
-
     def filter_samples(self, filter, return_field=None):
         """
         Find the set of acquisitions that pass the provided filter and return either the acquisition object or the 
         specified field of each passing sample
 
-        Args:
-            filter (dict): a filter dict compatable with acquisition.filter
-            return_field (str, optional): if defined, return that field from the acquisition, else the object. Defaults to "name".
+        :param filter: a filter dictionary
+        :param return_field: option, defaul None, if provided and valid
+            the field specified is return per matching acquisition. 
 
-        Returns:
-            list: list of passing acquisitions or fields from passing acquisitions
+        :return: list of matching acquisitions or the return_field value of the acquisitions
         """        
         if return_field:
             return [getattr(acquisition, return_field) for acquisition in self.acquisitions if acquisition.filter(filter)]
         else:
             return [acquisition for acquisition in self.acquisitions if acquisition.filter(filter)]
 
-
     def construct_experiment_from_CSV(experiment_directory, CSV_filepath, ionization_mode, filter=None, name_field='Name', path_field='Filepath', exp_config=None, sample_skip_list_fp=None):
         """
-        For a given sequence file, create the experiment object, including the addition of acquisitions
+        For a given sequence file, create the experiment object, and add all acquisitions
 
-        Args:
-            experiment_directory (str): path to the directory with experiment data and intermediates
-            CSV_filepath (str): filepath to the sequence CSV
-            ionization_mode (str): 'pos' or 'neg' specifies the ionization mode for the experiment
-            filter (str, optional): json string representing a dictionary to filter acquistions on. Defaults to None.
-            name_field (str, optional): the field to become the acquisition name. Defaults to 'Name'.
-            path_field (str, optional): the field that specifies the acquisition filepath. Defaults to 'Filepath'.
+        :param experiment_directory: path to store experiment and intermediates
+        :param CSV_filepath: filepath to sequence CSV
+        :param ionization: default None, can be 'pos' or 'neg'. The ionization mode of 
+            the experiment. If None, it will be determined automatically
+        :param filter: a filter dictionary, only matching entries are included
+        :param name_field: the column from which to extract the acquisition name
+        :param path_field: the column from which to extract the acquisition filepath
+        :param sample_skip_list: path to a txt file with sample names to exclude
 
-        Returns:
-            experiment: the experiment object
+        :return: experiment object
         """        
+        import csv 
         sample_skip_list = set()
         if sample_skip_list_fp:
             if sample_skip_list_fp.endswith(".txt"):
@@ -382,28 +297,23 @@ class Experiment:
 
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
             filter = {} if filter is None else filter
-            experiment = Experiment('', experiment_directory, sub_dirs=exp_config["experiment_subdirectories"], command_history=[str(time.time()) + ":start_analysis"])
+            experiment = Experiment.create_experiment('', experiment_directory, ionization_mode=ionization_mode)
             with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
                 for acquisition_info in csv.DictReader(CSV_fh):
                     acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
                     if name_field not in acquisition_info or path_field not in acquisition_info:
-                        raise Exception()
+                        raise Exception("Name Field or Path Field is Missing!")
                     if '___' in acquisition_info[name_field]:
                         acquisition_info[name_field] = acquisition_info[name_field].split('___')[-1]
-                    acquisition = Acquisition.Acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
+                    acquisition = Acquisition.Acquisition.create_acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
                     acquisition.experiment = experiment
-                    print(acquisition.name in sample_skip_list)
                     if acquisition.filter(filter) and acquisition.name not in sample_skip_list:
                         experiment.add_acquisition(acquisition)
             if experiment.acquisitions:
-                if exp_config:
-                    Experiment.subdirectories = exp_config["experiment_subdirectories"]
-                experiment.__ionization_mode = ionization_mode
                 experiment.save()
                 return experiment
             else:
-                import shutil
-                shutil.rmtree(experiment.experiment_directory)
+                file_operations["delete"](experiment.experiment_directory)
                 print("Unable to create empty experiment")
                 exit()
         else:
@@ -411,18 +321,27 @@ class Experiment:
             exit()
     
     def determine_ionization_mode(self, num_files_to_check=5):
+        """
+        If the ionization mode was not specified this method will 
+        determine if the mode is 'pos' or 'neg'. This assumes that all 
+        acquisitions are of the same mode.
+
+        :param num_files_to_check: number of files to check, default=5
+        
+        :return: ionization type, either 'pos' or 'neg'
+        """
         tested = []
         ion_modes = set()
-        while len(tested) < num_files_to_check:
+        while len(tested) < min(num_files_to_check, len(self.acquisitions)):
             acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
             ionization_mode = acquisition.ionization_mode
             tested.append(acquisition)
             ion_modes.add(ionization_mode)
         if len(ion_modes) == 1:
-            self.__ionization_mode = list(ion_modes)[0]
+            self._ionization_mode = list(ion_modes)[0]
         else:
             raise Exception()
-        return self.__ionization_mode
+        return self._ionization_mode
 
     def summarize(self):
         """
@@ -436,6 +355,19 @@ class Experiment:
             print("\t", moniker, " - ", path)
 
     def generate_cosmetic_map(self, field=None, cos_type='color', seed=None):
+        """
+        This generates the mapping of acquisition properties to colors,
+        markers, text, etc. used in figure generation. This allows for 
+        consistency across runs as the mapping is stored in the object.
+    
+        :param field: field for which to generate the mapping
+        :param cos_type: 'color', 'marker', or 'text'
+        :param seed: used for shuffling, by setting this value, the
+            same exact mapping can be generated each time. 
+
+        :return: the mapping of fields to cosmetic types.
+        """
+        import matplotlib.pyplot as mcolors
         if seed:
             random.seed(seed)
         if cos_type in self.cosmetics and field in self.cosmetics[cos_type]:
@@ -460,6 +392,14 @@ class Experiment:
             return cosmetic_map
 
     def batches(self, batch_field):
+        """
+        This will group samples into 'batches', based on the user
+        provided 'batch_field'.
+
+        :param batch_field: field by which to batch samples
+    
+        :return: dictionary of batches to lists of samples
+        """
         batches = {}
         for acquisition in self.acquisitions:
             batch_field_value = acquisition.metadata_tags[batch_field]
@@ -468,20 +408,21 @@ class Experiment:
             batches[batch_field_value].append(acquisition.name)
         return batches
     
-    def enumerate(self, metadata_field):
-        return list(set([x.metadata_tags[metadata_field] for x in self.acquisitions]))
-    
-    def list_metadata_fields(self):
-        for k in self.acquisitions[0].metadata_tags.keys():
-            print(k)
-            observed = set()
-            for acquisition in self.acquisitions:
-                v = acquisition.metadata_tags[k]
-                if v not in observed:
-                    print("\t", v)
-                    observed.add(v)
-    
     def asari(self, asari_cmd):
+        """
+        This command will run asari on the mzml acquisitions in an 
+        experiment. The details of the command to be ran is defined by
+        asari_cmd.
+
+        :param asari_cmd: can be string or space delimited list, must
+            contain the fields $IONIZATION_MODE, $CONVERTED_SUBDIR, and
+            $ASARI_SUBDIR which will be populated by this function. 
+
+            $CONVERTED_SUBDIR is where input mzml is located
+            $ASARI_SUBDIR is where the results will be output
+            $IONIZATION_MODE is the ionization mode of the experiment
+        
+        """
         import subprocess
         mapping = {
             '$IONIZATION_MODE': self.ionization_mode,
@@ -489,7 +430,6 @@ class Experiment:
             '$ASARI_SUBDIR': self.asari_subdirectory
         }
         job = []
-        print(asari_cmd)
         if type(asari_cmd) is list:
             for field in asari_cmd:
                 job.append(mapping.get(field, field))
@@ -497,7 +437,6 @@ class Experiment:
             for key, value in mapping.items():
                 asari_cmd.replace(key, value)
             job = asari_cmd.split(" ")
-        print(job)
         completed_process = subprocess.run(job)
 
         if completed_process.returncode == 0:
