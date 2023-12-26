@@ -1,14 +1,8 @@
-from khipu.epdsConstructor import epdsConstructor
 from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
-from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
-from jms.io import read_table_to_peaks
 from mass2chem.formula import PROTON, parse_chemformula_dict, calculate_formula_mass
-import matchms
 import json
 from intervaltree import IntervalTree
 import os
-from copy import deepcopy
-from . import utils 
 
 class empCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
@@ -16,10 +10,9 @@ class empCpds:
         the empCpds object is a wrapper around dict_empCpds that will associate the dict_empCpds with a moniker and 
         experiment object. 
 
-        Args:
-            dict_empCpds (dict): dictionary of empCpds
-            experiment (Experiment): the experiment object for the experiment from which these empCpds were generated
-            moniker (str): the moniker for this empCpd, used by experiment to store empCpds
+        :param dict_empCpds: dictionary of empCpds
+        :param experiment: experiment object for these empdpds
+        :param moniker: the moniker for this empCpd
         """        
         self.dict_empCpds = dict_empCpds
         self.experiment = experiment
@@ -34,6 +27,14 @@ class empCpds:
         self.__rt_trees = {}
 
     def get_mz_tree(self, mz_tolerance):
+        """
+        This method will return an existing m/z based interval tree for 
+        these empcpds for a given mz_tolerance.
+
+        :param mz_tolerance: the mz_tolerance in ppm
+
+        :return: interval tree for mz at the provided mz_tolerance
+        """
         if mz_tolerance not in self.__mz_trees:
             mz_tree = IntervalTree()
             for _, khipu in self.dict_empCpds.items():
@@ -43,6 +44,14 @@ class empCpds:
         return self.__mz_trees[mz_tolerance]
 
     def get_rt_tree(self, rt_tolerance):
+        """
+        This method will return an existing rt based interval tree for 
+        these empcpds for a given rt_tolerance
+
+        :param mz_tolerance: the rt_tolerance in sec(s)
+
+        :return: interval tree for rtime at the provided rt tolerance
+        """
         if rt_tolerance not in self.__rt_trees:
             rt_tree = IntervalTree()
             for _, khipu in self.dict_empCpds.items():
@@ -53,19 +62,28 @@ class empCpds:
 
     @property
     def num_khipus(self):
+        """
+        This method returns the number of khipus in empCpd
+
+        :return: number of empcpds
+        """
         return len(self.dict_empCpds)
     
     @property
     def num_features(self):
+        """
+        This method returns the number of features contained within
+        the empcpds. 
+
+        :return: number of features in empcpds.
+
+        """
         return len(self.feature_id_to_khipu_id)
 
     def search_for_feature(self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None):
-        """search_for_feature 
-
+        """
         Given a query_mz and query_rt with corresponding tolerances in ppm and absolute units respectively find all 
         features by id_number that have a matching mz and rtime. 
-
-        _extended_summary_
 
         All search fields are optional but if none are provided then all the features will be considered matching. 
         The mz tolerance should be in ppm while the rtime tolerance should be provided in rtime units. 
@@ -103,10 +121,8 @@ class empCpds:
         which effectively saves a new empCpd object. This also updates the empCpds registry in the experiment with the 
         path to the stored json.
 
-        Args:
-            save_as_moniker (str, optional): an alternative moniker to which to save the table. Defaults to None. 
+        :param save_as_monhiker: an alternative moniker to which to save the table. Defaults to None. 
         """
-        print("saving")
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json")
         with open(self.experiment.empCpds[save_as_moniker], 'w+') as out_fh:
@@ -118,30 +134,51 @@ class empCpds:
         """
         This method generates the empCpd object for the provided moniker.
 
-        Args:
-            experiment (Experiment object): the experiment for which the empCpd was generated
-            moniker (string): the empCpd moniker to load
-
-        Returns:
-            empCpds: the empCpds object for the specified moniker
+        :param moniker: the empCpd moniker to load
+        :param experiment: the experiment from which the empCpd was 
+            generated
+        :return: the empCpds object for the specified moniker
         """        
         path = experiment.empCpds[moniker]
         #path = path.replace("empirical", "emprical")
         return empCpds(json.load(open(path)), experiment, moniker)
 
     @staticmethod
-    def construct_empCpds_from_feature_table(experiment, isotopes=isotope_search_patterns, adducts=None, extended_adducts=extended_adducts, feature_table_moniker='full', empCpd_moniker='default', add_singletons=False, rt_search_window=2, mz_tolerance=5, charges=[1,2,3]):
-        """_summary_
-
-        Args:
-            experiment (_type_): _description_
-            feature_table_moniker (str, optional): _description_. Defaults to 'full'.
-            empCpd_moniker (str, optional): _description_. Defaults to 'default'.
-            add_singletons (bool, optional): _description_. Defaults to True.
-
-        Returns:
-            _type_: _description_
+    def construct_empCpds_from_feature_table(experiment, 
+                                             isotopes=isotope_search_patterns, 
+                                             adducts=None, 
+                                             extended_adducts=extended_adducts, 
+                                             feature_table_moniker='full', 
+                                             empCpd_moniker='default', 
+                                             add_singletons=False,
+                                             rt_search_window=2, 
+                                             mz_tolerance=5, 
+                                             charges=[1,2,3]):
         """
+        For a given feature table, generate the empirical compounds
+        for that table using a set of isotopes, adducts, charges, 
+        and save it as either the table moniker or a new moniker.
+
+        :param isotopes: isotopes for which to search
+        :param adducts: adducts to use, if None use defaults based on
+            ionization.
+        :param extended_adducts: extended_adducts to use, if None, the
+            default extended_adducts are used. 
+        :param feature_table_moniker: the feature table to use
+        :param empCpd_moniker: the moniker to save the empcpds to
+        :param add_singletons: if true, add singletons to the khipus
+        :param rt_search_window: the rt window to use for empcpd 
+            construction, default is 2.
+        :param mz_tolerance: the mz tolerance in ppm to use for
+            empcpd construction, default is 5.
+        :param charges: the charges, in absolute units, to consider
+            for empcpd construction.
+
+        :return: empcpd dict
+        """
+        from jms.io import read_table_to_peaks
+        from khipu.epdsConstructor import epdsConstructor
+
         if experiment.ionization_mode == 'pos' and adducts is None:
             adducts = adduct_search_patterns
         elif experiment.ionization_mode == 'neg' and adducts is None:
@@ -188,6 +225,7 @@ class empCpds:
         return empCpd
 
     def underivatize(self, ref_sample, deriv_formula):
+        raise NotImplemented
         deriv_dict = parse_chemformula_dict(deriv_formula)
         deriv_mass = calculate_formula_mass(deriv_formula)
         for empCpd in self.dict_empCpds.values():
@@ -221,10 +259,11 @@ class empCpds:
         Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula 
         match to the annotation sources.
 
-        Args:
-            annotation_sources (list[str]): list of filepaths to annotation sources in JSON format
-            rt_tolerance (int, optional): the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
+        :param annotation_sources: list of filepaths to annotation sources in JSON format
+        :param rt_tolerance: the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
         """
+        from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
+
         EED = ExperimentalEcpdDatabase(mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance)
         EED.build_from_list_empCpds(list(self.dict_empCpds.values()))
 
@@ -249,24 +288,38 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, similarity_method='CosineGreedy', min_peaks=3):
+    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, 
+                     similarity_method='CosineGreedy', min_peaks=3):
+        """
+        This method generates level1 and level2 annotations for a set 
+        of empcpds. This works by annotating individual features and 
+        mapping them to the empirical compound containing that feature. 
+        level2 annotations do not enforce the rt match between the 
+        feature and the database MS2 entry. level1 annotations do. 
+
+        :param msp_files: list of input msp files
+        :param ms2_files: list of extra files with experiment ms2 
+            spectra i.e., AcquireX
+        :param mz_tolerance: precursor ppm tolerance on precursor mz
+            from database and feature mz.
+        :param rt_tolerance: rt tolerance in seconds on precursor ion
+            and feature table feature. 
+        :param similarity_method: any valid similarity method name from
+            matchms is okay here, by default 'CosineGreedy'
+        :param min_peaks: at least these many peaks must be matched in 
+            order for an annotation to be returned. 
+        """
+        import matchms
+        from copy import deepcopy
+        from . import utils
+        
         observed_precursor_mzs = IntervalTree()
         observed_precursor_rts = IntervalTree()
         expMS2_registry = {}
         ms2_id = 0
-        mzML = []
-        if ms2_files:
-            for directory, _ , files in os.walk(ms2_files):
-                for file in files:
-                    if file.endswith(".mzML"):
-                        mzML.append(os.path.join(os.path.abspath(directory), file))
 
-        for x in self.experiment.acquisitions:
-            try:
-                if x.has_MS2:
-                    mzML.append(x.mzml_filepath)
-            except:
-                pass
+        mzML = utils.search_for_mzml(ms2_files) if ms2_files else []
+        mzML += [x.mzml_filepath for x in self.experiment.acquisitions if x.has_MS2]
 
         for mzml_filepath in mzML:
             print("Extracting: ", mzml_filepath)
@@ -344,6 +397,7 @@ class empCpds:
         print("Mapped: ", mapped, " mapped to samples")
 
     def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
+        raise NotImplemented
         """
         Given a list of authentic standards in JMS compliant format, annotate. 
 

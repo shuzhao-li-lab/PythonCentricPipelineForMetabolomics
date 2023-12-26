@@ -1,114 +1,105 @@
 import pymzml
 import numpy as np
-import bisect
 import os
 import pickle
 import functools
-import re
-import matplotlib.pyplot as plt
-
 
 class Acquisition(object):
-    def __init__(self, name, source_filepath, metadata_dict):
+    """
+    The Acquisition object represents a single LC-MS run. 
+    """
+    def __init__(self, __d):
+        for k, v in __d.items():
+            setattr(self, k, v)
+
+    @staticmethod
+    def create_acquisition(name, source_filepath, metadata_dict):
         """
-        An Acquisition object wraps raw or mzml file and stores associated metadata
+        This is the primary constructor the acquisition object.
 
-        Args:
-            name (str): the name for the acuqisition, from sequence file
-            source_filepath (str): a string pointing to the ORIGIN path of the acqusition
-            metadata_dict (dict): a dictionary storing metadata from the sequence file for the acquisition
-        """        
-        self.name = name
-        self.metadata_tags = metadata_dict
-        self.source_filepath = source_filepath
-        self.raw_filepath = None
-        self.mzml_filepath = None
-        if not self.source_filepath.endswith(".raw") and not self.source_filepath.endswith(".mzML"):
-            if self.name.endswith(".mzML"):
-                self.source_filepath = os.path.join(self.source_filepath, self.name + ".mzML")
-                self.mzml_filepath = self.source_filepath
-                self.raw_filepath = None
-            else:
-                self.source_filepath = os.path.join(self.source_filepath, self.name + ".raw")
-                self.raw_filepath = self.source_filepath
-                self.mzml_filepath = None
+        :param name: the name of the acquisition
+        :param source_filepath: the original location of the data file
+        :param metadata_dict: the metadata associated with the file, 
+            provided by the .csv file. 
 
-        self.data_path = None
-        self.spectra = {}
-
-        self.__min_mz = None
-        self.__max_mz = None
-        self.__min_rt = None
-        self.__max_rt = None
-        self._ionization_mode = None
-        self.__TIC = None
-        self.__has_ms2 = None
-
-    @property
-    @functools.lru_cache(10)
-    def TIC(self):
-        if self.__TIC is None:
-            self.__TIC = self.__extract_ms_information(None, "TIC")
-        return self.__TIC
+        :return: Acquisition object
+        """
+        acq_dict = {
+            "name": name,
+            "source_filepath": source_filepath,
+            "metadata_tags": metadata_dict,
+            "raw_filepath": None,
+            "mzml_filepath": None,
+            "data_path": None,
+            "spectra": {},
+            "_min_mz": None,
+            "_mz_mz": None,
+            "_min_rt": None,
+            "_max_rt": None,
+            "_ionization_mode": None,
+            "_has_ms2": None
+        }
+        return Acquisition(acq_dict)
 
     @property
     def min_rt(self):
         """
         the smallest retention time observed in the acquisition
 
-        Returns:
-            float: the min_rt in the experiment, the smallest observed retention time
+        :return: the min_rt in the experiment, the smallest observed retention time
         """        
-        if self.__min_rt is None:
+        if self._min_rt is None:
             peak_rts = [peak["rt"] for peak in self.__extract_ms_information(1, "peaks")]
-            self.__min_rt = min(peak_rts)
-            self.__max_rt = max(peak_rts)
-        return self.__min_rt
+            self._min_rt = min(peak_rts)
+            self._max_rt = max(peak_rts)
+        return self._min_rt
     
     @property
     def max_rt(self):
         """
         the largest retention time observed in the acquisition
 
-        Returns:
-            float: the max_rt in the experiment, the largest observed retention time
+        :return: the max_rt in the experiment, the largest observed retention time
         """     
-        if self.__max_rt is None:
+        if self._max_rt is None:
             peak_rts = [peak["rt"] for peak in self.__extract_ms_information(1, "peaks")]
-            self.__min_rt = min(peak_rts)
-            self.__max_rt = max(peak_rts)
-        return self.__max_rt
+            self._min_rt = min(peak_rts)
+            self._max_rt = max(peak_rts)
+        return self._max_rt
 
     @property
     def min_mz(self):
         """
         the smallest mz observed in the acquisition
 
-        Returns:
-            float: the min_mz in the experiment, the smallest observed mz
+        :return: the min_mz in the experiment, the smallest observed mz
         """             
-        if self.__min_mz is None:
+        if self._min_mz is None:
             mz_sorted_mzs = [peak["mz"] for peak in self.__extract_ms_information(1, "mz")]
-            self.__min_mz = min(mz_sorted_mzs)
-            self.__max_mz = max(mz_sorted_mzs)
-        return self.__min_mz
+            self._min_mz = min(mz_sorted_mzs)
+            self._max_mz = max(mz_sorted_mzs)
+        return self._min_mz
 
     @property
     def max_mz(self):
         """
         the largest mz observed in the acquisition
 
-        Returns:
-            float: the max_mz in the experiment, the largest observed mz
+        :return: the max_mz in the experiment, the largest observed mz
         """     
-        if self.__max_mz is None:
+        if self._max_mz is None:
             mz_sorted_mzs = [peak["mz"] for peak in self.__extract_ms_information(1, "mz")]
-            self.__min_mz = min(mz_sorted_mzs)
-            self.__max_mz = max(mz_sorted_mzs)
-        return self.__max_mz
+            self._min_mz = min(mz_sorted_mzs)
+            self._max_mz = max(mz_sorted_mzs)
+        return self._max_mz
     
     @property
     def ionization_mode(self):
+        """
+        This method determines the ionization mode of the acquisition
+
+        :return: ionization mode, "pos" or "neg"
+        """
         if self._ionization_mode is None:
             for spec in pymzml.run.Reader(self.mzml_filepath):
                 if spec["positive scan"]:
@@ -125,73 +116,52 @@ class Acquisition(object):
         """
         This generates the dict representation of the acquisition, this is used when the experiment is saved or loaded.
 
-        Returns:
-            dict: a JSON-friendly dictionary for serialization during experiment saving and loading
-        """        
-        return {
-            "name": self.name,
-            "metadata": self.metadata_tags,
-            "source_filepath": self.source_filepath,
-            "raw_filepath": self.raw_filepath,
-            "mzml_filepath": self.mzml_filepath,
-            "spectra": self.spectra,
-            "__min_mz": self.__min_mz,
-            "__max_mz": self.__max_mz,
-            "__min_rt": self.__min_rt,
-            "__max_rt": self.__max_rt,
-            "__ionization_mode": self._ionization_mode,
-            "__TIC": self.__TIC,
-            "data_path": self.data_path,
-            "__has_ms2": self.__has_ms2
-        }
+        :return: a JSON-friendly dictionary for serialization during experiment saving and loading
+        """ 
+        from .utils import recursive_encoder    
+        return recursive_encoder(self.__dict__) 
     
     @property
     def has_MS2(self):
-        if self.__has_ms2 is None:
-            self.__has_ms2 = False
+        """
+        Scan the mzml to detect if there are MS2 spectra
+
+        :return: has_MS2, True or False
+        """
+        if self._has_ms2 is None:
+            self._has_ms2 = False
             reader = pymzml.run.Reader(self.mzml_filepath)
             for spec in reader:
                 if spec.ms_level == 2:
-                    self.__has_ms2 = True
+                    self._has_ms2 = True
                     break
-        return self.__has_ms2    
+        return self._has_ms2    
 
-    @staticmethod
-    def extract_acquisition(acquisition):
-        reader = pymzml.run.Reader(acquisition.mzml_filepath)
-        spectra = {}
-        peaks = {}
-        id = 0
-        for spec in reader:
-            if acquisition._ionization_mode is None:
-                acquisition._ionization_mode = "pos" if spec["positive scan"] else "neg"
-            if spec.ms_level not in spectra:
-                spectra[spec.ms_level] = []
-                peaks[spec.ms_level] = []
-            peak_objs = []
-            for peak in spec.peaks("centroided"):
-                id += 1
-                peak_objs.append({
-                    "ms_level": spec.ms_level,
-                    "rt": spec.scan_time[0],
-                    "mz": float(peak[0]),
-                    "intensity": float(peak[1]),
-                    "id": id}
-                )
-            spectra[spec.ms_level].append(peak_objs)
-            peaks[spec.ms_level].extend(peak_objs)
-        acquisition_data = {
-            "spectra": spectra,
-            "peaks": peaks,
-            "TIC": list(zip([spectrum[0]['rt'] for spectrum in spectra[1]], [sum([peak['intensity'] for peak in spectrum]) for spectrum in spectra[1]])),
-            "acquisition_mode": acquisition._ionization_mode
-        }
-        data_path = os.path.abspath(os.path.join(acquisition.experiment.acquisition_datapath, acquisition.name + ".pickle"))
-        with open(data_path, 'wb+') as out_fh:
-            pickle.dump(acquisition_data, out_fh)
-        return data_path
+    def TIC(self, mz=None, ppm=None, rtime_range=None, title=None):
+        """
+        This will generate and save a TIC for the acquisition. If an mz
+        and ppm are provided, the TIC will be limited to that target mz
+        and ppm. If an rtime range is provided, it will be limited to 
+        that time range. This can be useful for extracting specific 
+        peaks like internal standards. Likewise, not providing
+        an m/z or rtime_range, can give you the TIC for the acquisition
 
-    def TICz(self, round_val=3, mz=None, ppm=None, title=None):
+        :param mz: target mz, can be None. 
+        :param ppm: mass resolution, can be None for TIC.
+        :param rtime_range: any two element interable, for a min_rtime
+            and max_rtime. Can be none for whole time range.
+
+        Args:
+            round_val (int, optional): _description_. Defaults to 3.
+            mz (_type_, optional): _description_. Defaults to None.
+            ppm (_type_, optional): _description_. Defaults to None.
+            title (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
+        import matplotlib.pyplot as plt
+        import re
         fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "TICs/")
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
@@ -204,22 +174,25 @@ class Acquisition(object):
         else:
             if title is None:
                 title = str(mz(round, 4))
+                if rtime_range is not None:
+                    title += "_" + rtime_range[0] + "-" + rtime_range[1]
             min_mass = mz - mz / 1e6 * ppm
             max_mass = mz + mz / 1e6 * ppm
-            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + "_" + str(mz) + "_" + str(ppm) + ".png")
-
+            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + "_" + str(mz) + "_" + str(ppm) + "_" + str(rtime_range[0]) + "_" + str(rtime_range[1]) + ".png")
+        rtime_range = [-np.inf, np.inf] if rtime_range is None else rtime_range
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         if os.path.exists(save_path):
             return save_path
         else:
             bins = {}
             for spec in pymzml.run.Reader(self.mzml_filepath):
-                rtime = round(spec.scan_time[0] * 60, round_val)
-                if rtime not in bins:
-                    bins[rtime] = 0
-                for peak in spec.peaks("centroided"):
-                    if min_mass < peak[0] < max_mass:
-                        bins[rtime] += float(peak[1])
+                rtime = round(spec.scan_time[0] * 60, 3)
+                if rtime_range[0] < rtime < rtime_range[1]:
+                    if rtime not in bins:
+                        bins[rtime] = 0
+                    for peak in spec.peaks("centroided"):
+                        if min_mass < peak[0] < max_mass:
+                            bins[rtime] += float(peak[1])
             fig, (ax1, ax2) = plt.subplots(2,1)
             
             Xs = []
@@ -263,11 +236,8 @@ class Acquisition(object):
         Multiple keys can be specified in the filter. The results from the filter are AND'd for every
         key. 
 
-        Args:
-            filter (dict): this stores the filtering criteria. 
-
-        Returns:
-            bool: True if the acquistion matches or False if the acquisition fails the filter 
+        :param filter: dictionary as described above
+        :return: true if acquisition passed filter else false
         """        
         passed_filter  = True
         if filter:
@@ -308,8 +278,43 @@ class Acquisition(object):
         else:
             return data["TIC"]
 
+    @staticmethod
+    def extract_acquisition(acquisition):
+        reader = pymzml.run.Reader(acquisition.mzml_filepath)
+        spectra = {}
+        peaks = {}
+        id = 0
+        for spec in reader:
+            if acquisition._ionization_mode is None:
+                acquisition._ionization_mode = "pos" if spec["positive scan"] else "neg"
+            if spec.ms_level not in spectra:
+                spectra[spec.ms_level] = []
+                peaks[spec.ms_level] = []
+            peak_objs = []
+            for peak in spec.peaks("centroided"):
+                id += 1
+                peak_objs.append({
+                    "ms_level": spec.ms_level,
+                    "rt": spec.scan_time[0],
+                    "mz": float(peak[0]),
+                    "intensity": float(peak[1]),
+                    "id": id}
+                )
+            spectra[spec.ms_level].append(peak_objs)
+            peaks[spec.ms_level].extend(peak_objs)
+        acquisition_data = {
+            "spectra": spectra,
+            "peaks": peaks,
+            "TIC": list(zip([spectrum[0]['rt'] for spectrum in spectra[1]], [sum([peak['intensity'] for peak in spectrum]) for spectrum in spectra[1]])),
+            "acquisition_mode": acquisition._ionization_mode
+        }
+        data_path = os.path.abspath(os.path.join(acquisition.experiment.acquisition_datapath, acquisition.name + ".pickle"))
+        with open(data_path, 'wb+') as out_fh:
+            pickle.dump(acquisition_data, out_fh)
+        return data_path
 
     def search_for_peak_match(self, mz, rt, mslevel, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity):
+        raise NotImplemented
         """
         With a given mz, rt value, attempt to find a peak that matches those values within a given tolerance
 
@@ -324,6 +329,7 @@ class Acquisition(object):
         Returns:
             _type_: _description_
         """        
+        import bisect
         mzs = self.__extract_ms_information(mslevel, 'mz_sorted_mzs')
         peaks = self.__extract_ms_information(mslevel, 'mz_sorted_peaks')
         if mz is not None:
@@ -349,6 +355,7 @@ class Acquisition(object):
         return [peak for peak in peaks if peak.id in mz_rt_match_ids]
 
     def generate_null_distribution(self, ms_level, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, num_samples=100):
+        raise NotImplemented
         #todo - rewrite to use an empirical distribution of mz values
         #todo - rewrite to include rt distribution as well
         """
@@ -375,6 +382,7 @@ class Acquisition(object):
 
 
     def check_for_standards(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=False):
+        raise NotImplemented
         #todo - rewrite this to use JMS objects
         #todo - rewrite to avoid hard coding
         """
@@ -415,6 +423,7 @@ class Acquisition(object):
 
     
     def generate_report(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, text_report=False, output_directory=None):
+        raise NotImplemented
         """
         Search for standards and optionally store the results from the check_for_standards into a .txt file 
 

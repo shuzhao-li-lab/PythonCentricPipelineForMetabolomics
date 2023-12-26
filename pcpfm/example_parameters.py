@@ -22,7 +22,7 @@ PARAMETERS = {
     "moniker": "default",
     "multicores": 4,
     "conversion_command": ['$(which mono)', 
-                           '/ThermoRawFileParser/ThermoRawFileParser.exe', 
+                           '/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/ThermoRawFileConverter/ThermoRawFileParser.exe', 
                            '-f=1', 
                            '-i', 
                            '$RAW_PATH', 
