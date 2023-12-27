@@ -32,6 +32,27 @@ def get_similarity_method(method_name):
     except:
         raise Exception("no matching similarity method named: ", method_name)
 
+def extract_MS2_spectra(ms2_files):
+    MS2_spectral_registry = {}
+    for ms2_file in ms2_files:
+        for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
+            if spectrum:
+                MS2_spec_obj = process_ms2_spectrum(spectrum)
+                if MS2_spec_obj:
+                    MS2_spectral_registry[MS2_spec_obj.id] = MS2_spec_obj
+    return MS2_spectral_registry
+
+def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
+    for ms2_file in ms2_files:
+        for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
+            spectrum = matchms.filtering.add_precursor_mz(spectrum)
+            precursor_mz = spectrum.get('precursor_mz')
+            if precursor_mz:
+                if spectrum and (mz_tree is None or mz_tree.at(precursor_mz)):
+                    MS2_spec_obj = process_ms2_spectrum(spectrum)
+                    if MS2_spec_obj:
+                        yield MS2_spec_obj
+
 def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3):
     """
     This is the default MS2 processing used by the pipeline. 
@@ -46,22 +67,44 @@ def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3):
     :return: dictionary summarize MS2 spectrum.
     """
 
-    try:
-        spectrum = matchms.filtering.add_precursor_mz(spectrum)
-        spectrum = matchms.filtering.default_filters(spectrum)
-        spectrum = matchms.filtering.normalize_intensities(spectrum)
-        spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-        spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+    from .MSnSpectrum import MS2Spectrum
 
-        return {
-            "exp_spectrum": spectrum, 
-            "precursor_mz": float(spectrum.get('precursor_mz')),
-            "precursor_rt": float(spectrum.get('retention_time')),
-            "origin": filename,
-            "annotations": []
-        }
-    except:
+    spectrum = matchms.filtering.add_precursor_mz(spectrum)
+    spectrum = matchms.filtering.default_filters(spectrum)
+    spectrum = matchms.filtering.normalize_intensities(spectrum)
+    spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+
+    if spectrum is None:
         return None
+    try:
+        spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+    except:
+        pass
+    
+    id = []
+    if spectrum.get('precursor_mz'):
+        id.append(str(float(spectrum.get('precursor_mz', ''))))
+    if spectrum.get('retention_time'):
+        id.append(str(float(spectrum.get('retention_time', ''))))
+    id.append(filename)
+    id = '_'.join(id)    
+    try:
+        reference_id = spectrum.get("compound_name")
+    except:
+        reference_id = id
+
+    spectrum = MS2Spectrum(
+                        id = id,
+                        precursor_mz=float(spectrum.get('precursor_mz')),
+                        precursor_rt=float(spectrum.get('retention_time')) if spectrum.get('retention_time') else None,
+                        list_mz=[],
+                        list_intensity=[],
+                        matchms_spectrum=spectrum,
+                        source=filename,
+                        instrument="Unknown",
+                        collision_energy="Unknown",
+                        compound_name=reference_id)
+    return spectrum
     
 def search_for_mzml(sdir):
     """
@@ -72,7 +115,10 @@ def search_for_mzml(sdir):
 
     :return: list of absolute mzML filepaths in sdir
     """
-    return [os.path.join(os.path.abspath(d), f) for f, _, d in os.walk(sdir) if f.endwith(".mzML")]
+    if sdir:
+        return [os.path.join(os.path.abspath(d), f) for d, _, f in os.walk(sdir) if f.endwith(".mzML")]
+    else:
+        return []
 
 def recursive_encoder(to_encode):
     """
@@ -102,6 +148,8 @@ def recursive_encoder(to_encode):
             return {k: recursive_encoder(v) for k,v in to_encode.items()}
         elif hasattr(to_encode, "JSON_repr"):
             return to_encode.JSON_repr
+        elif hasattr(to_encode, "serialize"):
+            return recursive_encoder(to_encode.serialize())
         else:
             pass
 
@@ -133,3 +181,4 @@ file_operations = {
     "move": shutil.move,
     "delete": shutil.rmtree,
 }
+

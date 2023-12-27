@@ -1,5 +1,4 @@
 from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
-from mass2chem.formula import PROTON, parse_chemformula_dict, calculate_formula_mass
 import json
 from intervaltree import IntervalTree
 import os
@@ -224,37 +223,7 @@ class empCpds:
         empCpd.save()
         return empCpd
 
-    def underivatize(self, ref_sample, deriv_formula):
-        raise NotImplemented
-        deriv_dict = parse_chemformula_dict(deriv_formula)
-        deriv_mass = calculate_formula_mass(deriv_formula)
-        for empCpd in self.dict_empCpds.values():
-            M0_intensities = {}
-            for x in empCpd["MS1_pseudo_Spectra"]:
-                if x["isotope"] == "M0" and float(x[ref_sample]) > 0:
-                    M0_intensities[x["modification"]] = float(x[ref_sample])
-            num_deriv = 0 
-            if M0_intensities:
-                for modification in M0_intensities.keys():
-                    M0_intensity = M0_intensities[modification]
-                    for num_groups, iso in zip([1,2,3], ["13C/12C*2", "13C/12C*4", "13C/12C*6"]):
-                        for x in empCpd["MS1_pseudo_Spectra"]:
-                            if x["isotope"] == iso and x["modification"] == modification:
-                                if .67 < float(x[ref_sample]) / float(M0_intensity) < 1.5 and num_groups * deriv_mass < empCpd['neutral_formula_mass']:
-                                    num_deriv = max(num_deriv, num_groups)
-
-                empCpd["neutral_formula_mass"] -= num_deriv * deriv_mass
-                if empCpd["neutral_formula"]:
-                    neutral_formula = parse_chemformula_dict(empCpd['inferred_neutral_formula'])
-                    inferred_neutral_formula = {}
-                    for k, v in neutral_formula.items():
-                        inferred_neutral_formula[k] = neutral_formula[k] - num_groups * deriv_dict[k]
-                    empCpd["neutral_formula"] = inferred_neutral_formula
-                else:
-                    empCpd["neutral_formula"] = None                
-                empCpd["num_derivatized_groups"] = num_deriv
-
-    def MS1_annotate(self, annotation_sources, rt_tolerance=5):
+    def L4_annotate(self, annotation_sources, rt_tolerance=5):
         """
         Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula 
         match to the annotation sources.
@@ -288,157 +257,52 @@ class empCpds:
                     if formula in formula_entry_lookup:
                         empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
 
-    def MS2_annotate(self, msp_files, ms2_files, mz_tolerance=5, rt_tolerance=20, 
-                     similarity_method='CosineGreedy', min_peaks=3):
-        """
-        This method generates level1 and level2 annotations for a set 
-        of empcpds. This works by annotating individual features and 
-        mapping them to the empirical compound containing that feature. 
-        level2 annotations do not enforce the rt match between the 
-        feature and the database MS2 entry. level1 annotations do. 
-
-        :param msp_files: list of input msp files
-        :param ms2_files: list of extra files with experiment ms2 
-            spectra i.e., AcquireX
-        :param mz_tolerance: precursor ppm tolerance on precursor mz
-            from database and feature mz.
-        :param rt_tolerance: rt tolerance in seconds on precursor ion
-            and feature table feature. 
-        :param similarity_method: any valid similarity method name from
-            matchms is okay here, by default 'CosineGreedy'
-        :param min_peaks: at least these many peaks must be matched in 
-            order for an annotation to be returned. 
-        """
-        import matchms
-        from copy import deepcopy
+    def L2_annotate(self, 
+                     msp_files, 
+                     ms2_files=None, 
+                     mz_tolerance=5, 
+                     rt_tolerance=20,
+                     similarity_method='CosineGreedy',
+                     min_peaks=3,
+                     score_cutoff=0.60,
+                     L1_mode=False):
         from . import utils
-        
-        observed_precursor_mzs = IntervalTree()
-        observed_precursor_rts = IntervalTree()
-        expMS2_registry = {}
-        ms2_id = 0
-
-        mzML = utils.search_for_mzml(ms2_files) if ms2_files else []
-        mzML += [x.mzml_filepath for x in self.experiment.acquisitions if x.has_MS2]
-
-        for mzml_filepath in mzML:
-            print("Extracting: ", mzml_filepath)
-            i = 0
-            for spectrum in utils.get_parser(mzml_filepath.split(".")[-1])(mzml_filepath, metadata_harmonization=False):
-                i += 1
-                spectrum = matchms.filtering.add_precursor_mz(spectrum)
-                spectrum = matchms.filtering.default_filters(spectrum)
-                spectrum = matchms.filtering.normalize_intensities(spectrum)
-                spectrum = matchms.filtering.add_precursor_mz(spectrum)
-                spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-                try:
-                    precursor_mz = float(spectrum.get('precursor_mz'))
-                    spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
-                    precursor_rt = float(spectrum.get('retention_time'))
-                    ms2_id = len(expMS2_registry)
-                    expMS2_registry[ms2_id] = {"exp_spectrum": spectrum, 
-                                                "precursor_mz": precursor_mz, 
-                                                "precursor_rt": float(spectrum.get('retention_time')),
-                                                "origin": mzml_filepath, 
-                                                "Annotations": []}
-                    observed_precursor_mzs.addi(precursor_mz - (precursor_mz / 1e6 * mz_tolerance * 2), precursor_mz + (precursor_mz / 1e6 * mz_tolerance * 2), ms2_id)
-                    observed_precursor_rts.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, ms2_id)
-                except:
-                    pass
-            print("\tFound: ", i, "spectra!")
-        print("Found: ", ms2_id, " spectra!")
-        if ms2_id == 0:
+        has_MS2 = utils.search_for_mzml(ms2_files)
+        has_MS2 += [x.mzml_filepath for x in self.experiment.acquisitions if x.has_MS2]
+        expMS2_registry = utils.extract_MS2_spectra(has_MS2)
+        observered_precursor_mzs = IntervalTree()
+        observered_precursor_rts = IntervalTree()
+        for id, ms2_object in expMS2_registry.items():
+            mz_error = ms2_object.precursor_ion_mz / 1e6 * 2 *mz_tolerance
+            observered_precursor_mzs.addi(ms2_object.precursor_ion_mz - mz_error, ms2_object.precursor_ion_mz + mz_error, id)
+            observered_precursor_rts.addi(ms2_object.retention_time - rt_tolerance, ms2_object.retention_time + rt_tolerance, id)
+        if not expMS2_registry:
             return
+        print("Found: ", len(expMS2_registry), " MS2 Spectra")
+        msp_files = [msp_files] if type(msp_files) is str else msp_files
         hits = 0
-        if type(msp_files) is str:
-            msp_files = [msp_files]
-        for msp_file in msp_files:
-            file_origin = os.path.basename(msp_file)
-            for msp_spectrum in utils.get_parser(msp_file.split(".")[-1])(msp_file, metadata_harmonization=True):
-                if msp_spectrum:
-                    try: 
-                        precursor_mz = float(msp_spectrum.get('precursor_mz'))
-                        spectrum = matchms.filtering.default_filters(msp_spectrum)
-                        spectrum = matchms.filtering.normalize_intensities(msp_spectrum)
-                        spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
-                    except:
-                        precursor_mz = None
-                    if precursor_mz:
-                        for expMS2_id in [x.data for x in observed_precursor_mzs.at(precursor_mz)]:
-                            msms_score, n_matches = utils.get_similarity_method(similarity_method).pair(expMS2_registry[expMS2_id]["exp_spectrum"], msp_spectrum).tolist()
-                            if msms_score > 0.60 and n_matches > min_peaks:
-                                hits += 1
-                                try:
-                                    reference_id = msp_spectrum.get("compound_name")
-                                except:
-                                    reference_id = "spec_no." + str(x)
-                                if reference_id:
-                                    expMS2_registry[expMS2_id]["Annotations"].append({
-                                        "msms_score": msms_score,
-                                        "matched_peaks": n_matches,
-                                        "db_precursor_mz": precursor_mz,
-                                        "origin": file_origin,
-                                        "reference_id": msp_spectrum.get("compound_name"),
-                                        "db_spectrum": [[x[0], x[1]] for x in msp_spectrum.peaks]
-                                    })
-
-        print("Found: ", hits, " hits")
+        similarity_method = utils.get_similarity_method(similarity_method)
+        for db_ms2_object in utils.lazy_extract_MS2_spectra(msp_files, mz_tree=observered_precursor_mzs):
+            possible_matches = [x.data for x in observered_precursor_mzs.at(db_ms2_object.precursor_ion_mz)]
+            if L1_mode:
+                rt_matches = [x.data for x in observered_precursor_rts.at(db_ms2_object.retention_time)]
+                possible_matches = [x for x in possible_matches if x in rt_matches]
+            for possible_match in possible_matches:
+                expMS2_object = expMS2_registry[possible_match]
+                msms_score, n_matches = similarity_method.pair(db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum).tolist()
+                if msms_score >= score_cutoff and n_matches >= min_peaks:
+                    expMS2_object.annotate(db_ms2_object, msms_score, n_matches)
+                    hits += 1
+        print("Annotated: ", hits, " MS2 Spectra")
         mapped = 0
-        for expMS2_id, entry in expMS2_registry.items():
-            for feature_id in self.search_for_feature(entry["precursor_mz"], entry["precursor_rt"], 2 * mz_tolerance, rt_tolerance):
-                mapped += 1
+        for id, ms2_object in expMS2_registry.items():
+            for feature_id in self.search_for_feature(ms2_object.precursor_ion_mz, ms2_object.retention_time, 2 * mz_tolerance, rt_tolerance):
                 khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
-                entry_copy = deepcopy(entry)
-                entry_copy["Matching_Feature"] = feature_id
-                entry_copy["exp_spectrum"] = [[x[0], x[1]] for x in entry["exp_spectrum"].peaks]
                 if "MS2_Spectra" not in khipu:
                     khipu["MS2_Spectra"] = []
-                khipu["MS2_Spectra"].append(entry_copy)
-        print("Mapped: ", mapped, " mapped to samples")
+                khipu["MS2_Spectra"].append(ms2_object.embedding())
+                mapped += 1
+        print("Mapped: ", mapped, " MS Spectra to Table")
 
-    def auth_std_annotate(self, auth_stds, mz_tolerance=5, rt_tolerance=30, rtime_permissive=False):
-        raise NotImplemented
-        """
-        Given a list of authentic standards in JMS compliant format, annotate. 
-
-        Args:
-            auth_stds (list[str]): list of filepaths to auth standard JSON files
-            mz_tolerance (int, optional): mz tolerance in ppm for matches. Defaults to 5.
-            rt_tolerance (int, optional): rt tolerance, in absolute seconds, for matches. Defaults to 30.
-            rtime_permissive (bool, optional): if true, rtime matching is not enforced. Defaults to False.
-        """        
-        mz_tree = IntervalTree()
-        rt_tree = IntervalTree()
-
-        for empCpd_id, empCpd in self.dict_empCpds.items():
-            if empCpd['neutral_formula_mass'] == "":
-                if self.experiment.ionization_mode == 'pos':
-                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] - PROTON
-                elif self.experiment.ioinzation_mode == 'neg':
-                    neutral_formula_mass = empCpd["MS1_pseudo_Spectra"][0]['mz'] + PROTON
-            else:
-                neutral_formula_mass = empCpd["neutral_formula_mass"]
-            mass_error = neutral_formula_mass / 1e6 * mz_tolerance
-            mz_tree.addi(neutral_formula_mass - mass_error, neutral_formula_mass + mass_error, empCpd_id)
-            rtimes = [peak['rtime'] for peak in empCpd["MS1_pseudo_Spectra"]]
-            rt_tree.addi(min(rtimes) - rt_tolerance, max(rtimes) + rt_tolerance, empCpd_id)
-        
-        for auth_std in auth_stds:
-            for std in json.load(open(auth_std)):
-                if rtime_permissive:
-                    rtime_empCpd_id_matches = set([x for x in self.dict_empCpds.keys()])
-                else:
-                    rtime_empCpd_id_matches = set()
-                if 'retention_time' in std and std['retention_time']:
-                    rtime_matches = rt_tree.at(std['retention_time'])
-                    if rtime_matches:
-                        rtime_empCpd_id_matches = set([x.data for x in rtime_matches])
-                if rtime_empCpd_id_matches:
-                    mz_empCpd_id_matches = set([x.data for x in mz_tree.at(std['neutral_formula_mass'])])
-                    mz_rtime_empCpd_id_matches = mz_empCpd_id_matches.intersection(rtime_empCpd_id_matches)
-                    for empCpd_id in mz_rtime_empCpd_id_matches:
-                        if "identity" not in self.dict_empCpds[empCpd_id]:
-                            self.dict_empCpds[empCpd_id]["identity"] = []
-                        self.dict_empCpds[empCpd_id]["identity"].append(std)
-
-
+    def L1_annotate(self):
+        pass

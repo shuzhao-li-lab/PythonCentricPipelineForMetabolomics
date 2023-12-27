@@ -980,6 +980,7 @@ class FeatureTable:
         if drop_others:
             to_drop = [x for x in self.sample_columns if x not in to_drop]
         if to_drop:
+            print("Dropping: \n\t" + "\t\n".join(to_drop))
             self.feature_table.drop(columns=to_drop, inplace=True)
 
     def blank_mask(self, 

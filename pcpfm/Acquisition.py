@@ -3,12 +3,14 @@ import numpy as np
 import os
 import pickle
 import functools
+from metDataModel.core import Sample
 
-class Acquisition(object):
+class Acquisition(Sample):
     """
     The Acquisition object represents a single LC-MS run. 
     """
     def __init__(self, __d):
+        super().__init__()
         for k, v in __d.items():
             setattr(self, k, v)
 
@@ -101,16 +103,17 @@ class Acquisition(object):
         :return: ionization mode, "pos" or "neg"
         """
         if self._ionization_mode is None:
-            for spec in pymzml.run.Reader(self.mzml_filepath):
-                if spec["positive scan"]:
-                    self._ionization_mode = "pos"
-                    break
-                else:
-                    self._ionization_mode = "neg"
-                    break
-        return self._ionization_mode
-
-    
+            try:
+                for spec in pymzml.run.Reader(self.mzml_filepath):
+                    if spec["positive scan"]:
+                        self._ionization_mode = "pos"
+                        return self._ionization_mode
+                    else:
+                        self._ionization_mode = "neg"
+                        return self._ionization_mode
+            except:
+                pass
+        
     @property
     def JSON_repr(self):
         """
@@ -122,7 +125,7 @@ class Acquisition(object):
         return recursive_encoder(self.__dict__) 
     
     @property
-    def has_MS2(self):
+    def has_MS2(self, scan_limit=50):
         """
         Scan the mzml to detect if there are MS2 spectra
 
@@ -131,9 +134,11 @@ class Acquisition(object):
         if self._has_ms2 is None:
             self._has_ms2 = False
             reader = pymzml.run.Reader(self.mzml_filepath)
-            for spec in reader:
+            for i, spec in enumerate(reader):
                 if spec.ms_level == 2:
                     self._has_ms2 = True
+                    break
+                if i > scan_limit:
                     break
         return self._has_ms2    
 
@@ -312,144 +317,3 @@ class Acquisition(object):
         with open(data_path, 'wb+') as out_fh:
             pickle.dump(acquisition_data, out_fh)
         return data_path
-
-    def search_for_peak_match(self, mz, rt, mslevel, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity):
-        raise NotImplemented
-        """
-        With a given mz, rt value, attempt to find a peak that matches those values within a given tolerance
-
-        Args:
-            mz (float): query mz value to find, can be None to skip mz matching
-            rt (float): query rt value for the mz value to find, can be None to skip rt matching
-            mslevel (int): specifies MSn level
-            mz_search_tolerance_ppm (float): mz tolerance for match in ppm, does nothing if mz is None
-            rt_search_tolerance (float): rt tolerance in absolute seconds, does nothing if rt is None
-            min_intensity (float): peaks with less intensity than this value will not be considered 
-
-        Returns:
-            _type_: _description_
-        """        
-        import bisect
-        mzs = self.__extract_ms_information(mslevel, 'mz_sorted_mzs')
-        peaks = self.__extract_ms_information(mslevel, 'mz_sorted_peaks')
-        if mz is not None:
-            mz_match_ids = set()
-            #todo - check that we don't need a minus one or something to ensure we aren't missing anything with this index nonsense. 
-            lower_index = bisect.bisect_left(mzs, mz - mz / 1e6 * mz_search_tolerance_ppm)
-            upper_index = bisect.bisect_right(mzs, mz + mz / 1e6 * mz_search_tolerance_ppm)
-            for peak in peaks[lower_index:upper_index]:
-                if peak.intensity > min_intensity:
-                    mz_match_ids.add(peak.id)
-        else:
-            mz_match_ids = {peak.id for peak in peaks}
-
-        if rt is not None:
-            mz_rt_match_ids = set()
-            for peak in peaks:
-                if peak.id in mz_match_ids:
-                    if peak.rt - rt_search_tolerance < rt < peak.rt + rt_search_tolerance:
-                        mz_match_ids.add(peak.id)
-        else:
-            mz_rt_match_ids = mz_match_ids
-
-        return [peak for peak in peaks if peak.id in mz_rt_match_ids]
-
-    def generate_null_distribution(self, ms_level, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, num_samples=100):
-        raise NotImplemented
-        #todo - rewrite to use an empirical distribution of mz values
-        #todo - rewrite to include rt distribution as well
-        """
-        Some mz, rt matches are expected at random for any given mz, rt query. This generates a null distribution to 
-        estimate how many random matches to expected using randomly generated mz and rt values. This is used for to
-        generate a cutoff to decide if a standard or other query compound (e.g., mz, rt) is truly detected or not.
-
-        Args:
-            ms_level (int): MSn level
-            mz_search_tolerance_ppm (float): mz tolerance for match in ppm
-            rt_search_tolerance (float): rt tolerane for match in absolute retention time 
-            null_distribution_percentile (float): this value determine the percentile used to calculate the cutoff
-            min_intensity (float): peaks below this intensity are not included as matches
-            num_samples (int, optional): how many randomly generated mz, rt pairs should be sampled. Defaults to 100.
-
-        Returns:
-            float: the number of matches from the null distribution based on the percentile
-        """        
-        num_hits = []
-        for query_mz in np.random.uniform(self.min_mz, self.max_mz, [num_samples,]):
-            hits = self.search_for_peak_match(query_mz, None, ms_level, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity)
-            num_hits.append(len(hits))
-        return np.percentile(num_hits, null_distribution_percentile)
-
-
-    def check_for_standards(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=False):
-        raise NotImplemented
-        #todo - rewrite this to use JMS objects
-        #todo - rewrite to avoid hard coding
-        """
-        This searches for a provided list of adducted standards in the acquisition
-
-        Args:
-            standards (list): list of standards in a JMS compliant format
-            mz_search_tolerance_ppm (float): mz tolerance for match in ppm
-            rt_search_tolerance (float): rt tolerance for match in absolute units
-            null_distribution_percentile (float): cutoff for null distribution to use cutoff
-            min_intensity (float): peaks with intensity below this value are not considered matches
-            null_distro_override (bool|float, optional): if provided, this overwrites the cutoff from the null distribution with the provided value. Defaults to False.
-
-        Returns:
-            dict: results from standards search and null_distribution calculation
-        """
-        if null_distro_override:
-            cutoff = float(null_distro_override)
-        else:
-            cutoff = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
-        standards_matches = []
-        for standard in standards:
-            name = standard['Name']
-            mz = standard['Search Mass']
-            rt = None
-            standard_hits = self.search_for_peak_match(mz, rt, 1, mz_search_tolerance_ppm, rt_search_tolerance, min_intensity)
-            if standard_hits is None:
-                standard_hits = []
-            detected = len(standard_hits) > cutoff
-            standards_matches.append({
-                "name": name,
-                "mz": mz,
-                "rt": rt,
-                "detected": detected,
-                "matching_peaks": len(standard_hits)
-            })
-        return {"null_cutoff": cutoff, "standards": standards_matches}
-
-    
-    def generate_report(self, standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, text_report=False, output_directory=None):
-        raise NotImplemented
-        """
-        Search for standards and optionally store the results from the check_for_standards into a .txt file 
-
-        Args:
-            standards (list): list of standards in a JMS compliant format
-            mz_search_tolerance_ppm (float): mz tolerance for match in ppm
-            rt_search_tolerance (float): rt tolerance for match in absolute units
-            null_distribution_percentile (float): cutoff for null distribution to use cutoff
-            min_intensity (float): peaks with intensity below this value are not considered matches
-            text_report (bool, optional): if True, generate report and store in .txt file. Defaults to False.
-            output_directory (string, optional): if provided, store the txt files in this directory. Defaults to None.
-
-        Returns:
-            dict: results from standards search and null_distribution calculation
-        """        
-        
-        null_match_count = self.generate_null_distribution(1, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity)
-        search_results = self.check_for_standards(standards, mz_search_tolerance_ppm, rt_search_tolerance, null_distribution_percentile, min_intensity, null_distro_override=null_match_count)
-        if text_report:
-            try:
-                os.makedirs(output_directory)
-            except:
-                pass
-            report_fh = open(os.path.join(output_directory, self.name + "_report.txt"), 'w+')
-            report_fh.write("Null matches: " + str(null_match_count) + "\n")
-            for standard in search_results["standards"]:
-                report_fh.write(standard["name"] + " - Num Matching Peaks: " + str(standard["matching_peaks"]) + " - Detected: " + str(standard["detected"])  + "\n")
-            report_fh.close()
-        return search_results

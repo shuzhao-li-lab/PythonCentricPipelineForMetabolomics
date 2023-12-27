@@ -218,6 +218,11 @@ class Main():
                 writer.writerow(entry)
 
     @staticmethod
+    def assemble_study(params):
+        pass
+
+
+    @staticmethod
     def assemble(params):
         """
         This is the first command in any pcpfm analysis. Starting with a 
@@ -591,9 +596,17 @@ class Main():
         feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
         feature_table.log_transform(params['log_transform_mode'])
         feature_table.save(params["new_moniker"])
+    
+    @staticmethod
+    def MS2_annotate(params):
+        Main.L2_annotate(params)
 
     @staticmethod
     def MS1_annotate(params):
+        Main.L4_annotate(params)
+
+    @staticmethod
+    def L4_annotate(params):
         """
         This will generate MS1 annotations on a provided feature table
         or empcpd list. 
@@ -617,29 +630,13 @@ class Main():
         """
 
         experiment = Experiment.Experiment.load(params['input'])
-        if 'table_moniker' in params:
-            if experiment.ionization_mode == "pos":
-                adducts = params['feature_adducts_pos']
-            else:
-                adducts = params['feature_adducts_neg']
-            feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
-            feature_table.MS1_annotate(
-                params['targets'],
-                float(params['annot_mz_tolerance']),
-                float(params['annot_rt_tolerance']),
-                params["search_isotopologues"],
-                params["MS1_annotation_name"],
-                adducts
-            )
-            feature_table.save(params['new_moniker'])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
-            empCpd.MS1_annotate(params['targets'], 
-                                float(params['annot_rt_tolerance']))
+            empCpd.L4_annotate(params['targets'], float(params['annot_rt_tolerance']))
             empCpd.save(params['new_moniker'])
 
     @staticmethod
-    def MS2_annotate(params):
+    def L2_annotate(params):
         """
         This will generate MS2 annotations on a provided feature table
         or empcpd list. 
@@ -677,22 +674,9 @@ class Main():
             msp_file = params['msp_files_pos']
         elif experiment.ionization_mode == "neg":
             msp_file = params['msp_files_neg']
-        if 'table_moniker' in params:
-            feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
-            feature_table.MS2_annotate(
-                msp_file,
-                params['ms2_dir'],
-                params["annot_mz_tolerance"],
-                params["annot_rt_tolerance"],
-                params["MS2_annotation_name"],
-                params["ms2_similarity_metric"],
-                params["ms2_min_peaks"],
-                params["find_experiment_ms2"]
-            )
-            feature_table.save(params["new_moniker"])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
-            empCpd.MS2_annotate(
+            empCpd.L2_annotate(
                 msp_file,
                 params['ms2_dir'],
                 params["annot_mz_tolerance"],
@@ -701,16 +685,6 @@ class Main():
                 params["ms2_min_peaks"],
             )
             empCpd.save(params["new_moniker"])
-
-    @staticmethod
-    def underivatize(params):
-        raise NotImplemented
-        experiment = Experiment.Experiment.load(params['input'])
-        if 'empCpd_moniker' in params and "sample_for_ratio" in params and "deriv_formula" in params:
-            if params['empCpd_moniker'] and params['sample_for_ratio'] and params['deriv_formula']:
-                empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
-                empCpd.underivatize(params["sample_for_ratio"], params["deriv_formula"])
-                empCpd.save(params["new_moniker"])
 
     @staticmethod
     def report(params):
@@ -793,7 +767,7 @@ class Main():
             df = pd.DataFrame(matches)
             df.drop(columns="other_ids", inplace=True)
             
-            pd.DataFrame(matches).to_csv(output + new_moniker + "_annotation_table.tsv", index=False)
+            pd.DataFrame(matches).to_csv(output + new_moniker + "_feature_annotation_table.tsv", index=False)
             pd.DataFrame(feature_table.feature_table).to_csv(output + new_moniker + "_feature_table.tsv", index=False)
             sample_table = []
             for acquisition in experiment.acquisitions:
@@ -807,7 +781,7 @@ class Main():
                             if type(v) in [str, float, int, list]:
                                 acq_dict[k] = v
                     sample_table.append(acq_dict)
-            pd.DataFrame(sample_table).to_csv(output + new_moniker + "_sample_metadata.tsv", index=False)
+            pd.DataFrame(sample_table).to_csv(output + new_moniker + "_sample_annotation.tsv", index=False)
 
 
 def main():
