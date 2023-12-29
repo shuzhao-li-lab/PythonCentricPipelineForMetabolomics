@@ -125,101 +125,73 @@ class Acquisition(Sample):
         return recursive_encoder(self.__dict__) 
     
     @property
-    def has_MS2(self, scan_limit=50):
+    def has_MS2(self, scan_limit=np.inf):
         """
         Scan the mzml to detect if there are MS2 spectra
 
         :return: has_MS2, True or False
         """
         if self._has_ms2 is None:
-            self._has_ms2 = False
-            reader = pymzml.run.Reader(self.mzml_filepath)
-            for i, spec in enumerate(reader):
-                if spec.ms_level == 2:
-                    self._has_ms2 = True
-                    break
-                if i > scan_limit:
-                    break
+            if self.mzml_filepath:
+                fp_to_read = self.mzml_filepath
+            elif self.source_filepath.endswith(".mzML") or self.source_filepath.endswith(".mzml") :
+                fp_to_read = self.source_filepath
+            else:
+                fp_to_read = None
+            if fp_to_read is not None:
+                self._has_ms2 = False
+                reader = pymzml.run.Reader(fp_to_read)
+                for i, spec in enumerate(reader):
+                    if spec.ms_level == 2:
+                        self._has_ms2 = True
+                        break
+                    if i > scan_limit:
+                        break
         return self._has_ms2    
 
-    def TIC(self, mz=None, ppm=None, rtime_range=None, title=None):
-        """
-        This will generate and save a TIC for the acquisition. If an mz
-        and ppm are provided, the TIC will be limited to that target mz
-        and ppm. If an rtime range is provided, it will be limited to 
-        that time range. This can be useful for extracting specific 
-        peaks like internal standards. Likewise, not providing
-        an m/z or rtime_range, can give you the TIC for the acquisition
-
-        :param mz: target mz, can be None. 
-        :param ppm: mass resolution, can be None for TIC.
-        :param rtime_range: any two element interable, for a min_rtime
-            and max_rtime. Can be none for whole time range.
-
-        Args:
-            round_val (int, optional): _description_. Defaults to 3.
-            mz (_type_, optional): _description_. Defaults to None.
-            ppm (_type_, optional): _description_. Defaults to None.
-            title (_type_, optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+    def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
+        from intervaltree import IntervalTree
         import matplotlib.pyplot as plt
-        import re
-        fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "TICs/")
-        if not os.path.exists(fig_path):
-            os.makedirs(fig_path)
-        name = re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "_", self.name)
-        if mz is None and ppm is None:
-            title = "TIC"
-            min_mass = -np.inf
-            max_mass = np.inf
-            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png")
+        if mz is None:
+            mz = []
+        if rt is None:
+            rt = []
+        title = self.name + ",".join([str(x) for x in mz]) + "_" + ",".join([str(x) for x in rt]) + "_" + str(ppm) + "_" + str(rt_tol)
+        fig_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "TICs/", title + ".png")
+        if os.path.exists(fig_path):
+            return fig_path
         else:
-            if title is None:
-                title = str(mz(round, 4))
-                if rtime_range is not None:
-                    title += "_" + rtime_range[0] + "-" + rtime_range[1]
-            min_mass = mz - mz / 1e6 * ppm
-            max_mass = mz + mz / 1e6 * ppm
-            save_path = os.path.join(fig_path, self.experiment.experiment_name + "_" + name + "_" + str(mz) + "_" + str(ppm) + "_" + str(rtime_range[0]) + "_" + str(rtime_range[1]) + ".png")
-        rtime_range = [-np.inf, np.inf] if rtime_range is None else rtime_range
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        if os.path.exists(save_path):
-            return save_path
-        else:
-            bins = {}
+            os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+            mz_trees = [IntervalTree()] + [IntervalTree() for _ in mz] 
+            rt_trees = [IntervalTree()] + [IntervalTree() for _ in mz] 
+            mz_trees[0].addi(-np.inf, np.inf)
+            rt_trees[0].addi(-np.inf, np.inf)
+            for i, (x, y) in enumerate(zip(mz, rt)):
+                mz_trees[i + 1].addi(x - x/1e6 * ppm, x + x/1e6 * ppm)
+                rt_trees[i + 1].addi(y-rt_tol, y+rt_tol)
+            bins = [[] for _ in mz_trees]
+            rtimes = []
             for spec in pymzml.run.Reader(self.mzml_filepath):
                 rtime = round(spec.scan_time[0] * 60, 3)
-                if rtime_range[0] < rtime < rtime_range[1]:
-                    if rtime not in bins:
-                        bins[rtime] = 0
+                rtimes.append(rtime)
+                for bin in bins:
+                    bin.append(0)
+                matches = [True if rt_tree.at(rtime) else False for rt_tree in rt_trees]
+                match_mask = [i for i, match in enumerate(matches) if match]
+                if match_mask:
                     for peak in spec.peaks("centroided"):
-                        if min_mass < peak[0] < max_mass:
-                            bins[rtime] += float(peak[1])
-            fig, (ax1, ax2) = plt.subplots(2,1)
-            
-            Xs = []
-            Ys = []
-            Y2s = []
-            for x in sorted(bins):
-                Xs.append(x)
-                Ys.append(bins[x])
-                if bins[x]:
-                    Y2s.append(np.log2(bins[x]))
-                else:
-                    Y2s.append(0)
+                        mz = peak[0]
+                        for match in match_mask:
+                            if mz_trees[match].at(mz):
 
-            plt.suptitle(self.name + "\n" + title)
-            ax1.plot(Xs, Ys)
-            ax1.set(ylabel="Intensity")
-            ax2.plot(Xs, Y2s)
-            ax2.set(ylabel="Log2(Intensity)")
-            ax2.set(xlabel="Rtime (sec)")
-            plt.savefig(save_path)
+                                bins[match][-1] += float(peak[1])
+            fig = plt.figure()
+            for i, bin in enumerate(bins):
+                ax = fig.add_subplot(len(bins), 1, i + 1)
+                ax.plot(rtimes, bin)
+            plt.savefig(fig_path)
             plt.close()
-            return save_path
+            return fig_path
         
     def filter(self, filter):
         """
