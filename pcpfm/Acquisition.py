@@ -197,14 +197,15 @@ class Acquisition(Sample):
         """
         This method filters acquisition based on their metadata keys. 
 
-        The filter is organized as follows:
+        The filter is organized as follows::
 
-        {
-            "key_1" : {
-                "includes": ["substr1", "substr2"],
-                "lacks" : ["substr3"]
-            }...
-        }
+            {
+                "key_1": {
+                    "includes": ["substr1", "substr2"],
+                    "lacks": ["substr3"]
+                }
+                ...
+            }
 
         In this case, key_1 must be a field in the metadata. It will pass the filter if and only if
         every substring (substr1, substr2) from includes is present in the metadata field's value AND
@@ -215,7 +216,7 @@ class Acquisition(Sample):
 
         :param filter: dictionary as described above
         :return: true if acquisition passed filter else false
-        """        
+        """     
         passed_filter  = True
         if filter:
             for key, rules in filter.items():
