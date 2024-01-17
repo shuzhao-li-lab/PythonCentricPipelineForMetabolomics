@@ -3,6 +3,7 @@ import os
 import scipy.stats
 import numpy as np
 import shutil
+from functools import partial
 
 def get_parser(file_extension):
     """
@@ -28,28 +29,33 @@ def get_similarity_method(method_name):
     """
 
     try:
-        return matchms.similarity.__getattribute__(method_name)()
+        return matchms.similarity.__getattribute__(method_name)
     except:
         raise Exception("no matching similarity method named: ", method_name)
 
 def extract_MS2_spectra(ms2_files):
     MS2_spectral_registry = {}
     for ms2_file in ms2_files:
+        print("Extracting: ", ms2_file)
+        found = 0
         for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
+            found += 1
             if spectrum:
-                MS2_spec_obj = process_ms2_spectrum(spectrum)
+                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
                 if MS2_spec_obj:
                     MS2_spectral_registry[MS2_spec_obj.id] = MS2_spec_obj
+        print("\tFound: ", found)
     return MS2_spectral_registry
 
 def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
     for ms2_file in ms2_files:
+        print("Extracting (lazy): ", ms2_file)
         for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
             spectrum = matchms.filtering.add_precursor_mz(spectrum)
             precursor_mz = spectrum.get('precursor_mz')
             if precursor_mz:
                 if spectrum and (mz_tree is None or mz_tree.at(precursor_mz)):
-                    MS2_spec_obj = process_ms2_spectrum(spectrum)
+                    MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
                     if MS2_spec_obj:
                         yield MS2_spec_obj
 
@@ -116,7 +122,12 @@ def search_for_mzml(sdir):
     :return: list of absolute mzML filepaths in sdir
     """
     if sdir:
-        return [os.path.join(os.path.abspath(d), f) for d, _, f in os.walk(sdir) if f.endwith(".mzML")]
+        mzml_found = []
+        for d, _, fs in os.walk(sdir):
+            for f in fs:
+                if f.endswith(".mzML"):
+                    mzml_found.append(os.path.join(os.path.abspath(d), f))
+        return mzml_found
     else:
         return []
 

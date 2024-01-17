@@ -98,7 +98,6 @@ class empCpds:
         :return: list of matching feature IDs
         :rtype: list
         """        
-        
         if query_mz and mz_tolerance:
             mz_matches = set([x.data for x in self.get_mz_tree(mz_tolerance).at(query_mz)])
             if query_rt is None or rt_tolerance is None:
@@ -261,14 +260,24 @@ class empCpds:
                      msp_files, 
                      ms2_files=None, 
                      mz_tolerance=5, 
-                     rt_tolerance=20,
-                     similarity_method='CosineGreedy',
-                     min_peaks=3,
-                     score_cutoff=0.60,
-                     L1_mode=False):
+                     rt_tolerance=30,
+                     similarity_method='CosineHungarian',
+                     min_peaks=2,
+                     score_cutoff=0.50,
+                     L1_mode=False,
+                     mapping_mz_tolerance=5,
+                     mapping_rt_tolerance=30):
         from . import utils
+        from functools import partial
         has_MS2 = utils.search_for_mzml(ms2_files)
-        has_MS2 += [x.mzml_filepath for x in self.experiment.acquisitions if x.has_MS2]
+        for acq in self.experiment.acquisitions:
+            try:
+                if acq.has_MS2:
+                    has_MS2.append(acq.mzml_filepath)
+            except:
+                pass
+
+        # extract MS2 from experimental spectra
         expMS2_registry = utils.extract_MS2_spectra(has_MS2)
         observered_precursor_mzs = IntervalTree()
         observered_precursor_rts = IntervalTree()
@@ -279,30 +288,70 @@ class empCpds:
         if not expMS2_registry:
             return
         print("Found: ", len(expMS2_registry), " MS2 Spectra")
+
+        # extract MS2 from database
         msp_files = [msp_files] if type(msp_files) is str else msp_files
         hits = 0
         similarity_method = utils.get_similarity_method(similarity_method)
         for db_ms2_object in utils.lazy_extract_MS2_spectra(msp_files, mz_tree=observered_precursor_mzs):
             possible_matches = [x.data for x in observered_precursor_mzs.at(db_ms2_object.precursor_ion_mz)]
+            similarity_instance = similarity_method(tolerance=db_ms2_object.precursor_ion_mz/1e6 * mz_tolerance * 2)
             if L1_mode:
                 rt_matches = [x.data for x in observered_precursor_rts.at(db_ms2_object.retention_time)]
                 possible_matches = [x for x in possible_matches if x in rt_matches]
             for possible_match in possible_matches:
                 expMS2_object = expMS2_registry[possible_match]
-                msms_score, n_matches = similarity_method.pair(db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum).tolist()
+                msms_score, n_matches = similarity_instance.pair(db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum).tolist()
                 if msms_score >= score_cutoff and n_matches >= min_peaks:
                     expMS2_object.annotate(db_ms2_object, msms_score, n_matches)
                     hits += 1
+        top_annotations = 0
+        total_annotations = 0
+        for expMS2_object in expMS2_registry.values():
+            if expMS2_object.annotations:
+                top_annotations += 1
+                total_annotations += min(len(expMS2_object.annotations), 10)
+        print("Top Annotations: ", top_annotations)
+        print("Total Annotations: ", total_annotations)
+
         print("Annotated: ", hits, " MS2 Spectra")
         mapped = 0
+        mapped_annotated = 0
+        mapped_annotated_total = 0
         for id, ms2_object in expMS2_registry.items():
-            for feature_id in self.search_for_feature(ms2_object.precursor_ion_mz, ms2_object.retention_time, 2 * mz_tolerance, rt_tolerance):
-                khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
-                if "MS2_Spectra" not in khipu:
-                    khipu["MS2_Spectra"] = []
-                khipu["MS2_Spectra"].append(ms2_object.embedding())
+            used_khipu = set()
+            for feature_id in self.search_for_feature(ms2_object.precursor_ion_mz, ms2_object.retention_time, 2*mapping_mz_tolerance, mapping_rt_tolerance):
+                if self.feature_id_to_khipu_id[feature_id] not in used_khipu:
+                    khipu = self.dict_empCpds[self.feature_id_to_khipu_id[feature_id]]
+                    if "MS2_Spectra" not in khipu:
+                        khipu["MS2_Spectra"] = []
+                    khipu["MS2_Spectra"].append(ms2_object.embedding())
+                    used_khipu.add(self.feature_id_to_khipu_id[feature_id])
+            if used_khipu:
+                if ms2_object.annotations:
+                    mapped_annotated += 1
+                    mapped_annotated_total += min(len(ms2_object.annotations), 10)
                 mapped += 1
+        print("Annotated Mapped (Top): ", mapped_annotated, " Annotated MS2 Mapped to Table")
+        print("Annotated Mapped (Total): ", mapped_annotated_total )
         print("Mapped: ", mapped, " MS Spectra to Table")
 
-    def L1_annotate(self):
-        pass
+    def L1_annotate_w_MS2(self, annotation_sources, rt_tolerance, mz_tolerance):
+        self.L2_annotate(annotation_sources, rt_tolerance, mz_tolerance, L1_mode=True)
+
+    def L1_annotate(self, annotation_sources, rt_tolerance=5, mz_tolerance=5, deduplicate=True):
+        import pandas as pd
+        print("HERE")
+        for annotation_source in annotation_sources:
+            stds = pd.read_csv(annotation_source)
+            stds['RT'] = 60 * stds['RT']
+            for mz, rtime, cname in zip(stds['ExtractedMass'], stds['RT'], stds['CompoundName']):
+                for feature_match in self.search_for_feature(mz, rtime, mz_tolerance, rt_tolerance):
+                    kp = self.dict_empCpds[self.feature_id_to_khipu_id[feature_match]]
+                    kp['identity'] = [] if 'identity' not in kp else kp['identity']
+                    if cname not in kp['identity']:
+                        kp['identity'].append(cname)
+                    if deduplicate:
+                        kp['identity'] = list(set(kp['identity']))
+                    print(feature_match, mz, rtime, cname)
+                    

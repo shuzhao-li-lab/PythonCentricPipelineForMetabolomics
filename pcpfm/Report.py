@@ -2,6 +2,7 @@ from fpdf import FPDF
 import os
 import json
 from mass2chem.formula import calculate_mass, PROTON
+import matplotlib.pyplot as plt
 from . import FeatureTable
 
 class ReportPDF(FPDF):
@@ -95,16 +96,17 @@ class Report():
         report element each section specifies.
         """
         for section in self.style:
-            try:
+            #try:
                 method = self.__getattribute__(section["section"])
-            except:
-                print("unable to load method for: ", section["section"])
-            try:
-                method(section)
-            except:
-                print("Error while generating ", section["section"], " report component")
-                print("Please ensure that the specified template is compatible, see below:")
-                print(method.__doc__)
+                if "table" in section and section["table"] + "_cleaned" in self.experiment.feature_tables:
+                    section["table"] = section["table"] + "_cleaned"
+                    method(section)
+                else:
+                    method(section)
+            #except:
+            #    print("Unable to processes section: \n", section)
+
+
 
     def __reset_font(self):
         """
@@ -182,7 +184,7 @@ class Report():
         chunk_size = int(self.max_width // 2)
         while (i * chunk_size) < len(text):
             i += 1
-            line = text[chunk_size * (i - 1): max(chunk_size * i, len(text))]
+            line = text[chunk_size * (i - 1): min(chunk_size * i, len(text))]
             self.__section_line(line, options=options)
         self.report.ln(5)
         self.report.ln(5)
@@ -196,27 +198,10 @@ class Report():
         """
         for acquisition in self.experiment.acquisitions:
             try:
-                tic_path = acquisition.TICz()
+                tic_path = acquisition.TIC()
                 self.report.image(tic_path, w=self.max_width)
             except:
                 print(section_desc)
-
-    def standards(self, section_desc):
-        return NotImplemented
-        for entry in csv.DictReader(open(section_desc["standards"])):
-            if "Name" in entry:
-                name = entry["Name"]
-            else:
-                name = entry["\ufeffName"]
-            isotope_dictionary = json.loads(entry["Isotope Dictionary"])
-            standard_mass = calculate_mass(isotope_dictionary)
-            if self.experiment.ionization_mode == "pos":
-                ion_mass = standard_mass + PROTON
-            else:
-                ion_mass = standard_mass - PROTON
-            for acquisition in self.experiment.acquisitions:
-                TIC = acquisition.TICz(mz=ion_mass, ppm=5, title=name + "_[H+]")
-                self.report.image(TIC, w=self.max_width)
 
     def annotation_summary(self, section_desc):
         """
@@ -294,7 +279,8 @@ class Report():
         if 'text' in section_desc: 
             self.__section_text(section_desc['text'])
         self.__section_line("Table Name, Num Samples, Num Features", options=["bold"])
-        for table in self.experiment.feature_tables.keys():
+        tables = [x for x in self.experiment.feature_tables.keys() if "cleaned" not in x]
+        for table in tables:
             try:
                 feature_table = self.experiment.retrieve(table, True, False, True)
                 self.__section_line(", ".join([str(x) for x in [table, feature_table.num_samples, feature_table.num_features]]))
@@ -429,28 +415,27 @@ class Report():
         provided.
 
         """
-        self.report.add_page()
-        self.__section_line("Table: " + section_desc["table"])
-        self.__section_line("Figure: " + section_desc["name"])
-        self.report.ln(10)
-        figure_path = os.path.join(self.experiment.qaqc_figs, section_desc["table"], "_" + section_desc["name"], ".png")
+        
+        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"      
         if os.path.exists(figure_path):
+            self.report.add_page()
+            self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
+            self.report.ln(10)            
             self.report.image(figure_path, w=self.max_width)
         else:
             feature_table = self.experiment.retrieve(section_desc["table"], True, False, True)
             params_for_figure = {k: v for k,v in self.parameters.items()}
             params_for_figure['all'] = False
             params_for_figure['save_plots'] = True
-            params_for_figure['interactive_plots'] = False
+            #params_for_figure['interactive_plots'] = False
             if section_desc["name"] in feature_table.qaqc_result_to_key:
                 params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
-                try:
-                    feature_table.QAQC(params_for_figure)
-                    figure_path = os.path.join(self.experiment.qaqc_figs + section_desc["table"], "_" + section_desc["name"] + ".png")
-                    self.report.image(figure_path, w=self.max_width)
-                except Exception as e:
-                    print(e)
-                    print("failed making figure for " + section_desc["name"])
+                feature_table.QAQC(params_for_figure)
+                figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"                
+                self.report.add_page()
+                self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
+                self.report.ln(10)
+                self.report.image(figure_path, w=self.max_width)
 
 # this updates the docstring for 
 getattr(Report, "figure").__doc__ += "\nValid name values are: \n\t" + "\n\t".join([x for x in FeatureTable.FeatureTable.qaqc_result_to_key.keys()]) 

@@ -125,13 +125,17 @@ class Acquisition(Sample):
         return recursive_encoder(self.__dict__) 
     
     @property
-    def has_MS2(self, scan_limit=np.inf):
+    def has_MS2(self, scan_limit=np.inf, method_field="Method"):
         """
         Scan the mzml to detect if there are MS2 spectra
 
         :return: has_MS2, True or False
         """
         if self._has_ms2 is None:
+            if method_field in self.metadata_tags:
+                ms_method = self.metadata_tags[method_field]
+                if ms_method in self.experiment.method_has_MS2 and self.experiment.method_has_MS2[ms_method]:
+                    self._has_ms2 = True
             if self.mzml_filepath:
                 fp_to_read = self.mzml_filepath
             elif self.source_filepath.endswith(".mzML") or self.source_filepath.endswith(".mzml") :
@@ -147,6 +151,8 @@ class Acquisition(Sample):
                         break
                     if i > scan_limit:
                         break
+        if method_field in self.metadata_tags:
+            self.experiment.method_has_MS2[ms_method] = True
         return self._has_ms2    
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):

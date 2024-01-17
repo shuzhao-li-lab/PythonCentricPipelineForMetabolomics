@@ -1,7 +1,5 @@
 import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-import matplotlib.lines as mlines
+
 import scipy.stats
 import os
 import pandas as pd
@@ -40,7 +38,11 @@ class FeatureTable:
             "log_missing_dropped_median_intensity": "intensity_analysis",
             "tics": "intensity_analysis",
             "log_tics": "intensity_analysis",
-            "feature_count_z_scores": "feature_outlier_detection"
+            "feature_count_z_scores": "feature_outlier_detection",
+            "intensity_distribution": "intensity_distribution",
+            "intensity_distribution_log": "intensity_distribution",
+            "snr_distribution": "properties_distribution",
+            "cSelectivity_distribution": "properties_distribution"
         }
     def __init__(self, feature_table, experiment, moniker):
         """
@@ -72,7 +74,9 @@ class FeatureTable:
             'missing_feature_z_scores': self.MissingFeatureZScores,
             'intensity_analysis': self.intensity_analysis,
             'feature_distribution': self.feature_distribution,
-            'feature_outlier_detection': self.feature_distribution_outlier_detection
+            'feature_outlier_detection': self.feature_distribution_outlier_detection,
+            'intensity_distribution': self.intensity_distribution,
+            'properties_distribution': self.properties_distribution
         }
 
         self.qaqc_result_to_method = {k: self.method_map[v] for k,v in self.qaqc_result_to_key.items()}
@@ -85,13 +89,27 @@ class FeatureTable:
         This will convert these back to the anticipated names.
         """
         #_d = {os.path.basename(a.mzml_filepath).rstrip(".mzML") : a.name for a in self.experiment.acquisitions}
-        to_drop = []
-        for column in self.feature_table.columns:
-            if '___' in column:
-                self.feature_table[column.split('___')[-1]] = self.feature_table[column]
-                to_drop.append(column)
-        self.feature_table.drop(columns=to_drop, inplace=True)
-        self.feature_table = self.feature_table.copy()
+        if "cleaned" in self.moniker:
+            return
+        else:
+            was_cleaned = False
+            insert_count = 0
+            to_drop = []
+            for column in self.feature_table.columns:
+                if '___' in column:
+                    was_cleaned = True
+                    insert_count += 1
+                    self.feature_table[column.split('___')[-1]] = self.feature_table[column]
+                    to_drop.append(column)
+                    if insert_count == 10:
+                        self.feature_table = self.feature_table.copy()
+                        insert_count = 0
+            if was_cleaned:
+                if insert_count != 0:
+                    self.feature_table = self.feature_table.copy()
+                self.feature_table.drop(columns=to_drop, inplace=True)
+                self.feature_table = self.feature_table.copy()
+                self.save(new_moniker=self.moniker + "_cleaned")
 
     def get_mz_tree(self, mz_tol):
         """
@@ -207,6 +225,7 @@ class FeatureTable:
         :return: the feature table for the moniker
         :rtype: FeatureTable
         """        
+        moniker = moniker + "_cleaned" if moniker + "_cleaned" in experiment.feature_tables else moniker
         return FeatureTable(pd.read_csv(experiment.feature_tables[moniker], sep="\t"), experiment, moniker)
 
     def make_nonnegative(self, fill_value=1):
@@ -253,6 +272,8 @@ class FeatureTable:
             self.feature_table.to_csv(os.path.join(self.experiment.filtered_feature_tables_subdirectory, output_path), sep="\t", index=False)
             self.experiment.feature_tables[new_moniker] = output_path
             self.experiment.save()
+            if os.path.exists(self.experiment.qaqc_figs + "/" + new_moniker):
+                os.removedirs(self.experiment.qaqc_figs + "/" + new_moniker)
         except:
             print("FAILURE TO SAVE FEATURE TABLE")
 
@@ -275,7 +296,7 @@ class FeatureTable:
         name = re.sub(r"[/\\?%*:|\"<>\x7F\x00-\x1F]", "_", name)
         return os.path.join(fig_path, self.experiment.experiment_name + "_" + name + ".png")
 
-    def gen_figure(self, figure_type, data, title='', x_label=None, y_label=None, fig_params=None, skip_annot=False):
+    def gen_figure(self, figure_type, data, title='', x_label=None, y_label=None, fig_params=None, skip_annot=False, bins=100):
         """gen_figure 
 
         #todo - this needs to be cleaned up.
@@ -307,6 +328,9 @@ class FeatureTable:
         :param skip_annot: if true do not apply cosmetics to the figure, defaults to False
         :type skip_annot: bool, optional
         """        
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        import matplotlib.lines as mlines
         if fig_params is None:
             fig_params = self.figure_params
 
@@ -321,6 +345,8 @@ class FeatureTable:
                 else:
                     X = data[:, 0]
                     Y = data[:, 1]
+                print(X)
+                print(Y)
                 plt.title(title)
                 plt.xlabel(x_label)
                 plt.ylabel(y_label)
@@ -329,7 +355,7 @@ class FeatureTable:
                         for x, y, c, m in zip(X, Y, list(colors[0]), list(markers[0])):
                             plt.scatter(x, y, c=c, marker=m)
                     elif markers and not colors:
-                        for x, y, m in zip(X, Y, list(colors[0])):
+                        for x, y, m in zip(X, Y, list(markers[0])):
                             plt.scatter(x, y, marker=m)
                     elif colors and not markers:
                         for x, y, c in zip(X, Y, list(colors[0])):
@@ -394,28 +420,20 @@ class FeatureTable:
                         loc='lower right'
                     )
             elif figure_type == "bar":
-                if False:
-                    if text and colors:
-                        plt.bar(
-                            [x+"_"+str(i) for i, x in enumerate(text[0])], data[1], color=colors[0])
-                    elif text and not colors:
-                        plt.bar([x+"_"+str(i)
-                                for i, x in enumerate(text[0])], data[1])
-                    elif not text and colors:
-                        plt.bar([i for i in range(len(data[1]))],
-                                data[1], color=colors[0])
-                    else:
-                        plt.bar([i for i in range(data[1])], data[1])
+                if type(data) is dict:
+                    data = [list(data.keys()), list(data.values())]
+                if text and colors:
+                    plt.bar([x+"_"+str(i) for i, x in enumerate(text[0])], data[1], color=colors[0])
+                elif text and not colors:
+                    plt.bar([x+"_"+str(i) for i, x in enumerate(text[0])], data[1])
+                elif not text and colors:
+                    plt.bar([i for i in range(len(data[1]))], data[1], color=colors[0])
                 else:
-                    if colors:
-                        plt.scatter([i for i in range(len(data[1]))],
-                                    data[1], color=colors[0])
-                    else:
-                        plt.scatter([i for i in range(len(data[1]))], data[1])
+                    plt.bar([i for i in range(len(data[1]))], data[1])
                 plt.title(title)
                 plt.xticks(rotation=90)
-                plt.xlabel(x_label)
-                plt.ylabel(y_label)
+                plt.xlabel(y_label)
+                plt.ylabel(x_label)
                 if fig_params['color_legend']:
                     plt.tight_layout(rect=[0, 0, 0.75, 1])
                     plt.legend(
@@ -426,6 +444,9 @@ class FeatureTable:
                         bbox_transform=plt.gcf().transFigure,
                         loc='lower right'
                     )
+            elif figure_type == "histogram":
+                plt.suptitle(title)
+                plt.hist(data, bins=bins)
             if fig_params['save_figs']:
                 plt.savefig(self.save_fig_path(title.replace(" ", "_")))
             if fig_params['interactive']:
@@ -466,6 +487,65 @@ class FeatureTable:
         else:
             rt_matches = None
         return list(rt_matches.intersection(mz_matches))
+
+    def intensity_distribution(self, skip_zero=True):
+        if self.log_transformed:
+            self.gen_figure(
+                "histogram",
+                [x for x in self.feature_table[self.sample_columns].values.flatten() if x and skip_zero],
+                title="intensity_distribution_log",
+                x_label="Intensity (Log-Transformed)",
+                y_label="Counts"
+            )
+        else:
+            self.gen_figure(
+                "histogram",
+                [x for x in self.feature_table[self.sample_columns].values.flatten() if x and skip_zero],
+                title="intensity_distribution",
+                x_label="Intensity",
+                y_label="Counts"
+            )
+            self.gen_figure(
+                "histogram",
+                np.log2([x for x in self.feature_table[self.sample_columns].values.flatten() if x and skip_zero]),
+                title="intensity_distribution_log",
+                x_label="Intensity (Log-Transformed)",
+                y_label="Counts"
+            )
+
+    def properties_distribution(self):
+        for column in self.non_sample_columns:
+            if column not in ["id_number", "parent_masstrack_id"]:
+                print(column)
+                try:
+                    self.gen_figure(
+                        "histogram",
+                        self.feature_table[column].values.flatten(),
+                        title=column + "_distribution",
+                        x_label=column,
+                        y_label="Counts",
+                        bins=100
+                    )
+                except:
+                    pass
+                try:
+                    self.gen_figure(
+                        "histogram",
+                        np.log10([x for x in self.feature_table[column].values.flatten() if x > 0]),
+                        title="log10_" + column + "_distribution",
+                        x_label=column,
+                        y_label="Counts",
+                        bins=100
+                    )
+                except:
+                    pass
+
+    
+    def snr_distribution(self):
+        self.properties_distribution()
+    
+    def cSelectivity_distribution(self):
+        self.properties_distribution()
 
     def median_correlation_outlier_detection(self, correlation_type='pearson'):
         """
@@ -567,17 +647,21 @@ class FeatureTable:
                   "log_missing_dropped_sum_intensity", 
                   "log_missing_dropped_mean_intensity", 
                   "log_missing_dropped_median_intensity",
-                  "log_TICs",
+                  "log_tics",
                   "tics"]
 
         for table, title in zip(tables, titles):
+            results = {k: v for k, v in zip(self.sample_columns, table)}
+
             self.gen_figure(
                 "bar",
-                (self.sample_columns, table),
+                results,
                 title,
                 x_label="title",
                 y_label="sample",
             )
+            #except:
+            print("blah blah")
 
         result_values = {
                 "sum_intensity": {name: value for name, value in zip(self.sample_columns, intensity_sums)},
@@ -625,19 +709,23 @@ class FeatureTable:
         :return: a dictionary with the correlation results and configuration used to generate the result
         :rtype: dict
         """        
-
+        corr_method = utils.correlation_modes[correlation_type]
         corr_matrix = np.zeros((self.num_samples, self.num_samples))
+        working_table = self.feature_table.copy()
+        if log_transform:
+            working_table = np.log2(working_table[self.sample_columns] + 1)
         for i, s1 in enumerate(self.sample_columns):
-            val_s1 = self.feature_table[s1]
+            val_s1 = working_table[s1]
             for j, s2 in enumerate(self.sample_columns):
-                val_s2 = self.feature_table[s2]
-                if log_transform and not self.log_transformed:
-                    val_s1, val_s2 = np.log2(val_s1 + 1), np.log(val_s2 + 1)
-                corr = utils.correlation_modes[correlation_type](val_s1, val_s2)
-                try:
-                    corr_matrix[i][j] = corr.statistic
-                except:
-                    corr_matrix[i][j] = corr[0][1]
+                if corr_matrix[j][i] != 0:
+                    corr_matrix[i][j] = corr_matrix[j][i]
+                else:
+                    corr = corr_method(val_s1, working_table[s2])
+                    try:
+                        corr_matrix[i][j] = corr.statistic
+                    except:
+                        corr_matrix[i][j] = corr[0][1]
+
 
         if log_transform:
             title = correlation_type + "_logtransformed_correlation"
@@ -867,6 +955,9 @@ class FeatureTable:
         # this relies upon the sorted order of the dictionary, may not be safe in all Python versions
         sample_names = [*missing_feature_counts_result["Result"].keys()]
         missing_feature_counts = np.array([*missing_feature_counts_result["Result"].values()])
+        missing_feature_count_std = np.std(missing_feature_counts)
+
+
         missing_feature_z_scores = (missing_feature_counts - np.mean(missing_feature_counts)) / np.std(missing_feature_counts)
         self.gen_figure(
             "scatter",
@@ -1123,12 +1214,10 @@ class FeatureTable:
         if by_batch is not None:
             aggregate_batch_TICs = {}
             for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
-                batch_name_list = [
-                    x for x in batch_name_list if x in self.feature_table.columns]
-                self.feature_table["percent_inclusion"] = np.sum(
-                    self.feature_table[batch_name_list] > 0, axis=1) / len(batch_name_list)
-                TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"]
-                                       > TIC_normalization_percentile][sample]) for sample in batch_name_list}
+                print("Batching")
+                batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
+                self.feature_table["percent_inclusion"] = np.sum(self.feature_table[batch_name_list] > 0, axis=1) / len(batch_name_list)
+                TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in batch_name_list}
                 norm_factors = {sample: utils.descriptive_stat_modes[normalize_mode](list(TICs.values()))/value for sample, value in TICs.items()}
                 aggregate_batch_TICs[batch_name] = utils.descriptive_stat_modes[normalize_mode](list(TICs.values()))
                 for sample, norm_factor in norm_factors.items():
@@ -1164,6 +1253,7 @@ class FeatureTable:
                 for acquisition in acquisition_list:
                     batch_idx_map[acquisition] = batch_idx
             batches = [batch_idx_map[x] for x in self.sample_columns]
+            #batches = [1 if x < 8 else 2 for x in batches]
             batch_corrected = pycombat(self.feature_table[self.sample_columns], batches)
             for column in batch_corrected.columns:
                 self.feature_table[column] = batch_corrected[column]
@@ -1181,7 +1271,7 @@ class FeatureTable:
         :type new_moniker: _type_
         :param log_mode: _description_, defaults to "log2"
         :type log_mode: str, optional
-        """        
+        """
         try:
             self.experiment.log_transformed_feature_tables.append(new_moniker)
             self.experiment.save()
@@ -1270,37 +1360,23 @@ class FeatureTable:
             for acquisition in self.experiment.acquisitions:
                 if acquisition.name == sample_name:
                     for i, x in enumerate(colorby):
-                        colors[i].append(combined_cosmetic_map[(
-                            'color', acquisition.metadata_tags[x])])
-                        color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
-                            'color', acquisition.metadata_tags[x])]
+                        colors[i].append(combined_cosmetic_map[('color', acquisition.metadata_tags[x])])
+                        color_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[('color', acquisition.metadata_tags[x])]
                     for i, x in enumerate(markerby):
-                        markers[i].append(combined_cosmetic_map[(
-                            'marker', acquisition.metadata_tags[x])])
-                        marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[(
-                            'marker', acquisition.metadata_tags[x])]
+                        markers[i].append(combined_cosmetic_map[('marker', acquisition.metadata_tags[x])])
+                        marker_legend[acquisition.metadata_tags[x]] = combined_cosmetic_map[('marker', acquisition.metadata_tags[x])]
                     for i, x in enumerate(textby):
                         texts[i].append(acquisition.metadata_tags[x])
+                    break
         return colors, markers, texts, color_legend, marker_legend
 
-    def overlay_TICs(self):
-        """overlay_TICs _summary_
-
-        _extended_summary_
-        """        
-        TICs = []
-        for acquisition in self.experiment.acquisitions:
-            TIC = acquisition.TIC
-            plt.scatter([x[0] for x in TIC], [x[1] for x in TIC])
-            plt.show()
-            print(acquisition.TIC)
 
     def generate_figure_params(self, params):
         import json
         for x in ['color_by', 'marker_by', 'text_by']:
             if x in params and type(params[x]) is str:
                 params[x] = json.loads(params[x])
-        colors, markers, texts, color_legend, marker_legend = self.generate_cosmetic(params['color_by'], params['marker_by'], params['text_by'])
+        colors, markers, texts, color_legend, marker_legend = self.generate_cosmetic(params['color_by'], params['marker_by'], params['text_by'], params['seed'])
         self.figure_params = {
             "acquisitions": list(self.sample_columns),
             "interactive": params['interactive_plots'],
