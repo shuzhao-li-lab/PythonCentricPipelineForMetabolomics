@@ -27,7 +27,7 @@ class MS2Spectrum(MSnSpectrum):
         self.compound_name = compound_name
         self.source = source
 
-    def annotate(self, other_MS2, score, matched_peaks):
+    def annotate(self, other_MS2, score, matched_peaks, L1_annotation=False):
         self.annotations.append(
             {
                 "msms_score": score,
@@ -35,13 +35,14 @@ class MS2Spectrum(MSnSpectrum):
                 "db_precursor_mz": other_MS2.precursor_ion_mz,
                 "reference_id": other_MS2.compound_name,
                 "db_spectrum": [[x[0], x[1]] for x in other_MS2.matchms_spectrum.peaks],
-                "annot_source": other_MS2.source
+                "annot_source": other_MS2.source,
+                "annotation_level": "Level_2" if L1_annotation is False else "Level_1"
             }
         )
 
     def embedding(self):
         embedding = {}
         for k, v in self.__dict__.items():
-            if type(v) in [int, float, str, dict, set]:
+            if type(v) in [int, float, str, dict, set, list]:
                 embedding[k] = v
         return embedding

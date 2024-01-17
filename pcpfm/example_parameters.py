@@ -93,6 +93,7 @@ PARAMETERS = {
     "deriv_formula": None,
     "skip_list": None,
     "extra_asari": None,
+    "seed": None,
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
