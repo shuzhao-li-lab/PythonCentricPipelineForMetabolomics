@@ -1,0 +1,3 @@
+[console_scripts]
+2to3 = cmd_2to3.__main__:main
+
