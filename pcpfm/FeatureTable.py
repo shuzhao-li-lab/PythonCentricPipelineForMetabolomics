@@ -1199,7 +1199,7 @@ class FeatureTable:
 
         :param new_moniker: _description_
         :type new_moniker: _type_
-        :param TIC_normalization_percentile: _descr iption_, defaults to 0.90
+        :param TIC_normalization_percentile: _description_, defaults to 0.90
         :type TIC_normalization_percentile: float, optional
         :param by_batch: _description_, defaults to None
         :type by_batch: _type_, optional
