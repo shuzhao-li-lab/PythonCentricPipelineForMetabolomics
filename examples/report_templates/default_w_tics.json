@@ -22,32 +22,27 @@
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_PCA_(n_components=2).png"
+            "name": "pca"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_TSNE_(n_components=2).png"
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_pearson_(log_transformed).png"
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_spearman.png"
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_Log_TICs.png"
-        },
-        {
-            "section": "figure",
-            "table": "preferred",
-            "name": "_Num_Feature_Z-Score.png"
+            "name": "feature_count_z_scores"
         },
         {
             "section": "figure",
@@ -57,117 +52,70 @@
 
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_PCA_(n_components=2).png"
+            "table": "full",
+            "name": "pca"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_TSNE_(n_components=2).png"
+            "table": "full",
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_pearson_(log_transformed).png"
+            "table": "full",
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_spearman.png"
+            "table": "full",
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Log_TICs.png"
-        },
-        {
-            "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Num_Feature_Z-Score.png"
-        },
-        {
-            "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Feature_Counts.png"
+            "table": "full",
+            "name": "feature_count_z_scores"
         },
 
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_PCA_(n_components=2).png"
+            "table": "for_analysis",
+            "name": "pca"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_TSNE_(n_components=2).png"
+            "table": "for_analysis",
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_pearson_(log_transformed).png"
+            "table": "for_analysis",
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_spearman.png"
+            "table": "for_analysis",
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Log_TICs.png"
+            "table": "for_analysis",
+            "name": "feature_count_z_scores"
         },
         {
-            "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Num_Feature_Z-Score.png"
+            "section": "TICs"
         },
         {
-            "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Feature_Counts.png"
-        },
-
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_PCA_(n_components=2).png"
+            "section": "version_summary"
         },
         {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_TSNE_(n_components=2).png"
-        },
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_pearson_(log_transformed).png"
-        },
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_spearman.png"
-        },
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_Log_TICs.png"
-        },
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_Num_Feature_Z-Score.png"
-        },
-        {
-            "section": "figure",
-            "table": "batch_corrected",
-            "name": "_Feature_Counts.png"
+            "section": "command_history"
         },
         {
             "section": "save",
             "report_name": "report.pdf"
         }
     ],
-    "texts":
+    "text":
     {
         "table_summary": "A feature denotes a region of a spectrum believed to represent a ion of a compound with a retention time and a mass-to-charge ratio. Multiple features often represent the same metabolite due to isotopologues, adduct, multiple charges etc. and thus, the number of features is only a rough proxy for the number of detected metabolites. Due to noise, artifacts, rare metabolites, etc. the number of features often increases with the number of samples.",
         "empcpd_summary": "Empirical compounds are computational intermediates representing sets of features suspected to correspond to the same compound. Each empirical compound is a khipu, thus, the number of khipus is an estimateof the number of detected metabolites. Each khipu represents multiple features; however, unless singletons were added to the khipu during construction, the number of features grouped captured by empCpds is less thanthe number of features.",

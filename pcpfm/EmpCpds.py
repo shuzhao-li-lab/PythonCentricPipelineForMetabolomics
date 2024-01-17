@@ -341,7 +341,6 @@ class empCpds:
 
     def L1_annotate(self, annotation_sources, rt_tolerance=5, mz_tolerance=5, deduplicate=True):
         import pandas as pd
-        print("HERE")
         for annotation_source in annotation_sources:
             stds = pd.read_csv(annotation_source)
             stds['RT'] = 60 * stds['RT']
@@ -353,5 +352,4 @@ class empCpds:
                         kp['identity'].append(cname)
                     if deduplicate:
                         kp['identity'] = list(set(kp['identity']))
-                    print(feature_match, mz, rtime, cname)
                     

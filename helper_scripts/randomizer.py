@@ -4,6 +4,8 @@ import random
 import numpy as np
 import sys
 
+labels = ["Group"]
+
 def bin_to_quantiles(values, quantiles):
     bins = []
     for value in values:
@@ -47,7 +49,7 @@ def group_samples(samples):
 def gen_expected(samples, num_batches=1):
     counts = {}
     for sample in samples:
-        for field in ['Clone ID', 'KO strategy', 'Media']:
+        for field in labels:
             if field not in counts:
                 counts[field] = {}
             val = sample[field]
@@ -62,7 +64,7 @@ def gen_expected(samples, num_batches=1):
 def gen_weights(samples):
     counts = {}
     for sample in samples:
-        for field in ['Clone ID', 'KO strategy', 'Media']:
+        for field in labels:
             val = sample[field]
             if (field, val) not in counts:
                 counts[(field, val)] = 0
@@ -75,7 +77,7 @@ def gen_weights(samples):
 def gen_weights2(samples):
     counts = {}
     for sample in samples:
-        for field in ['Clone ID', 'KO strategy', 'Media']:
+        for field in labels:
             val = sample[field]
             if (field, val) not in counts:
                 counts[(field, val)] = 0
@@ -179,6 +181,6 @@ for b_no, batch in enumerate(split_samples(samples, 1, weights)):
             sample["sub_batch_no"] = sub_b_no
             all_samples.append(sample)
 randomized = pd.DataFrame(all_samples)
-randomized.drop(columns='Box label (Media)', inplace=True)
+#randomized.drop(columns='Box label (Media)', inplace=True)
 randomized['run_order'] = np.arange(len(randomized)) + 1
 randomized.to_csv(sys.argv[2], sep=",")

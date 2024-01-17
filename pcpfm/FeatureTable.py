@@ -345,8 +345,6 @@ class FeatureTable:
                 else:
                     X = data[:, 0]
                     Y = data[:, 1]
-                print(X)
-                print(Y)
                 plt.title(title)
                 plt.xlabel(x_label)
                 plt.ylabel(y_label)
@@ -516,7 +514,6 @@ class FeatureTable:
     def properties_distribution(self):
         for column in self.non_sample_columns:
             if column not in ["id_number", "parent_masstrack_id"]:
-                print(column)
                 try:
                     self.gen_figure(
                         "histogram",
@@ -660,8 +657,7 @@ class FeatureTable:
                 x_label="title",
                 y_label="sample",
             )
-            #except:
-            print("blah blah")
+
 
         result_values = {
                 "sum_intensity": {name: value for name, value in zip(self.sample_columns, intensity_sums)},
@@ -1136,7 +1132,6 @@ class FeatureTable:
                 to_filter = []
                 for blank_mean, sample_mean in zip(blank_means, sample_means):
                     to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
-                    print("batch", blank_mean, sample_mean, blank_mean * blank_intensity_ratio > sample_mean)
                 blank_mask_column = "blank_masked_" + batch_name
                 blank_mask_columns.append(blank_mask_column)
                 self.feature_table[blank_mask_column] = to_filter
@@ -1214,7 +1209,6 @@ class FeatureTable:
         if by_batch is not None:
             aggregate_batch_TICs = {}
             for batch_name, batch_name_list in self.experiment.batches(by_batch).items():
-                print("Batching")
                 batch_name_list = [x for x in batch_name_list if x in self.feature_table.columns]
                 self.feature_table["percent_inclusion"] = np.sum(self.feature_table[batch_name_list] > 0, axis=1) / len(batch_name_list)
                 TICs = {sample: np.sum(self.feature_table[self.feature_table["percent_inclusion"] > TIC_normalization_percentile][sample]) for sample in batch_name_list}
