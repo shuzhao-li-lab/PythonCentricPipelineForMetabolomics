@@ -5,7 +5,8 @@ import json
 from .utils import recursive_encoder, file_operations
 from . import Acquisition
 
-class Experiment:
+from metDataModel.core import Experiment
+class Experiment(Experiment):
     """
     The experiment object represents a set of acquisitions.
     """
@@ -16,14 +17,33 @@ class Experiment:
                 "annotation_subdirectory": "annotations/",
                 "filtered_feature_tables_subdirectory": "filtered_feature_tables/",
                 "ms2_directory": "ms2_acquisitions/",
-                "qaqc_figs": "QAQC_figs/"
+                "qaqc_figs": "QAQC_figs/",
+                "asari_subdirectory": "asari/"
             }
     def __init__(self, __d):
+        super().__init__(__d["experiment_name"])
+        self.parent_study = __d["study"]
+        self.number_samples = len(__d["acquisitions"])
+        self.species = None
+        self.tissue = None
+        self.ordered_samples = tuple(__d["acquisitions"])
+        self.provenance = {
+            "generated_time": __d["start_time"],
+            "generated_by": None,
+            "input_filename": __d["sequence"],
+            "preprocess_software": "",
+            "preprocess_parameters": {}
+        }
+        self.List_of_empCpds = __d["final_empcpds"]
         for k, v in __d.items():
-            setattr(self, k, v) 
+            try:
+                getattr(self, k)
+            except:
+                setattr(self, k, v)
+
 
     @staticmethod
-    def create_experiment(experiment_name, experiment_directory, ionization_mode=None):
+    def create_experiment(experiment_name, experiment_directory, ionization_mode=None, sequence=None):
         """
         This is the main constructor for an experiment object. 
 
@@ -37,7 +57,6 @@ class Experiment:
 
         :return: experiment object
         """
-        
         exp_dict = {
             "experiment_name": experiment_name,
             "experiment_directory": os.path.abspath(experiment_directory),
@@ -54,7 +73,11 @@ class Experiment:
             "MS2_methods": set(),
             "MS1_only_methods": set(),
             "command_history": [str(time.time()) + ':start_analysis'],
-            "_acq_names": None
+            "_acq_names": None,
+            "study": None,
+            "start_time": str(time.time()),
+            "sequence": sequence,
+            "final_empcpds": None
         }
         for k, v in Experiment.initialize_subdirectories(Experiment.subdirectories, experiment_directory).items():
             exp_dict[k] = v
@@ -88,7 +111,10 @@ class Experiment:
         """        
         decoded_JSON = json.load(open(experiment_json_filepath))
         decoded_JSON["acquisitions"] = [Acquisition.Acquisition(x) for x in decoded_JSON["acquisitions"]]
-        return Experiment(decoded_JSON)
+        experiment = Experiment(decoded_JSON)
+        for acq in decoded_JSON["acquisitions"]:
+            acq.experiment = experiment
+        return experiment
 
     @property
     def MS2_acquisitions(self):
@@ -124,9 +150,17 @@ class Experiment:
 
         :return: the ionization mode 'pos' or 'neg'
         """
-        if self._ionization_mode is None:
-            self._ionization_mode = self.determine_ionization_mode()
-        return self._ionization_mode
+        tested = []
+        ion_modes = []
+        while len(tested) < min(3, len(self.acquisitions)):
+            acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
+            ionization_mode = acquisition.ionization_mode
+            tested.append(acquisition)
+            if ionization_mode is not None:
+                ion_modes.append(ionization_mode)
+        ion_modes = set(ion_modes)
+        if len(ion_modes) == 1:
+            return list(ion_modes)[0]
 
     @staticmethod
     def initialize_subdirectories(subdirectories, experiment_directory):
@@ -188,7 +222,7 @@ class Experiment:
                 to_retrieve = self.empCpds
             return to_retrieve[moniker]
 
-    def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method"):
+    def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method", override=True):
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
         and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
@@ -199,21 +233,22 @@ class Experiment:
             determination
         """        
         if os.path.exists(acquisition.source_filepath):
+            target_path = None
             method = acquisition.metadata_tags.get(method_field, None)
             if acquisition.source_filepath.endswith(".mzML"):
                 has_MS2 = self.method_has_MS2.get(method, None)
                 if has_MS2 is None:
                     has_MS2 = acquisition.has_MS2
                     self.method_has_MS2[method] = has_MS2
-                if has_MS2:
-                    target_path = os.path.join(self.MS2_subdirectory, os.path.basename(acquisition.source_filepath))
+                if has_MS2 and not override:
+                    target_path = os.path.join(self.ms2_directory, os.path.basename(acquisition.source_filepath))                        
                 else:
                     target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
                 acquisition.mzml_filepath = target_path
             elif acquisition.source_filepath.endswith(".raw"):
                 target_path = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
                 acquisition.raw_filepath = target_path
-            if not os.path.exists(target_path):
+            if target_path is not None and not os.path.exists(target_path):
                 file_operations[mode](acquisition.source_filepath, target_path)
                 self.acquisitions.append(acquisition)
             else:
@@ -297,7 +332,7 @@ class Experiment:
 
         if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
             filter = {} if filter is None else filter
-            experiment = Experiment.create_experiment('', experiment_directory, ionization_mode=ionization_mode)
+            experiment = Experiment.create_experiment('', experiment_directory, ionization_mode=ionization_mode, sequence=CSV_filepath)
             with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
                 for acquisition_info in csv.DictReader(CSV_fh):
                     acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
@@ -320,29 +355,6 @@ class Experiment:
             print("Experiment already exists!")
             exit()
     
-    def determine_ionization_mode(self, num_files_to_check=5):
-        """
-        If the ionization mode was not specified this method will 
-        determine if the mode is 'pos' or 'neg'. This assumes that all 
-        acquisitions are of the same mode.
-
-        :param num_files_to_check: number of files to check, default=5
-        
-        :return: ionization type, either 'pos' or 'neg'
-        """
-        tested = []
-        ion_modes = set()
-        while len(tested) < min(num_files_to_check, len(self.acquisitions)):
-            acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
-            ionization_mode = acquisition.ionization_mode
-            tested.append(acquisition)
-            ion_modes.add(ionization_mode)
-        if len(ion_modes) == 1:
-            self._ionization_mode = list(ion_modes)[0]
-        else:
-            raise Exception()
-        return self._ionization_mode
-
     def summarize(self):
         """
         Print the list of empCpds and feature tables in the experiment to the console
@@ -367,18 +379,32 @@ class Experiment:
 
         :return: the mapping of fields to cosmetic types.
         """
-        import matplotlib.pyplot as mcolors
+        import matplotlib.colors as mcolors
+
+        banned_colors = [
+            "snow", "beige", "honeydew", "azure", 
+            "aliceblue", "lightcyan", "lightyellow", 
+            "white", "oldlace", "antiquewhite", "ivory", 
+            "whitesmoke", "mistyrose", "seashell", "linen", 
+            "antiquewhite", "lightgoldenrodyellow", "cornsilk", 
+            "lemonchiffon", "honeydew", "mintcream", "ghostwhite",
+            "lavenderblush"
+            ]
+        allowed_markers = [
+                ".", "o", "v", "^", ">", "<", "1", 
+                "2", "3", "4", "8", "s", "P"
+            ]
+
+
         if seed:
             random.seed(seed)
         if cos_type in self.cosmetics and field in self.cosmetics[cos_type]:
             return self.cosmetics[cos_type][field]
         else:
             if cos_type == 'color':
-                banned_colors = self.parameters["banned_colors"]
                 allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
                 allowed_cosmetics = [x for x in allowed_colors if x not in self.used_cosmetics]
             elif cos_type == 'marker':
-                allowed_markers = self.parameters["allowed_markers"]
                 allowed_cosmetics = [x for x in allowed_markers if x not in self.used_cosmetics]
             elif cos_type == 'text':
                 pass
@@ -424,25 +450,26 @@ class Experiment:
         
         """
         import subprocess
+        import asari
         mapping = {
             '$IONIZATION_MODE': self.ionization_mode,
             '$CONVERTED_SUBDIR': self.converted_subdirectory,
             '$ASARI_SUBDIR': self.asari_subdirectory
         }
-        job = []
-        if type(asari_cmd) is list:
-            for field in asari_cmd:
-                job.append(mapping.get(field, field))
-        if type(asari_cmd) is str:
-            for key, value in mapping.items():
-                asari_cmd.replace(key, value)
-            job = asari_cmd.split(" ")
+        job = asari_cmd if type(asari_cmd) is list else asari_cmd.split(" ")
+        job = [mapping.get(f, f) for f in asari_cmd]
         completed_process = subprocess.run(job)
-
         if completed_process.returncode == 0:
             for x in os.listdir(self.experiment_directory):
-                if x.startswith("asari_results"):
+                if x.startswith("asari") and "project" in x:
                     self.feature_tables['full'] = os.path.join(self.experiment_directory, x, "export/full_feature_table.tsv")
                     self.feature_tables['preferred'] = os.path.join(self.experiment_directory, x, "preferred_Feature_table.tsv")
                     self.empCpds['asari'] = os.path.join(self.experiment_directory, x, "Annotated_empiricalCompounds.json")
+            self.provenance["preprocess_software"] = 'Asari'
+            self.provenance["preprocess_parameters"]["version"] = asari.__version__
+            for i, x in enumerate(job):
+                if x.startswith('-') or x.startswith('--'):
+                    self.provenance["preprocess_parameters"][x] = job[i+1]
+
+            
             

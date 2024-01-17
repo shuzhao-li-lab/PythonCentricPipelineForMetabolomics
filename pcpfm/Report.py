@@ -96,15 +96,15 @@ class Report():
         report element each section specifies.
         """
         for section in self.style:
-            #try:
+            try:
                 method = self.__getattribute__(section["section"])
                 if "table" in section and section["table"] + "_cleaned" in self.experiment.feature_tables:
                     section["table"] = section["table"] + "_cleaned"
                     method(section)
                 else:
                     method(section)
-            #except:
-            #    print("Unable to processes section: \n", section)
+            except:
+                print("Unable to processes section: \n", section)
 
 
 

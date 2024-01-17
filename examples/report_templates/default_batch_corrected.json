@@ -22,32 +22,27 @@
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_PCA_(n_components=2).png"
+            "name": "pca"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_TSNE_(n_components=2).png"
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_pearson_(log_transformed).png"
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_spearman.png"
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
             "table": "preferred",
-            "name": "_Log_TICs.png"
-        },
-        {
-            "section": "figure",
-            "table": "preferred",
-            "name": "_Num_Feature_Z-Score.png"
+            "name": "feature_count_z_scores"
         },
         {
             "section": "figure",
@@ -57,81 +52,89 @@
 
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_PCA_(n_components=2).png"
+            "table": "full",
+            "name": "pca"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_TSNE_(n_components=2).png"
+            "table": "full",
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_pearson_(log_transformed).png"
+            "table": "full",
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_spearman.png"
+            "table": "full",
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Log_TICs.png"
-        },
-        {
-            "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Num_Feature_Z-Score.png"
-        },
-        {
-            "section": "figure",
-            "table": "masked_preferred_unknowns",
-            "name": "_Feature_Counts.png"
+            "table": "full",
+            "name": "feature_count_z_scores"
         },
 
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_PCA_(n_components=2).png"
+            "table": "batch_corrected",
+            "name": "pca"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_TSNE_(n_components=2).png"
+            "table": "batch_corrected",
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_pearson_(log_transformed).png"
+            "table": "batch_corrected",
+            "name": "spearman_corrlation"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_spearman.png"
+            "table": "batch_corrected",
+            "name": "log_tics.png"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Log_TICs.png"
+            "table": "batch_corrected",
+            "name": "feature_count_z_scores"
+        },
+
+        {
+            "section": "figure",
+            "table": "for_analysis",
+            "name": "pca"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Num_Feature_Z-Score.png"
+            "table": "for_analysis",
+            "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "pref_interpolated",
-            "name": "_Feature_Counts.png"
+            "table": "for_analysis",
+            "name": "spearman_corrlation"
         },
+        {
+            "section": "figure",
+            "table": "for_analysis",
+            "name": "log_tics.png"
+        },
+        {
+            "section": "figure",
+            "table": "for_analysis",
+            "name": "feature_count_z_scores"
+        },
+
         {
             "section": "version_summary"
         },
         {
             "section": "command_history"
         },
+
         {
             "section": "save",
             "report_name": "report.pdf"

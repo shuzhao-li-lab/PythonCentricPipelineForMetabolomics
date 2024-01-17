@@ -4,7 +4,7 @@ import os
 import multiprocessing as mp
 import re
 
-def process(raw, output_dir, existing, delete=False, cleanup=False, add_directory_name=True):
+def process(raw, output_dir, existing, delete=True, cleanup=True, add_directory_name=True):
     os.makedirs(output_dir, exist_ok=True)
     try:
         mzML_name = os.path.basename(raw).replace(".raw", ".mzML")
@@ -16,7 +16,7 @@ def process(raw, output_dir, existing, delete=False, cleanup=False, add_director
                 os.remove(raw)
             return True
         else:    
-            command = "/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics-1/ThermoRawFileParser/ThermoRawFileParser.exe -f 2 -b " + output_file + " -i " + raw
+            command = "/Library/Frameworks/Mono.framework/Versions/Current/Commands/mono /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/ThermoRawFileConverter/ThermoRawFileParser.exe -f 2 -b " + output_file + " -i " + raw
             try:
                 return_val = os.system(command)
                 if delete and return_val == 0:
@@ -53,14 +53,13 @@ def combine_csv_files(in_dir, out_dir, csv_out):
         for file in files:
             filepath = os.path.join(root, file)
             if file.endswith(".csv") and not file.startswith("._"):
-                print(file)
                 batch_no = re.search("batch_(\d+)", filepath.lower())
                 if batch_no is None:
                     batch_no = re.search("batch(\d+)", filepath.lower())
                 if batch_no is None:
                     batch_no = "no_batch"
                 if batch_no:
-                    #batch_no = int(batch_no.group(1))
+                    batch_no = int(batch_no.group(1))
                     for entry in csv.DictReader(open(filepath).readlines()[1:]):
                         if "File Name" in entry:
                             file_no += 1
@@ -68,10 +67,18 @@ def combine_csv_files(in_dir, out_dir, csv_out):
                             if os.path.exists(entry['Filepath']):
                                 pass
                             else:
-                                path = entry["Path"].split('\\')[-1]
-                                #path = "09222023_HMGCS2_Zukai_Cellpellets"
+                                path = os.path.abspath(filepath).split("/")[-2]
                                 entry['Filepath'] = os.path.join(os.path.abspath("."), out_dir, path + "___" + entry["File Name"] + ".mzML")
-                            print(entry["Filepath"])
+                            # check for rerun and use the newest one
+                            reruns = []
+                            for file in os.listdir(out_dir):
+                                if entry['File Name'] + "_" in file:
+                                    reruns.append(file)
+                            if reruns:
+                                reruns = sorted(reruns, reverse=True)
+                                entry["Filepath"] = os.path.join(os.path.abspath("."), out_dir, reruns[0])
+
+                            
                             if os.path.exists(entry['Filepath']):
                                 entry['Method'] = entry['Instrument Method']
                                 entry['batch'] = batch_no
@@ -105,8 +112,6 @@ def combine_csv_files(in_dir, out_dir, csv_out):
                                 else:
                                     entry["Sample Type"] = "unknown"
                                 all_entries.append(entry)
-                            else:
-                                print(entry["Filepath"])
 
     all_entries = sorted(all_entries, key=lambda x: (x["batch"], x["file_no"]))
     with open(csv_out, 'w+') as csvfile:
@@ -123,14 +128,13 @@ def main(in_dir, out_dir, csv_out):
         for file in files:
             if file.endswith(".mzML"):
                 existing_mzML.add(file)
-    #workers = mp.Pool(1)
     workers = mp.Pool(mp.cpu_count()-1)
     workers.starmap(process, [[r, out_dir, existing_mzML] for r in raw_files])
     _ = combine_csv_files(in_dir, out_dir, csv_out)
 
 if __name__ == '__main__':
     in_dir = sys.argv[1]
-    mzML_dir = sys.argv[2]
+    mzML_dir = os.path.abspath(sys.argv[2])
     csv_out = sys.argv[3]
     main(in_dir, mzML_dir, csv_out)
 

@@ -1,18 +1,25 @@
-# Disclaimer
+# Introduction 
 
-Thanks for your interest in the PCPFM! his project is still an alpha. While I'm not aware of any issues that could cause data quality issues, use at your at your own risk!
+The Python-Centric Pipeline for Metabolomics is an end-to-end LC-MS data processing pipeline based on Asari. 
 
-Note that while the LMSD, HMDB, and other databases are free for public non-commercial use, their size prohibits redistributing them in the git repo. There will be a command added to enable their download to the appropriate directory in the pcpfm shortly. 
+The documentation is still a work in progress but should be sufficient for performing an analysis. Please do not hesitate to contact us via the GitHub issues. 
+
+Note that annotation sources including the HMDB, while free for public non-commercial use, is not redistributed in this package. There is a command to download this source and other annotation sources once you agree to respect the license of the annotation sources we will allow the downloading of. This includes currently the HMDB and LC-MS/MS Orbitrap database from MoNA.
 
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 ## Overview
 
-The PythonCentricPipelineForMetabolomics (PCPFM) - better name pending - aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our feature detection software Asari. 
+The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
 
 ### Inputs
 
-PCPFM requires a csv file as an input that minimally has fields for sample_IDs and the corresponding path to their .mzML file or .raw file. 
+The PCPFM requires a csv file as an input that contains, at a minimum, the following fields:
+
+```
+    File Name - this is the name of the file, should not have the .mzML or .raw extension
+    Filepath - the location of the acquisition data in .raw or .mzML format
+```
 
 Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
 
@@ -62,9 +69,14 @@ The preferred installation mechanism is pip:
 
 or download the source and install manually:
 
-`pip install -e .`
+`pip install -e .` or `pip install .`
 
-optionally, download the MoNAfiles for LC-MS-MS_Negative_Mode and Positive_Mode in msp format for orbitraps and place in the annotation_sources/ sub_directory and download or create a JMS-compliant version of LMSD or HMDB, named HMDB.json and LMSD.json, and place in annotation_sources/ as well. 
+Additional files such as the LC-MS/MS databases from MoNA, a JMS-compliant version of the HMDB and LMSD can be download and placed in the correct directory by running:
+
+`pcpfm download_extras`
+
+After the basic installation is complete. By running this command, you agree to the terms and conditions of those 3rd pary resources. Namely this includes that the HMDB is NOT to be used for commercial purposes. 
+
 
 ## Basic Usage
 
@@ -84,16 +96,13 @@ For example:
             },
         ...
 ```
-Would result in the "sample_type" field being populated with "qstd" if any of the substrings are observed in either the "File Name" or "Sample ID" fields
-in the csv file. 
+Would result in the "sample_type" field being populated with "qstd" if any of the substrings are observed in either the "File Name" or "Sample ID" fields in the csv file. 
 
-If multiple key: value pairs are true, the specified value is added only once; however, multiple different matches will be concatenated using "_". Thus
-if something matches the qstd and blank definitions, the type would become "qstd_blank". 
+If multiple key: value pairs are true, the specified value is added only once; however, multiple different matches will be concatenated using "_". Thus if something matches the qstd and blank definitions, the type would become "qstd_blank". 
 
-Furthermore pre-processing will attempt to map the specified path to the file to a local path. If the path exists, no changes are made; however, if the path does not exist, a .mzML or .raw file in the same location as the sequence file with the specified Name field is checked for existence. If it exists a
-field called "InferredPath is created that stores this path. 
+Furthermore pre-processing will attempt to map the specified path to the file to a local path. If the path exists, no changes are made; however, if the path does not exist, a .mzML or .raw file in the same location as the sequence file with the specified Name field is checked for existence. If it exists a field called "InferredPath" is created that stores this path. 
 
-An example preprocessing configuration is provided. 
+An example preprocessing configuration is provided under preprocessing_examples.
 
 An example command: `pcpfm preprocess -s ./Sequence.csv --new_csv_path ./NewSequence.csv --name_field='File Name' --path_field='Path' --preprocessing_config ./pcpfm/prerpocessing.json
 
@@ -109,14 +118,16 @@ For assembly, you will need to specify the field to be used for the sample namin
 
 For example: `pcpfm assemble -s ./sequence.csv --name_field='Name' --path_field='InferredPath' -o . -j my_experiment` will create an experiment in the local directory with the name 'my_experiment'.
 
+Since a sequence file may contain entries that you do not want to include in the experiment, you can specify a filter or a drop list as follows. The filter is a dictionary in JSON-format, which is passed using --filter <filter_filepath>. All filters contain a top-level key which is the metadata field on which the filter will be applied. This key may have one of two values, either 'includes' or 'lacks'. These may then have an interable as a value with the substrings that must be present or not, depending on which mode was specified, for the filter to be passed. Thus if you have a sequence file with both HILCpos and RPneg acquisiitons, you can use a filter to select only the HILCpos ones if the "Method" column indicates what type of chromatography was used. 
+
+Alternatively, by using --skip_list <names.txt> option and providing a txt file with sample names, any acquisitions with those names will be excluded from the analysis.
+
 ### Conversion to mzML
 
 If the filepaths specified in the sequence file were .raw files, they need 
 to be converted to .mzML. 
 
-How you convert to mzML is largely left to the end user but provided that the command for conversion can
-be executed by the user and is in the form of a string that takes an input filepath and output filepath conversion
-can be done as follows:
+How you convert to mzML is largely left to the end user but provided that the command for conversion can be executed by the user and is in the form of a string that takes an input filepath and output filepath conversion can be done as follows:
 
 `pcpfm convert -i ./my_experiment --conversion_command "mono ThermoRawFileParser.exe -f=1 -i $RAW_PATH -b $OUT_PATH"`
 
@@ -128,7 +139,7 @@ Now we can extract features with Asari as follows:
 
 `pcpfm asari -i ./my_experiment`
 
-This command will infer the correct ionization mode for the experiment; however, if additional parameters or different parameters are needed, they can be provided using `--asari_command "asari process -m $IONIZATION_MODE -i $CONVERTED_SUBDIR -o $ASARI_SUBDIR ...", just replace ... with your additional params. 
+This command will infer the correct ionization mode for the experiment; however, if additional parameters or different parameters are needed, they can be provided using `--asari_command "asari process -m $IONIZATION_MODE -i $CONVERTED_SUBDIR -o $ASARI_SUBDIR ...", just replace ... with your additional params. Alternatively, you can use the default asari_command and simply add --extra_asari with the parameters you want to add. 
 
 Here it is important to introduce the concept of monikers and how they are used by the pipeline. For any given experiment, multiple feature tables and/or empirical compound lists may be created using different criteria (e.g., which isotope patterns are considered or adducts for empCpds or different filtering rules for feature tables). Each such table or empCpd list will be stored on disk in the appropriate subdirectory but they will be accessible by their moniker, a name given to them by the user or automatically created by the pipeline. 
 
@@ -146,8 +157,26 @@ Or with data-driven approaches:
 
 `.main.py QAQC -i ./my_experiment --table_moniker <moniker> --all true`
 
-Passing `--interactive` will allow interactive plots to be generated. By default, figures are saved to disk and  the results of each QCQA step is stored in the experiment.json file located in the experiment directory. `--all` can be replaced with any set of supported QCQA commands (e.g., `--pca`, `--pearson` for PCA and inter-sample pearson correlation respectively). 
+Passing `--interactive` will allow interactive plots to be generated. By default, figures are saved to disk and the results of each QCQA step is stored in the experiment.json file located in the experiment directory. `--all` can be replaced with any set of supported QCQA commands (e.g., `--pca`, `--pearson` for PCA and inter-sample pearson correlation respectively). 
 
+However, this step is largely completely optional. Report generation will trigger the creation of the qaqc figures that are specified by a template if they do not already exist and if a qaqc result is needed for filtering, it will be calculated on the fly. 
+
+The entire set of commands that are possible here is large and are documented in the FeatureTable.py documentation. However a brief summary is here:             
+
+```
+    pca - limited to two components
+    tsne - limited to two components
+    pearson - the pearson correlation of the feature table, also performed on log transformed table
+    spearman - the spearman correlation of the feature table, also performed on log transformed table
+    kendall - the kendall tau correlation of the feature table, also performed on log transformed table
+    missing_feature_percentiles - calculates the distribution of feature 'missingness' across all samples
+    missing_feature_distribution - calculates the number of missing features per sample, both absolute and as z-score
+    median_correlation_outlier_detection - calculates the median correlation on all sample pairs, both absolute and as z-score
+    missing_feature_outlier_detection - calculates the number of msising features per sample, both absolute and as z-score
+    intensity_analysis - calculates median, mean, and sum features with and without missing features and log transformed.
+    feature_distribution - calculates the number of missing features per sample, both absolute and as z-score
+    feature_outlier_detection - calculates the number of missing features per sample, both absolute and as z-score
+```
 ### Feature Processing
 
 raw feature tables are rarely used for analyses, normalization and blank masking are some of the common processing steps supported by our pipeline. Tables are specififed for processing by their moniker and saved to a new moniker. The new moniker can be the same as the table moniker and this will overwrite an existing table. 
@@ -212,13 +241,15 @@ Interpolation ratio is the multiplier to multiply the minimum value for that fea
 
 #### Batch Correction and Multi Batch Experiments
 
-`TO DO`
+batch correction is performed using pycombat and specifying the batch_field:
+
+`pcpfm interpolate --table_moniker preferred_interpolated --new_moniker batch_corrected --by_batch batch -i ./my_experiment`
 
 #### Log Transformation
 
 The feature table can now be log transformed:
 
-`pcpfm log_transform --table_moniker preferred_interpolated --new_moniker preferred_transformed -i ./my_experiment`
+`pcpfm log_transform --table_moniker batch_corrected --new_moniker for_analysis --by -i ./my_experiment`
 
 ### Annotation
 
