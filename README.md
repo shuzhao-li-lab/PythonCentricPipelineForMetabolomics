@@ -45,6 +45,10 @@ The organization of the outputs is as such:
           user_created_table_1.tsv
           user_created_table_2.tsv
           ...
+      results
+          annotation_table
+          feature_table
+          sample_annotation_table
       QAQC_figs
           user_created_table_1/
               pca.png
@@ -306,5 +310,12 @@ or
 
 To see the set of all monikers and their corresponding paths in an experiment:
 
-`pcpfm summarize <experiment_directory>`
+`pcpfm summarize -i <experiment_directory>`
 
+### Generating Final Outputs
+
+Once a feature table and an annotated empirical compound have been created, you can create the three table output using:
+
+`pcpfm generate_output -i <experiment_directory> -em <empCpd_moniker> -tm <table_moniker>`
+
+The resulting tables will be found in a "<experiment_directory>/results/" subdirectory. 
