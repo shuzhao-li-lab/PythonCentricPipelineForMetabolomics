@@ -10,7 +10,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from matplotlib.patches import Patch
 import re
-from mass2chem.formula import calculate_mass, PROTON, ELECTRON, parse_chemformula_dict
+from mass2chem.formula import calculate_mass, PROTON, electron, parse_chemformula_dict
 import csv
 from . import utils
 from .utils import get_parser, get_similarity_method, search_for_mzml, file_operations
