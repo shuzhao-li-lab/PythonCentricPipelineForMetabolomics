@@ -138,7 +138,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
 
-        import gdown
+        import gdown, zipfile
         warning = '''
         Pcpfm extras are not actively maintained by the developers of pcpfm and are redistributed forms of third party
         publically available tools. Any issues encountered with these extras may or may not be a problem of pcpfm; 
@@ -181,9 +181,19 @@ class Main():
         print(warning)
         user_input = input()
         if user_input == "yes":
+
+            def download_from_cloud_storage(src, dst):
+                gdown.download(src, output=dst)
+                with zipfile.ZipFile(dst, 'r') as zip_ref:
+                    zip_ref.extractall(os.path.basename(dst))
+                os.remove(dst)
+
             this_dir = os.path.abspath(os.path.dirname(__file__))
-            gdown.download_folder("https://drive.google.com/drive/folders/14GjoEqOI6yZHrVEvp08A_54mN6-m8rMM?usp=sharing", output=os.path.join(this_dir, "ThermoRawFileConverter"))
-            gdown.download_folder("https://drive.google.com/drive/folders/1Y_sAuGoQ_Vnn6xqm-P9JWPsnIeX0d0Wl?usp=sharing", output=os.path.join(this_dir, "annotation_sources"))
+            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter", "ThermoRawFileConverter.zip")
+            anno_src_path = os.path.join(this_dir, "annotation_sources", "annotation_sources.zip")
+            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip', thermo_parser_path)
+            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path)
+
             #os.system("curl -L https://download.mono-project.com/archive/6.12.0/macos-10-universal/MonoFramework-MDK-6.12.0.199.macos10.xamarin.universal.pkg -o mono.pkg")
             #os.system("/usr/sbin/installer mono.pkg")
     
