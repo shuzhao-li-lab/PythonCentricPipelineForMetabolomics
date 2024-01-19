@@ -1,5 +1,7 @@
 # Introduction 
 
+[![Documentation Status](https://readthedocs.org/projects/pythoncentricpipelineformetabolomics/badge/?version=latest)](https://pythoncentricpipelineformetabolomics.readthedocs.io/en/latest/?badge=latest)
+
 The Python-Centric Pipeline for Metabolomics is an end-to-end LC-MS data processing pipeline based on Asari. 
 
 The documentation is still a work in progress but should be sufficient for performing an analysis. Please do not hesitate to contact us via the GitHub issues. 
