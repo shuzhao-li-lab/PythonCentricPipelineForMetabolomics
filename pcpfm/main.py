@@ -185,12 +185,13 @@ class Main():
             def download_from_cloud_storage(src, dst):
                 gdown.download(src, output=dst)
                 with zipfile.ZipFile(dst, 'r') as zip_ref:
-                    zip_ref.extractall(os.path.basename(dst))
+                    zip_ref.extractall(os.path.dirname(dst))
                 os.remove(dst)
 
             this_dir = os.path.abspath(os.path.dirname(__file__))
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter", "ThermoRawFileConverter.zip")
-            anno_src_path = os.path.join(this_dir, "annotation_sources", "annotation_sources.zip")
+            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter.zip")
+            anno_src_path = os.path.join(this_dir, "annotation_sources.zip")
+
             download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip', thermo_parser_path)
             download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path)
 
