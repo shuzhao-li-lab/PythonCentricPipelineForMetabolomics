@@ -3,9 +3,8 @@ combat
 fpdf
 intervaltree
 jms_metabolite_services
-khipu
 khipu_metabolomics
-mass2chem
+mass2chem>=0.4.9
 matchms
 matplotlib
 numpy
