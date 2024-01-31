@@ -14,8 +14,8 @@ class MS2Spectrum(MSnSpectrum):
                  collision_energy=None,
                  compound_name=None):
         super().__init__(id)
-        source = os.path.basename(source) if source != '' else source
-        self.precursor_ion = str(precursor_mz) + "_" + str(precursor_rt) + "_" + source
+        source = os.path.basename(source) if source != '' else os.path.basename(source)
+        self.precursor_ion = str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
         self.retention_time = precursor_rt
         self.precursor_ion_mz = precursor_mz
         self.list_mz = list_mz if list_mz is not None else []
@@ -23,6 +23,9 @@ class MS2Spectrum(MSnSpectrum):
         self.instrument = instrument
         self.collision_energy = collision_energy
         self.matchms_spectrum = matchms_spectrum
+        if self.matchms_spectrum:
+            self.list_mz = [x[0] for x in self.matchms_spectrum.peaks]
+            self.list_intensity = [x[1] for x in self.matchms_spectrum.peaks]
         self.annotations = []
         self.compound_name = compound_name
         self.source = source
