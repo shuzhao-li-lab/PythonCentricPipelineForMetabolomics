@@ -8,11 +8,57 @@ from metDataModel.core import Sample
 class Acquisition(Sample):
     """
     The Acquisition object represents a single LC-MS run. 
+
+    This super vague constructor was useful during testing, now 
+    will explicitly define all the fields.
     """
-    def __init__(self, __d):
-        super().__init__()
-        for k, v in __d.items():
-            setattr(self, k, v)
+    def __init__(self, 
+                 name, 
+                 source_filepath=None, 
+                 metadata_tags={}, 
+                 raw_filepath=None,
+                 mzml_filepath=None,
+                 data_path=None,
+                 spectra={},
+                 _min_mz=None,
+                 _max_mz=None,
+                 _min_rt=None,
+                 _max_rt=None,
+                 _ionization_mode=None,
+                 _has_ms2=None):
+        self.name = name
+        self.source_filepath = source_filepath
+        self.metadata_tags = metadata_tags
+        self.raw_filepath = raw_filepath
+        self.mzml_filepath = mzml_filepath
+        self.data_path = data_path
+        self.spectra = spectra
+
+        #lazily evaluated parameters
+        self._min_mz = _min_mz
+        self._max_mz = _max_mz
+        self._min_rt = _min_rt
+        self._max_rt = _max_rt
+        self._ionization_mode = _ionization_mode
+        self._has_ms2 = _has_ms2
+
+    @staticmethod
+    def load_acquisition(acquisition_data):
+        return Acquisition(
+            acquisition_data['name'],
+            acquisition_data['source_filepath'],
+            acquisition_data['metadata_tags'],
+            acquisition_data['raw_filepath'],
+            acquisition_data['mzml_filepath'],
+            acquisition_data['data_path'],
+            acquisition_data['spectra'],
+            acquisition_data['_min_mz'],
+            acquisition_data['_max_mz'],
+            acquisition_data['_min_rt'],
+            acquisition_data['_max_rt'],
+            acquisition_data['_ionization_mode'],
+            acquisition_data['_has_ms2']
+        )
 
     @staticmethod
     def create_acquisition(name, source_filepath, metadata_dict):
@@ -26,22 +72,21 @@ class Acquisition(Sample):
 
         :return: Acquisition object
         """
-        acq_dict = {
-            "name": name,
-            "source_filepath": source_filepath,
-            "metadata_tags": metadata_dict,
-            "raw_filepath": None,
-            "mzml_filepath": None,
-            "data_path": None,
-            "spectra": {},
-            "_min_mz": None,
-            "_mz_mz": None,
-            "_min_rt": None,
-            "_max_rt": None,
-            "_ionization_mode": None,
-            "_has_ms2": None
-        }
-        return Acquisition(acq_dict)
+        return Acquisition(
+            name,
+            source_filepath,
+            metadata_dict,
+            raw_filepath=None,
+            mzml_filepath=None,
+            data_path=None,
+            spectra={},
+            _min_mz=None,
+            _max_mz=None,
+            _min_rt=None,
+            _max_rt=None,
+            _ionization_mode=None,
+            _has_ms2=None
+        )
 
     @property
     def min_rt(self):
@@ -145,14 +190,17 @@ class Acquisition(Sample):
             if fp_to_read is not None:
                 self._has_ms2 = False
                 reader = pymzml.run.Reader(fp_to_read)
-                for i, spec in enumerate(reader):
-                    if spec.ms_level == 2:
-                        self._has_ms2 = True
-                        break
-                    if i > scan_limit:
-                        break
+                try:
+                    for i, spec in enumerate(reader):
+                        if spec.ms_level == 2:
+                            self._has_ms2 = True
+                            break
+                        if i > scan_limit:
+                            break
+                except:
+                    pass
         if method_field in self.metadata_tags:
-            self.experiment.method_has_MS2[ms_method] = True
+            self.experiment.method_has_MS2[ms_method] = self._has_ms2
         return self._has_ms2    
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
