@@ -3,7 +3,7 @@ import os
 PARAMETERS = {
     #"preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
     "annot_mz_tolerance": 5,
-    "annot_rt_tolerance": 10,
+    "annot_rt_tolerance": 30,
     "khipu_mz_tolerance": 5,
     "khipu_rt_tolerance": 2,
     "mode": None,
@@ -22,7 +22,7 @@ PARAMETERS = {
     "moniker": "default",
     "multicores": 4,
     "conversion_command": ['$(which mono)', 
-                           '/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/ThermoRawFileConverter/ThermoRawFileParser.exe', 
+                           '/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/ThermoRawFileConverter/ThermoRawFileParser.exe', 
                            '-f=1', 
                            '-i', 
                            '$RAW_PATH', 

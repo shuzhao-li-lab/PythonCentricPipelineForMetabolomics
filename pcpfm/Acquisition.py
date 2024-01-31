@@ -46,18 +46,18 @@ class Acquisition(Sample):
     def load_acquisition(acquisition_data):
         return Acquisition(
             acquisition_data['name'],
-            acquisition_data['source_filepath'],
-            acquisition_data['metadata_tags'],
-            acquisition_data['raw_filepath'],
-            acquisition_data['mzml_filepath'],
-            acquisition_data['data_path'],
-            acquisition_data['spectra'],
-            acquisition_data['_min_mz'],
-            acquisition_data['_max_mz'],
-            acquisition_data['_min_rt'],
-            acquisition_data['_max_rt'],
-            acquisition_data['_ionization_mode'],
-            acquisition_data['_has_ms2']
+            source_filepath=acquisition_data['source_filepath'],
+            metadata_tags=acquisition_data['metadata_tags'],
+            raw_filepath=acquisition_data['raw_filepath'],
+            mzml_filepath=acquisition_data['mzml_filepath'],
+            data_path=acquisition_data['data_path'],
+            spectra=acquisition_data['spectra'],
+            _min_mz=acquisition_data['_min_mz'],
+            _max_mz=acquisition_data['_max_mz'],
+            _min_rt=acquisition_data['_min_rt'],
+            _max_rt=acquisition_data['_max_rt'],
+            _ionization_mode=acquisition_data['_ionization_mode'],
+            _has_ms2=acquisition_data['_has_ms2']
         )
 
     @staticmethod
@@ -148,16 +148,14 @@ class Acquisition(Sample):
         :return: ionization mode, "pos" or "neg"
         """
         if self._ionization_mode is None:
-            try:
-                for spec in pymzml.run.Reader(self.mzml_filepath):
-                    if spec["positive scan"]:
-                        self._ionization_mode = "pos"
-                        return self._ionization_mode
-                    else:
-                        self._ionization_mode = "neg"
-                        return self._ionization_mode
-            except:
-                pass
+            for spec in pymzml.run.Reader(self.mzml_filepath):
+                if spec["positive scan"]:
+                    self._ionization_mode = "pos"
+                    return self._ionization_mode
+                else:
+                    self._ionization_mode = "neg"
+                    return self._ionization_mode
+
         
     @property
     def JSON_repr(self):
