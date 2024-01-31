@@ -1,7 +1,7 @@
-from metDataModel.core import MSnSpectrum
+from metDataModel.core import Spectrum
 import os 
 
-class MS2Spectrum(MSnSpectrum):
+class MS2Spectrum(Spectrum):
     def __init__(self,
                  id,
                  precursor_mz, 
