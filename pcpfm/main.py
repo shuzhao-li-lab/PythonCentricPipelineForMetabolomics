@@ -12,6 +12,7 @@ from . import Report
 class Main():
     @staticmethod
     def process_params():
+        # TODO - simplify this somehow if possible
         """
         This process parses the command line arguments and returns the 
         parameters in a dictionary. Default parameters are specified in 
@@ -137,7 +138,6 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
 
-        import gdown, zipfile
         warning = '''
         Pcpfm extras are not actively maintained by the developers of pcpfm and are redistributed forms of third party
         publically available tools. Any issues encountered with these extras may or may not be a problem of pcpfm; 
@@ -177,25 +177,11 @@ class Main():
         Please type 'yes' to acknowledge. 
         
         '''
+        import gdown, zipfile
         print(warning)
         user_input = input()
         if user_input == "yes":
-<<<<<<< HEAD
-            import urllib.request
-            this_dir = os.path.abspath(os.path.dirname(__file__))
-            os.makedirs(os.path.join(this_dir, "ThermoRawFileConverter"),exist_ok=True)
-            os.makedirs(os.path.join(this_dir, "annotation_sources"),exist_ok=True)
-            urllib.request.urlretrieve("https://mona.fiehnlab.ucdavis.edu/rest/downloads/retrieve/b309b71a-e7e0-448e-b6e4-e295a3a62013", os.path.join(this_dir, "annotation_sources/MoNA-export-LC-MS-MS_Negative_Mode.msp"))
-            urllib.request.urlretrieve("https://mona.fiehnlab.ucdavis.edu/rest/downloads/retrieve/873fbe29-4808-46d1-a4a3-a4134ac8c755", os.path.join(this_dir, "annotation_sources/MoNA-export-LC-MS-MS_Positive_Mode.msp"))
-            urllib.request.urlretrieve("https://github.com/compomics/ThermoRawFileParser/releases/download/v1.4.2/ThermoRawFileParser1.4.2.zip", os.path.join(this_dir, "ThermoRawFileConverter/ThermoRawFileParser.zip"))
-            os.system("unzip " +  os.path.join(this_dir, "ThermoRawFileConverter/ThermoRawFileParser.zip -d " + os.path.join(this_dir, "ThermoRawFileConverter")))
-            #urllib.request.urlretrieve("https://hmdb.ca/system/downloads/current/hmdb_metabolites.zip", os.path.join(this_dir, "annotation_sources/HMDB.zip"))
-            #urllib.request.urlretrieve("https://www.lipidmaps.org/files/?file=LMSD&ext=sdf.zip", os.path.join(this_dir, "annotation_sources/LMSD.zip"))
-            #os.system("unzip " +  os.path.join(this_dir, "annotation_sources/HMDB.zip"))
-            #os.system("unzip " +  os.path.join(this_dir, "annotation_sources/LMSD.zip"))
-            #print(os.path.join(this_dir, "annotation_sources/LMSD.zip"))
-=======
-
+            
             def download_from_cloud_storage(src, dst):
                 gdown.download(src, output=dst)
                 with zipfile.ZipFile(dst, 'r') as zip_ref:
@@ -209,9 +195,6 @@ class Main():
             download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip', thermo_parser_path)
             download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path)
 
-            #os.system("curl -L https://download.mono-project.com/archive/6.12.0/macos-10-universal/MonoFramework-MDK-6.12.0.199.macos10.xamarin.universal.pkg -o mono.pkg")
-            #os.system("/usr/sbin/installer mono.pkg")
->>>>>>> refs/remotes/origin/main
     
     @staticmethod
     def preprocess(params):
@@ -255,7 +238,7 @@ class Main():
 
     @staticmethod
     def assemble_study(params):
-        pass
+        raise NotImplementedError
 
 
     @staticmethod
@@ -359,7 +342,7 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         experiment.parameters = params["experiment_config"]
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         if params['table_moniker'] not in experiment.qcqa_results:     
             experiment.qcqa_results[params['table_moniker']] = {}
         for qaqc_result in feature_table.QAQC(params):
@@ -436,7 +419,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.blank_mask(params['blank_value'],
                                     params['sample_value'],
                                     params['query_field'],
@@ -469,7 +452,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         if params['drop_name']:
             feature_table.drop_sample_by_name(params['drop_name'], params['drop_others'])
         elif params['filter']:
@@ -514,7 +497,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         if params["TIC_normalization_percentile"]:
             feature_table.TIC_normalize(float(params["TIC_normalization_percentile"]),
                                         params["by_batch"],
@@ -541,7 +524,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.drop_missing_features(params["by_batch"], 
                                             float(params["feature_retention_percentile"]),
                                             params["feature_drop_logic"])
@@ -566,7 +549,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.interpolate_missing_features(float(params['interpolation_ratio']),
                                                     params['by_batch'],
                                                     params['interpolate_method'])
@@ -588,7 +571,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.batch_correct(params['by_batch'])
         feature_table.save(params['new_moniker'])
 
@@ -610,9 +593,9 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         if params["table_moniker"]:
-            experiment.delete(params["table_moniker"], True, False)
+            experiment.delete_feature_table(params['table_moniker'])
         elif params['empCpd_moniker']:
-            experiment.delete(params["empCpd_moniker"], True, False)
+            experiment.delete_empCpds(params['empCpd_moniker'])
 
     @staticmethod
     def log_transform(params):
@@ -629,7 +612,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.log_transform(params['log_transform_mode'])
         feature_table.save(params["new_moniker"])
     
@@ -666,7 +649,7 @@ class Main():
 
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
-            empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+            empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
             empCpd.L4_annotate(params['targets'], float(params['annot_rt_tolerance']))
             empCpd.save(params['new_moniker'])
 
@@ -706,7 +689,7 @@ class Main():
         elif experiment.ionization_mode == "neg":
             msp_file = params['msp_files_neg']
         if 'empCpd_moniker' in params:
-            empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+            empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
             empCpd.L2_annotate(
                 msp_file,
                 params['ms2_dir'],
@@ -741,7 +724,7 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         print("HERE")
         if 'empCpd_moniker' in params:
-            empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+            empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
             empCpd.L1_annotate(params['targets'], float(params['annot_rt_tolerance']), float(params['annot_mz_tolerance']), True)
             empCpd.save(params['new_moniker'])
     
@@ -772,7 +755,7 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
-            empCpd = experiment.retrieve(params['empCpd_moniker'], False, True, True)
+            empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
             empCpd.L1_annotate_w_MS2(params['targets'], 
                                      float(params['annot_rt_tolerance']), 
                                      float(params['annot_mz_tolerance']),
@@ -812,8 +795,8 @@ class Main():
         """
         import pandas as pd
         experiment = Experiment.Experiment.load(params['input'])
-        empCpds = experiment.retrieve(params['empCpd_moniker'], False, True, True)
-        feature_table = experiment.retrieve(params['table_moniker'], True, False, True)
+        empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         new_moniker = params['new_moniker']
         matches = []
         output = experiment.experiment_directory + "/results/"
