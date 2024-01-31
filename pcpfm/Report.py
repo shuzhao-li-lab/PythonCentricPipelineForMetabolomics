@@ -205,6 +205,9 @@ class Report():
 
     def annotation_summary(self, section_desc):
         """
+
+        TODO: this is broken 
+        
         This method summarizes the annotations generated during the 
         analysis on a per-table, per-empcpd basis. This counts the
         number of level-1, level-2, and level-4 annotations. 
@@ -219,7 +222,7 @@ class Report():
 
         for table in self.experiment.feature_tables.keys():
             try:
-                feature_table = self.experiment.retrieve(table, True, False, True)
+                feature_table = self.experiment.retrieve_feature_table(table, True, False, True)
             except:
                 feature_table = None
             if feature_table:
@@ -248,7 +251,7 @@ class Report():
         self.__section_line("empCpd Name, # Khipus, # MS1 Annotated Khipus, # MS2 Annotated Khipus", options=["bold"])
         for empcpd in self.experiment.empCpds.keys():
             try:
-                empcpd_object = self.experiment.retrieve(empcpd, False, True, True)
+                empcpd_object = self.experiment.retrieve_empCpds(empcpd, True)
             except:
                 empcpd_object = None
             if empcpd_object:
@@ -427,7 +430,6 @@ class Report():
             params_for_figure = {k: v for k,v in self.parameters.items()}
             params_for_figure['all'] = False
             params_for_figure['save_plots'] = True
-            #params_for_figure['interactive_plots'] = False
             if section_desc["name"] in feature_table.qaqc_result_to_key:
                 params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
                 feature_table.QAQC(params_for_figure)

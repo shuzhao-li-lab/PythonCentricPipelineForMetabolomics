@@ -33,33 +33,47 @@ def get_similarity_method(method_name):
     except:
         raise Exception("no matching similarity method named: ", method_name)
 
-def extract_MS2_spectra(ms2_files):
+def extract_MS2_spectra(ms2_files, skip_filters=False):
     MS2_spectral_registry = {}
     for ms2_file in ms2_files:
-        print("Extracting: ", ms2_file)
         found = 0
         for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
             found += 1
             if spectrum:
-                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file, skip_filters=skip_filters)
                 if MS2_spec_obj:
                     MS2_spectral_registry[MS2_spec_obj.id] = MS2_spec_obj
-        print("\tFound: ", found)
     return MS2_spectral_registry
 
 def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
+    if type(ms2_files) is str:
+        ms2_files = [ms2_files]
     for ms2_file in ms2_files:
-        print("Extracting (lazy): ", ms2_file)
         for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
             spectrum = matchms.filtering.add_precursor_mz(spectrum)
-            precursor_mz = spectrum.get('precursor_mz')
-            if precursor_mz:
-                if spectrum and (mz_tree is None or mz_tree.at(precursor_mz)):
+            if spectrum:
+                try:
+                    precursor_mz = spectrum.get('precursor_mz')
+                except:
+                    precursor_mz = None
+            if precursor_mz and mz_tree:
+                if mz_tree.at(precursor_mz):
+                    try:
+                        MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                        if MS2_spec_obj:
+                            yield MS2_spec_obj
+                    except:
+                        pass
+            elif mz_tree is None:
+                try:
                     MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
                     if MS2_spec_obj:
                         yield MS2_spec_obj
+                except:
+                    pass
 
-def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3):
+
+def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3, skip_meta=False, skip_filters=False):
     """
     This is the default MS2 processing used by the pipeline. 
 
@@ -75,41 +89,71 @@ def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3):
 
     from .MSnSpectrum import MS2Spectrum
 
-    spectrum = matchms.filtering.add_precursor_mz(spectrum)
-    spectrum = matchms.filtering.default_filters(spectrum)
-    spectrum = matchms.filtering.normalize_intensities(spectrum)
-    spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+    if not skip_meta:
+        spectrum = matchms.filtering.add_precursor_mz(spectrum)
+        if not skip_filters:
+            spectrum = matchms.filtering.default_filters(spectrum)
+            spectrum = matchms.filtering.normalize_intensities(spectrum)
+            spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
 
-    if spectrum is None:
-        return None
-    try:
-        spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
-    except:
-        pass
-    
-    id = []
-    if spectrum.get('precursor_mz'):
-        id.append(str(float(spectrum.get('precursor_mz', ''))))
-    if spectrum.get('retention_time'):
-        id.append(str(float(spectrum.get('retention_time', ''))))
-    id.append(filename)
-    id = '_'.join(id)    
-    try:
-        reference_id = spectrum.get("compound_name")
-    except:
-        reference_id = id
+        if spectrum is None:
+            return None
+        try:
+            spectrum.set('retention_time', spectrum.metadata['scan_start_time'][0] * 60)
+        except:
+            pass
+        
+        id = []
+        if spectrum.get('precursor_mz'):
+            id.append(str(float(spectrum.get('precursor_mz', ''))))
+        if spectrum.get('retention_time'):
+            id.append(str(float(spectrum.get('retention_time', ''))))
+        id.append(filename)
+        id = '_'.join(id)    
+        try:
+            reference_id = spectrum.get("compound_name")
+        except:
+            reference_id = id
+        spectrum = MS2Spectrum(
+                    id = id,
+                    precursor_mz=float(spectrum.get('precursor_mz')),
+                    precursor_rt=float(spectrum.get('retention_time')) if spectrum.get('retention_time') else None,
+                    list_mz=[],
+                    list_intensity=[],
+                    matchms_spectrum=spectrum,
+                    source=filename,
+                    instrument="Unknown",
+                    collision_energy="Unknown",
+                    compound_name=reference_id)
+    else:
+        id = []
+        id.append(str(float(spectrum['prec_mz'])))
+        id.append(str(float(spectrum['rt'])))
+        id.append(filename)
+        id = '_'.join(id)
+        precursor_mz = spectrum['prec_mz']
+        precursor_rt = spectrum['rt']
+        reference_id = spectrum['cpd_name']
+        spectrum = spectrum['spectrum']
+        if not skip_filters:
+            spectrum = matchms.filtering.default_filters(spectrum)
+            spectrum = matchms.filtering.normalize_intensities(spectrum)
+            spectrum = matchms.filtering.require_minimum_number_of_peaks(spectrum, min_peaks)
+        spectrum.set('retention_time', precursor_rt)
+        spectrum.set('precursor_mz', precursor_mz)
 
-    spectrum = MS2Spectrum(
-                        id = id,
-                        precursor_mz=float(spectrum.get('precursor_mz')),
-                        precursor_rt=float(spectrum.get('retention_time')) if spectrum.get('retention_time') else None,
-                        list_mz=[],
-                        list_intensity=[],
-                        matchms_spectrum=spectrum,
-                        source=filename,
-                        instrument="Unknown",
-                        collision_energy="Unknown",
-                        compound_name=reference_id)
+        spectrum = MS2Spectrum(
+                            id = id,
+                            precursor_mz=float(precursor_mz),
+                            precursor_rt=float(precursor_rt),
+                            list_mz=[],
+                            list_intensity=[],
+                            matchms_spectrum=spectrum,
+                            source=filename,
+                            instrument="Unknown",
+                            collision_energy="Unknown",
+                            compound_name=reference_id)
+
     return spectrum
     
 def search_for_mzml(sdir):
