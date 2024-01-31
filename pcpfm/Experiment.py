@@ -9,6 +9,9 @@ from metDataModel.core import Experiment
 class Experiment(Experiment):
     """
     The experiment object represents a set of acquisitions.
+
+    This super vague constructor was useful during testing, now 
+    will explicitly define all the fields.
     """
     subdirectories =  {
                 "converted_subdirectory": "converted_acquisitions/",
@@ -150,17 +153,14 @@ class Experiment(Experiment):
 
         :return: the ionization mode 'pos' or 'neg'
         """
-        tested = []
         ion_modes = []
-        while len(tested) < min(3, len(self.acquisitions)):
-            acquisition = random.sample([x for x in self.acquisitions if x not in tested], 1)[0]
-            ionization_mode = acquisition.ionization_mode
-            tested.append(acquisition)
-            if ionization_mode is not None:
-                ion_modes.append(ionization_mode)
-        ion_modes = set(ion_modes)
-        if len(ion_modes) == 1:
-            return list(ion_modes)[0]
+        if self._ionization_mode is None:
+            while len(ion_modes) < min(3, len(self.acquisitions)):
+                acquisition = random.sample([x for x in self.acquisitions], 1)[0]
+                ion_modes.append(acquisition.ionization_mode)
+            if len(set(ion_modes)) == 1:
+                self._ionization_mode = list(ion_modes)[0]
+        return self._ionization_mode
 
     @staticmethod
     def initialize_subdirectories(subdirectories, experiment_directory):
@@ -191,36 +191,23 @@ class Experiment(Experiment):
         os.remove(to_delete[moniker])
         del to_delete[moniker]
 
-    def retrieve(self, moniker, feature_table=False, empCpds=False, as_object=False):
-        """
-        Given a moniker return either the feature table or empCpd list
-        for that moniker. By default, this returns the path, needs the
-        as_object field to be true to return the object. 
+    def retrieve_feature_table(self, moniker, as_object=False):
+        #TODO - add docstring
 
-        TODO: this is more complicated than necessary.
-
-        :param moniker: which moniker to return, string
-        :param feature_table: if true, return feature table w/moniker
-        :param empCpds: if true, return empCpds w/moniker
-        :param as_object: if true, return the object, not path
-
-        :return: path or object for the feature table or emp cpd for 
-            the moniker
-        """
         from . import FeatureTable
+        if as_object:
+            return FeatureTable.FeatureTable.load(moniker, self)
+        else:
+            return self.feature_tables[moniker]
+        
+    def retrieve_empCpds(self, moniker, as_object=False):
+        #TODO - add docstring
+
         from . import EmpCpds
         if as_object:
-            if feature_table:
-                to_construct = FeatureTable.FeatureTable
-            elif empCpds:
-                to_construct = EmpCpds.empCpds
-            return to_construct.load(moniker, self)
+            return EmpCpds.empCpds.load(moniker, self)
         else:
-            if feature_table:
-                to_retrieve = self.feature_tables
-            elif empCpds:
-                to_retrieve = self.empCpds
-            return to_retrieve[moniker]
+            return self.feature_tables[moniker]
 
     def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method", override=True):
         """
@@ -257,6 +244,7 @@ class Experiment(Experiment):
             print("File Not Found: ", acquisition.name, acquisition.source_filepath)
 
     def convert_raw_to_mzML(self, conversion_command):
+        #TODO - switch from os.system to subprocess
         """
         Convert all raw files to mzML
 
@@ -272,26 +260,22 @@ class Experiment(Experiment):
         for acquisition in raw_acquisitions:
             output_filepath = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.raw_filepath)).replace(".raw", ".mzML")
             output_paths.append(output_filepath)
-            new_job = []
+            field_map = {
+                "$RAW_PATH": acquisition.raw_filepath,
+                "$OUT_PATH": output_filepath
+            }
             if type(conversion_command) is list:
-                for element in conversion_command:
-                    if element == "$RAW_PATH":
-                        new_job.append(acquisition.raw_filepath)
-                    elif element == "$OUT_PATH":
-                        new_job.append(output_filepath)
-                    else:
-                        new_job.append(element)
-                jobs.append(new_job)
+                jobs.append([field_map.get(element, element) for element in conversion_command])
             elif type(conversion_command is str):
-                conversion_command = conversion_command.replace("$RAW_PATH", acquisition.raw_filepath)
-                conversion_command = conversion_command.replace("$OUT_PATH", output_filepath) 
-        workers = mp.Pool(mp.cpu_count())
-        for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
-            raw_acquisition.mzml_filepath = output_path
-            if raw_acquisition.has_MS2:
-                MS2_path = os.path.join(self.ms2_directory, os.path.basename(raw_acquisition.mzml_filepath))
-                file_operations["move"](raw_acquisition.mzml_filepath, MS2_path)
-                raw_acquisition.mzml_filepath = MS2_path
+                for field, replacement_value in field_map.items():
+                    conversion_command = conversion_command.replace(field, replacement_value)
+        with mp.Pool(mp.cpu_count()) as workers:
+            for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
+                raw_acquisition.mzml_filepath = output_path
+                if raw_acquisition.has_MS2:
+                    MS2_path = os.path.join(self.ms2_directory, os.path.basename(raw_acquisition.mzml_filepath))
+                    file_operations["move"](raw_acquisition.mzml_filepath, MS2_path)
+                    raw_acquisition.mzml_filepath = MS2_path
             
     def filter_samples(self, filter, return_field=None):
         """
@@ -381,6 +365,7 @@ class Experiment(Experiment):
         """
         import matplotlib.colors as mcolors
 
+        # these colors are too close to being white
         banned_colors = [
             "snow", "beige", "honeydew", "azure", 
             "aliceblue", "lightcyan", "lightyellow", 
@@ -390,12 +375,13 @@ class Experiment(Experiment):
             "lemonchiffon", "honeydew", "mintcream", "ghostwhite",
             "lavenderblush"
             ]
+        # most of the markers are hard to see, whitelist these
         allowed_markers = [
                 ".", "o", "v", "^", ">", "<", "1", 
                 "2", "3", "4", "8", "s", "P"
             ]
 
-
+        # set the seed so that things are reproducible
         if seed:
             random.seed(seed)
         if cos_type in self.cosmetics and field in self.cosmetics[cos_type]:
@@ -408,6 +394,8 @@ class Experiment(Experiment):
                 allowed_cosmetics = [x for x in allowed_markers if x not in self.used_cosmetics]
             elif cos_type == 'text':
                 pass
+            else:
+                raise Exception("invalid cosmetic type: ", cos_type)
             needs_cosmetic = list(set([acquisition.metadata_tags[field] for acquisition in self.acquisitions]))
             cosmetic_map = {t: c for t, c in zip(needs_cosmetic, random.sample(allowed_cosmetics, len(needs_cosmetic)))}   
             self.used_cosmetics.extend(list(cosmetic_map.values()))
@@ -435,6 +423,7 @@ class Experiment(Experiment):
         return batches
     
     def asari(self, asari_cmd):
+        # TODO - clean up asari directory issue
         """
         This command will run asari on the mzml acquisitions in an 
         experiment. The details of the command to be ran is defined by
