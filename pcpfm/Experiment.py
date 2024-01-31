@@ -23,27 +23,82 @@ class Experiment(Experiment):
                 "qaqc_figs": "QAQC_figs/",
                 "asari_subdirectory": "asari/"
             }
-    def __init__(self, __d):
-        super().__init__(__d["experiment_name"])
-        self.parent_study = __d["study"]
-        self.number_samples = len(__d["acquisitions"])
-        self.species = None
-        self.tissue = None
-        self.ordered_samples = tuple(__d["acquisitions"])
-        self.provenance = {
-            "generated_time": __d["start_time"],
-            "generated_by": None,
-            "input_filename": __d["sequence"],
-            "preprocess_software": "",
-            "preprocess_parameters": {}
-        }
-        self.List_of_empCpds = __d["final_empcpds"]
-        for k, v in __d.items():
-            try:
-                getattr(self, k)
-            except:
-                setattr(self, k, v)
+    
+    def __init__(self,
+                 experiment_name,
+                 experiment_directory,
+                 acquisitions = [],
+                 qcqa_results = {},
+                 feature_tables = {},
+                 empCpds = {},
+                 log_transformed_feature_tables=[],
+                 _ionization_mode=None,
+                 cosmetics={},
+                 used_cosmetics=[],
+                 method_has_MS2={},
+                 MS2_methods=set(),
+                 MS1_only_methods=set(),
+                 command_history = [],
+                 _acq_names=None,
+                 study=None,
+                 start_time=None,
+                 sequence=None,
+                 final_empCpds=None,
+                 species=None,
+                 tissue=None,
+                 provenance={},
+                 converted_subdirectory=None,
+                 raw_subdirectory=None,
+                 acquisition_data=None,
+                 annotation_subdirectory=None,
+                 filtered_feature_tables_subdirectory=None,
+                 ms2_directory=None,
+                 qaqc_figs=None,
+                 asari_subdirectory=None):
+        super().__init__(experiment_name)
+        self.experiment_directory = os.path.abspath(experiment_directory),
+        self.acquisitions = acquisitions
+        self.qcqa_results = qcqa_results
+        self.feature_tables = feature_tables
+        self.empCpds = empCpds,
+        self.log_transformed_feature_tables = log_transformed_feature_tables,
+        self.cosmetics = cosmetics
+        self.used_cosmetics = used_cosmetics,
+        self.method_has_MS2 = method_has_MS2,
+        self.MS2_methods = MS2_methods,
+        self.MS1_only_method=MS1_only_methods,
+        self.command_history = command_history,
+        self.start_time = start_time,
+        self.sequence = sequence
+        self.List_of_empCpds = final_empCpds
+        self.parent_study = study
+        self.provenance = provenance
 
+        # subdirectories
+        self.converted_subdirectory = converted_subdirectory
+        self.raw_subdirectory = raw_subdirectory,
+        self.acquisition_data = acquisition_data,
+        self.annotation_subdirectory = annotation_subdirectory,
+        self.filtered_feature_tables_subdirectory = filtered_feature_tables_subdirectory
+        self.ms2_directory = ms2_directory,
+        self.qaqc_figs = qaqc_figs,
+        self.asari_subdirectory = asari_subdirectory
+
+        # special metadata fields
+        self.species = species
+        self.tissue = tissue
+
+        #lazily evaluated parameters
+        self._ionization_mode = _ionization_mode
+        self._acq_names = _acq_names
+    
+    @property
+    def number_samples(self):
+        return len(self.acquisitions)
+    
+    @property
+    def ordered_samples(self):
+        return tuple(self.acquisitions)
 
     @staticmethod
     def create_experiment(experiment_name, experiment_directory, ionization_mode=None, sequence=None):
@@ -60,6 +115,12 @@ class Experiment(Experiment):
 
         :return: experiment object
         """
+        to_create = [os.path.abspath(experiment_directory)]
+        to_create += [os.path.join(to_create[0], subdir) for subdir in Experiment.subdirectories.values()]
+        for subdirectory_full_path in to_create:
+            os.makedirs(subdirectory_full_path, exist_ok=True)
+        full_subdirs = {k: path for k, path in zip(Experiment.subdirectories.keys(), to_create[1:])}
+
         exp_dict = {
             "experiment_name": experiment_name,
             "experiment_directory": os.path.abspath(experiment_directory),
@@ -80,10 +141,16 @@ class Experiment(Experiment):
             "study": None,
             "start_time": str(time.time()),
             "sequence": sequence,
-            "final_empcpds": None
+            "final_empcpds": None,
+            "converted_subdirectory" : full_subdirs["converted_subdirectory"],
+            "raw_subdirectory" : full_subdirs["raw_subdirectory"],
+            "acquisition_data" : full_subdirs["acquisition_data"],
+            "annotation_subdirectory": full_subdirs["annotation_subdirectory"],
+            "filtered_feature_tables_subdirectory": full_subdirs["filtered_feature_tables_subdirectory"],
+            "ms2_directory" : full_subdirs["ms2_directory"],
+            "qaqc_figs": full_subdirs["qaqc_figs"],
+            "asari_subdirectory": full_subdirs["asari_subdirectory"]
         }
-        for k, v in Experiment.initialize_subdirectories(Experiment.subdirectories, experiment_directory).items():
-            exp_dict[k] = v
         return Experiment(exp_dict)
 
     def save(self):
@@ -113,11 +180,41 @@ class Experiment(Experiment):
 
         """        
         decoded_JSON = json.load(open(experiment_json_filepath))
-        decoded_JSON["acquisitions"] = [Acquisition.Acquisition(x) for x in decoded_JSON["acquisitions"]]
+        decoded_JSON["acquisitions"] = [Acquisition.Acquisition.load_acquisition(x) for x in decoded_JSON["acquisitions"]]
         experiment = Experiment(decoded_JSON)
-        for acq in decoded_JSON["acquisitions"]:
-            acq.experiment = experiment
-        return experiment
+        return Experiment(
+            experiment["experiment_name"],
+            experiment["experiment_directory"],
+            [Acquisition.Acquisition.load_acquisition(x) for x in decoded_JSON["acquisitions"]],
+            experiment["qcqa_results"],
+            experiment["feature_tables"],
+            experiment["empCpds"],
+            experiment["feature_tables"],
+            experiment["log_transformed_feature_tables"],
+            experiment["_ionization_mode"],
+            experiment["cosmetics"],
+            experiment["used_cosmetics"],
+            experiment["method_has_MS2"],
+            experiment["MS2_methods"],
+            experiment["MS1_only_methods"],
+            experiment["command_history"],
+            experiment["_acq_names"],
+            experiment["study"],
+            experiment["start_time"],
+            experiment["sequence"],
+            experiment["final_empCpds"],
+            experiment["species"],
+            experiment["tissue"],
+            experiment["provenance"],
+            experiment["converted_subdirectory"],
+            experiment["raw_subdirectory"],
+            experiment["acquisition_data"],
+            experiment["annotation_subdirectory"],
+            experiment["filtered_feature_tables_subdirectory"],
+            experiment["ms2_directory"],
+            experiment["qaqc_figs"],
+            experiment["asari_subdirectory"]
+        )
 
     @property
     def MS2_acquisitions(self):
@@ -175,25 +272,24 @@ class Experiment(Experiment):
             os.makedirs(subdirectory_full_path, exist_ok=True)
         return {k: path for k, path in zip(subdirectories.keys(), to_create[1:])}
 
-    def delete(self, moniker, delete_feature_table=False, delete_empCpds=False):
-        """
-        Given a moniker for a feature table or empCpds, delete the entry on disk and in the object
+    def delete_feature_table(self, moniker):
+        #TODO - add docstring
+        if moniker in self.feature_tables:
+            os.remove(self.feature_tables[moniker])
+            del self.feature_tables[moniker]
+        else:
+            raise Exception("No such table: ", moniker)
 
-        Args:
-            moniker (str): the moniker to be deleted
-            delete_feature_table (bool, optional): if True, delete the corresponding feature table. Defaults to False.
-            delete_empCpds (bool, optional): if True, delete the corresponding empCpd. Defaults to False.
-        """
-        if delete_feature_table:
-            to_delete = self.feature_tables
-        elif delete_empCpds:
-            to_delete = self.empCpds
-        os.remove(to_delete[moniker])
-        del to_delete[moniker]
+    def delete_empCpds(self, moniker):
+        #TODO - add docstring
+        if moniker in self.empCpds:
+            os.remove(self.empCpds[moniker])
+            del self.empCpds[moniker]
+        else:
+            raise Exception("No such empCpds: ", moniker)
 
     def retrieve_feature_table(self, moniker, as_object=False):
         #TODO - add docstring
-
         from . import FeatureTable
         if as_object:
             return FeatureTable.FeatureTable.load(moniker, self)
@@ -210,6 +306,7 @@ class Experiment(Experiment):
             return self.feature_tables[moniker]
 
     def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method", override=True):
+        # TODO - fix ms2 detection
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
         and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
