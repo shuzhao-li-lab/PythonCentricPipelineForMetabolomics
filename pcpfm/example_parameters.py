@@ -88,7 +88,6 @@ PARAMETERS = {
     "ms2_min_peaks": 3,
     "find_experiment_ms2": True,
     "requirements_txt": "../requirements.txt",
-    "report_config": "report_templates/default.json",
     "sample_for_ratio": None,
     "deriv_formula": None,
     "skip_list": None,
@@ -107,5 +106,6 @@ if PARAMETERS["conversion_command"][1] == '/ThermoRawFileParser/ThermoRawFilePar
     PARAMETERS["conversion_command"][1] = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
 
 for k, v in PARAMETERS.items():
-    if type(v) is str and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
+    if isinstance(v, str) and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
         PARAMETERS[k] = os.path.join(this_abs_dir, v)
+        
