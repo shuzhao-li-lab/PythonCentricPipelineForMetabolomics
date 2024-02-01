@@ -58,7 +58,8 @@ class MS2Spectrum():
                 "matched_peaks": matched_peaks,
                 "db_precursor_mz": other_MS2.precursor_ion_mz,
                 "reference_id": other_MS2.compound_name,
-                "db_spectrum": [[x[0], x[1]] for x in other_MS2.matchms_spectrum.peaks],
+                "list_mz": [x[0] for x in other_MS2.matchms_spectrum.peaks],
+                "list_intensity": [x[1] for x in other_MS2.matchms_spectrum.peaks],
                 "annot_source": other_MS2.source,
                 "annotation_level": "Level_2" if L1_annotation is False else "Level_1"
             }
