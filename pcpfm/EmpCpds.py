@@ -1,10 +1,12 @@
-from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
 import json
-from intervaltree import IntervalTree
 import os
-from .utils import get_similarity_method, get_parser, lazy_extract_MS2_spectra, search_for_mzml
 
-class empCpds:
+
+from khipu.extended import isotope_search_patterns, extended_adducts, adduct_search_patterns, adduct_search_patterns_neg
+from intervaltree import IntervalTree
+from .utils import get_similarity_method, lazy_extract_MS2_spectra, search_for_mzml, row_to_dict, extract_CD_csv
+
+class EmpCpds:
     def __init__(self, dict_empCpds, experiment, moniker):
         """
         the empCpds object is a wrapper around dict_empCpds that will associate the dict_empCpds with a moniker and 
@@ -25,26 +27,6 @@ class empCpds:
         self.__rt_trees = {}
         self._MS2_spectra = None
 
-    
-    def get_precursor_mz_tree(self, mz_tolerance):
-        if ('precursor', mz_tolerance) not in self.__mz_trees:
-            mz_tree = IntervalTree()
-            for spectrum in self.MS2_spectra.values():
-                precursor_mz = spectrum.precursor_ion_mz
-                mz_error = precursor_mz / 1e6 * mz_tolerance
-                mz_tree.addi(precursor_mz - mz_error, precursor_mz + mz_error, spectrum.precursor_ion)
-            self.__mz_trees[('precursor', mz_tolerance)] = mz_tree
-        return self.__mz_trees[('precursor', mz_tolerance)]
-    
-    def get_precursor_rt_tree(self, rt_tolerance):
-        if ('precursor', rt_tolerance) not in self.__rt_trees:
-            rt_tree = IntervalTree()
-            for spectrum in self.MS2_spectra.values():
-                precursor_rt = spectrum.precursor_ion_rt
-                rt_tree.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, spectrum.precursor_ion)
-            self.__mz_trees[('precursor', rt_tolerance)] = rt_tree
-        return self.__mz_trees[('precursor', rt_tolerance)]
-
     @property
     def MS2_spectra(self):
         from .MSnSpectrum import MS2Spectrum
@@ -56,7 +38,6 @@ class empCpds:
                         MS2_spectra[spectrum['precursor_ion']] = MS2Spectrum.from_embedding(spectrum)
             self._MS2_spectra = MS2_spectra
         return self._MS2_spectra
-
 
     @property
     def feature_id_to_khipu_id(self):
@@ -87,12 +68,42 @@ class empCpds:
         return self._khipu_id_to_feature_id
     
     def update_annotations(self):
+        # update MS2 annotations
         for _, khipu in self.dict_empCpds.items():
             if "MS2_Spectra" in khipu:
                 new_spectra = []
                 for spectrum in khipu["MS2_Spectra"]:
                     new_spectra.append(self.MS2_spectra[spectrum['precursor_ion']].embedding())
                 khipu["MS2_Spectra"] = new_spectra
+
+        # update other fields in the empCpds:
+        for _, khipu in self.dict_empCpds.items():
+            khipu['identity'] = set()
+            khipu['Database_referred'] = set()
+
+            #MS1 only, only Level_1b counts for identity
+            if 'Level_1b' in khipu:
+                for annotation, source in khipu['Level_1b']:
+                    khipu['identity'].add((annotation, "no score - ms1 only"))
+                    khipu['Database_referred'].add(source)
+
+            #MS1 only, NOT IDENTITY
+            if 'Level_4' in khipu:
+                for annotation in khipu['Level_4']:
+                    khipu['Database_referred'].add(annotation['primary_db'])
+
+            #MS2, both Level_1a and Level 2 will update identity
+            if 'MS2_Spectra' in khipu:
+                for ms2_spectrum in khipu["MS2_Spectra"]:
+                    for annotation in ms2_spectrum["annotations"]:
+                        if annotation["annotation_level"] == "Level_2":
+                            khipu['identity'].add((annotation["reference_id"], round(annotation["msms_score"],3)))
+                            khipu['Database_referred'].add(annotation["annot_source"])
+                        if annotation["annotation_level"] == "Level_1a":
+                            khipu['identity'].add((annotation["reference_id"], round(annotation["msms_score"],3), "matches standard"))
+                            khipu['Database_referred'].add(annotation["annot_source"])
+            khipu['identity'] = list(khipu['identity'])
+            khipu['Database_referred'] = list(khipu['Database_referred'])
 
     def get_mz_tree(self, mz_tolerance, abs=False):
         """
@@ -104,7 +115,7 @@ class empCpds:
 
         :return: interval tree for mz at the provided mz_tolerance
         """
-        if str(mz_tolerance) + str(abs) not in self.__mz_trees:
+        if ('feature', str(mz_tolerance), str(abs)) not in self.__mz_trees:
             mz_tree = IntervalTree()
             for _, khipu in self.dict_empCpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
@@ -113,8 +124,8 @@ class empCpds:
                     else:
                         mz_error = (peak["mz"]/1e6 * mz_tolerance)
                         mz_tree.addi(peak["mz"] - mz_error, peak["mz"] + mz_error, peak['id_number'])
-            self.__mz_trees[str(mz_tolerance) + str(abs)] = mz_tree
-        return self.__mz_trees[str(mz_tolerance) + str(abs)]
+            self.__mz_trees[('feature', str(mz_tolerance), str(abs))] = mz_tree
+        return self.__mz_trees[('feature', str(mz_tolerance), str(abs))]
 
     def get_rt_tree(self, rt_tolerance):
         """
@@ -125,13 +136,32 @@ class empCpds:
 
         :return: interval tree for rtime at the provided rt tolerance
         """
-        if rt_tolerance not in self.__rt_trees:
+        if ('feature', rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
             for _, khipu in self.dict_empCpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     rt_tree.addi(peak["rtime"] - rt_tolerance, peak["rtime"] + rt_tolerance, peak['id_number'])
-            self.__rt_trees[rt_tolerance] = rt_tree 
-        return self.__rt_trees[rt_tolerance]
+            self.__rt_trees[('feature', rt_tolerance)] = rt_tree 
+        return self.__rt_trees[('feature', rt_tolerance)]
+
+    def get_precursor_mz_tree(self, mz_tolerance):
+        if ('precursor', mz_tolerance) not in self.__mz_trees:
+            mz_tree = IntervalTree()
+            for spectrum in self.MS2_spectra.values():
+                precursor_mz = spectrum.precursor_ion_mz
+                mz_error = precursor_mz / 1e6 * mz_tolerance
+                mz_tree.addi(precursor_mz - mz_error, precursor_mz + mz_error, spectrum.precursor_ion)
+            self.__mz_trees[('precursor', mz_tolerance)] = mz_tree
+        return self.__mz_trees[('precursor', mz_tolerance)]
+    
+    def get_precursor_rt_tree(self, rt_tolerance):
+        if ('precursor', rt_tolerance) not in self.__rt_trees:
+            rt_tree = IntervalTree()
+            for spectrum in self.MS2_spectra.values():
+                precursor_rt = spectrum.retention_time
+                rt_tree.addi(precursor_rt - rt_tolerance, precursor_rt + rt_tolerance, spectrum.precursor_ion)
+            self.__mz_trees[('precursor', rt_tolerance)] = rt_tree
+        return self.__mz_trees[('precursor', rt_tolerance)]
 
     @property
     def num_khipus(self):
@@ -215,7 +245,7 @@ class empCpds:
         """        
         return empCpds(json.load(open(experiment.empCpds[moniker])), experiment, moniker)
 
-    def map_MS2_to_empCpds(self, mapping_mz_tolerance=5, mapping_rt_tolerance=30, ms2_files=False, scan_experiment=False):
+    def map_MS2_to_empCpds(self, mapping_mz_tolerance=5, mapping_rt_tolerance=30, ms2_files=None, scan_experiment=False):
         # we should first map ms2 spectra to empCpds, then annnotate them.
         mzml_w_ms2 = []
         if ms2_files:
@@ -226,6 +256,7 @@ class empCpds:
             for acq in self.experiment.acquisitions:
                 if acq.has_MS2:
                     mzml_w_ms2.append(acq.mzml_filepath)
+
         for ms2_object in lazy_extract_MS2_spectra(mzml_w_ms2):
             used_khipu = set()
             matching_features = self.search_for_feature(ms2_object.precursor_ion_mz,
@@ -295,7 +326,6 @@ class empCpds:
             for field in to_delete:
                 del p[field]
 
-
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empCpds = ECCON.peaks_to_epdDict(
             isotopes,
@@ -347,15 +377,16 @@ class empCpds:
             EED.extend_empCpd_annotation(KCD)
 
         for empCpd in self.dict_empCpds.values():
-            if 'mz_only_db_matches' not in empCpd:
-                empCpd['mz_only_db_matches'] = []
+            if 'Level_4' not in empCpd:
+                empCpd['Level_4'] = []
             if 'list_matches' in empCpd and empCpd['list_matches']:
                 for match in empCpd['list_matches']:
                     formula_mass, ion_relation, count = match
                     formula, mass = formula_mass.split("_")
                     if formula in formula_entry_lookup:
-                        empCpd['mz_only_db_matches'].extend(formula_entry_lookup[formula])
-    
+                        empCpd['Level_4'].extend(formula_entry_lookup[formula])
+        self.update_annotations()
+
     def L2_annotate(self,
                     msp_files, 
                     mz_tolerance=5, 
@@ -371,17 +402,42 @@ class empCpds:
                 expMS2_object = self.MS2_spectra[possible_match]
                 msms_score, n_matches = similarity_instance.pair(db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum).tolist()
                 if msms_score >= score_cutoff and n_matches >= min_peaks:
-                    expMS2_object.annotate(db_ms2_object, msms_score, n_matches)
-        self.update_annotations()        
+                    expMS2_object.annotate(db_ms2_object, msms_score, n_matches, annotation_level="Level_2")
+        self.update_annotations()
 
-    def L1_annotate(self, annotation_sources, rt_tolerance=30, mz_tolerance=10, deduplicate=True):
-        for standard in self.__extract_standards(annotation_sources):
-            mz, rtime, cname = standard.precursor_ion_mz, standard.retention_time, standard.compound_name
-            for feature_match in self.search_for_feature(mz, rtime, mz_tolerance, rt_tolerance):
-                kp = self.dict_empCpds[self.feature_id_to_khipu_id[feature_match]]
-                kp['identity'] = [] if 'identity' not in kp else kp['identity']
-                if cname not in kp['identity']:
-                    kp['identity'].append(cname)
-                if deduplicate:
-                    kp['identity'] = list(set(kp['identity']))
-                    
+    def L1a_annotate(self, 
+                     standards_csv,
+                     mz_tolerance=5,
+                     rt_tolerance=30,
+                     similarity_method='CosineHungarian',
+                     min_peaks=2,
+                     score_cutoff=0.50):
+        similarity_method = get_similarity_method(similarity_method)
+        precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tolerance)
+        precursor_rt_tree = self.get_precursor_rt_tree(rt_tolerance)
+        for db_ms2_object in extract_CD_csv(standards_csv, ionization_mode=self.experiment.ionization_mode, lazy=True):
+            similarity_instance = similarity_method(tolerance=db_ms2_object.precursor_ion_mz/1e6 * mz_tolerance * 2)
+            for possible_match in [x.data for x in precursor_mz_tree.at(db_ms2_object.precursor_ion_mz)]:
+                if possible_match in [x.data for x in precursor_rt_tree.at(db_ms2_object.retention_time)]:
+                    expMS2_object = self.MS2_spectra[possible_match]
+                    msms_score, n_matches = similarity_instance.pair(db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum).tolist()
+                    if msms_score >= score_cutoff and n_matches >= min_peaks:
+                        expMS2_object.annotate(db_ms2_object, msms_score, n_matches, annotation_level="Level_1a")
+        self.update_annotations()
+
+    def L1b_annotate(self,
+                     standards_csv,
+                     mz_tolerance=5,
+                     rt_tolerance=10,
+                     deduplicate=True):
+        import pandas as pd
+        for csv in standards_csv:
+            standards = pd.read_csv(csv)
+            for standard in standards.apply(row_to_dict, axis=1, args=(standards.columns,)):
+                mz, rtime, cname = [standard[k] for k in ["Confirm Precursor", "RT", "CompoundName"]]
+                for feature_match in self.search_for_feature(mz, rtime, mz_tolerance, rt_tolerance):
+                    kp = self.dict_empCpds[self.feature_id_to_khipu_id[feature_match]]
+                    if 'Level_1b' not in kp:
+                        kp['Level_1b'] = []
+                    kp['Level_1b'].append((cname, csv))
+        self.update_annotations()

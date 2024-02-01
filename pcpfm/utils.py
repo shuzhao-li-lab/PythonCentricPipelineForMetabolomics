@@ -3,7 +3,6 @@ import os
 import scipy.stats
 import numpy as np
 import shutil
-from functools import partial
 
 def row_to_dict(row, columns):
     _d = {}
@@ -12,6 +11,47 @@ def row_to_dict(row, columns):
         v = row[c].strip() if type(row[c]) is str else row[c]
         _d[c] = v
     return _d
+
+def extract_CD_csv(CD_csv, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True):
+    from mass2chem.formula import calculate_formula_mass
+    from matchms.Spectrum import Spectrum
+    import pandas as pd
+
+    standards_spectra = []
+    for csv in CD_csv:
+        standards = pd.read_csv(csv)
+        for standard in standards.apply(row_to_dict, axis=1, args=(standards.columns,)):
+            mzs, intensities = [], []
+            for i in range(10):
+                mzs.append(standard["Confirm Extracted." + str(i)] if i else standard["Confirm Extracted"])
+                intensities.append(standard["Target Ratio." + str(i)] if i else standard["Target Ratio"])
+            mzs = [mz for mz in mzs if (mz and not np.isnan(mz))]
+            intensities = [i for i in intensities if (i and not np.isnan(i))]
+            mzs, intensities = zip(*sorted(zip(mzs, intensities)))
+            if mzs and intensities and len(mzs) == len(intensities) and len(mzs) >= min_peaks:
+                spectrum = Spectrum(mz = np.asarray(list([float(x) for x in mzs])), 
+                                    intensities=np.asarray(list([float(x) for x in intensities])),
+                                    metadata=standard)
+                # assume proton for ionization adduct
+                if ionization_mode == "pos":
+                    standard['Theoretical_Precursor'] = calculate_formula_mass(standard["ChemicalFormula"]) + calculate_formula_mass("H") - 0.00054858
+                else:
+                    standard['Theoretical_Precursor'] = calculate_formula_mass(standard["ChemicalFormula"]) - calculate_formula_mass("H") + 0.00054858
+                spectrum = process_ms2_spectrum({'rt': standard['RT'] * 60,
+                                                'prec_mz': standard["Confirm Precursor"] if precursor_to_use == "Confirmed" else standard["Theoretical_Precursor"],
+                                                'cpd_name': standard["CompoundName"],
+                                                'spectrum': spectrum }, 
+                                                filename=csv, 
+                                                min_peaks=min_peaks, 
+                                                skip_meta=True,
+                                                skip_filters=False)
+            if spectrum and not lazy:
+                standards_spectra.append(spectrum)
+            if spectrum and lazy:
+                yield spectrum
+    if not lazy:
+        return standards_spectra
+
 
 def get_parser(file_extension):
     """
@@ -41,22 +81,8 @@ def get_similarity_method(method_name):
     except:
         raise Exception("no matching similarity method named: ", method_name)
 
-def extract_MS2_spectra(ms2_files, skip_filters=False):
-    MS2_spectral_registry = {}
-    for ms2_file in ms2_files:
-        found = 0
-        for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
-            found += 1
-            if spectrum:
-                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file, skip_filters=skip_filters)
-                if MS2_spec_obj:
-                    MS2_spectral_registry[MS2_spec_obj.id] = MS2_spec_obj
-    return MS2_spectral_registry
-
 def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
-    if type(ms2_files) is str:
-        ms2_files = [ms2_files]
-    for ms2_file in ms2_files:
+    for ms2_file in [ms2_files] if type(ms2_files) is str else ms2_files:
         for spectrum in get_parser(ms2_file.split(".")[-1])(ms2_file, metadata_harmonization=True):
             spectrum = matchms.filtering.add_precursor_mz(spectrum)
             if spectrum:
@@ -64,18 +90,16 @@ def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
                     precursor_mz = spectrum.get('precursor_mz')
                 except:
                     precursor_mz = None
-            if precursor_mz and mz_tree:
-                if mz_tree.at(precursor_mz):
-                    try:
+            if precursor_mz:
+                if mz_tree:
+                    if mz_tree.at(precursor_mz):
                         MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
                         if MS2_spec_obj:
                             yield MS2_spec_obj
-                    except:
-                        pass
-            elif mz_tree is None:
-                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
-                if MS2_spec_obj:
-                    yield MS2_spec_obj
+                else:
+                    MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                    if MS2_spec_obj:
+                        yield MS2_spec_obj
 
 def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3, skip_meta=False, skip_filters=False):
     """
@@ -174,7 +198,6 @@ def search_for_mzml(sdir):
         for f in [f for f in fs if f.endswith(".mzML")]:
             mzml_found.append(os.path.join(os.path.abspath(d), f))
     return mzml_found
-
 
 def recursive_encoder(to_encode):
     """
