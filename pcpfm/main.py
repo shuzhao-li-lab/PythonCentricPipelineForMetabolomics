@@ -777,7 +777,18 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         Report.Report(experiment, params)
 
+    def map_MS2_to_empCpds(params):
+        experiment = Experiment.Experiment.load(params['input'])
+        empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
+        empCpds.map_MS2_to_empCpds(30, 5, ms2_files=params['ms2_dir'])
+        empCpds.save(params["new_moniker"])
+        empCpds = experiment.retrieve_empCpds(params['new_moniker'], True)
+
+
+        empCpds.MS2_spectra
+
     def generate_output(params):
+        #TODO - this needs to be broken into the appropriate other files
         """
         This command generates the three table output for downstream
         analysis. This includes a feature table, an annotation table,
