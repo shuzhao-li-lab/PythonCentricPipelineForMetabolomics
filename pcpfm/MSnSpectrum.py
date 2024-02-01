@@ -51,7 +51,7 @@ class MS2Spectrum():
         )
 
 
-    def annotate(self, other_MS2, score, matched_peaks, L1_annotation=False):
+    def annotate(self, other_MS2, score, matched_peaks, annotation_level="Unspecified"):
         self.annotations.append(
             {
                 "msms_score": score,
@@ -61,7 +61,7 @@ class MS2Spectrum():
                 "list_mz": [x[0] for x in other_MS2.matchms_spectrum.peaks],
                 "list_intensity": [x[1] for x in other_MS2.matchms_spectrum.peaks],
                 "annot_source": other_MS2.source,
-                "annotation_level": "Level_2" if L1_annotation is False else "Level_1"
+                "annotation_level": annotation_level
             }
         )
 
