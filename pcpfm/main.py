@@ -692,9 +692,7 @@ class Main():
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
             empCpd.L2_annotate(
                 msp_file,
-                params['ms2_dir'],
                 params["annot_mz_tolerance"],
-                params["annot_rt_tolerance"],
                 params["ms2_similarity_metric"],
                 params["ms2_min_peaks"],
             )
@@ -782,10 +780,6 @@ class Main():
         empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
         empCpds.map_MS2_to_empCpds(30, 5, ms2_files=params['ms2_dir'])
         empCpds.save(params["new_moniker"])
-        empCpds = experiment.retrieve_empCpds(params['new_moniker'], True)
-
-
-        empCpds.MS2_spectra
 
     def generate_output(params):
         #TODO - this needs to be broken into the appropriate other files
