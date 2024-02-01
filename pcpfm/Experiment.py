@@ -2,7 +2,7 @@ import os
 import random
 import time
 import json
-from .utils import recursive_encoder, file_operations
+from .utils import recursive_encoder, file_operations, row_to_dict
 from . import Acquisition
 
 from metDataModel.core import Experiment
@@ -35,13 +35,10 @@ class Experiment(Experiment):
                  _ionization_mode=None,
                  cosmetics={},
                  used_cosmetics=[],
-                 method_has_MS2=None,
                  MS2_methods=set(),
                  MS1_only_methods=set(),
                  command_history = [],
-                 _acq_names=None,
                  study=None,
-                 start_time=None,
                  sequence=None,
                  final_empCpds=None,
                  species=None,
@@ -68,12 +65,11 @@ class Experiment(Experiment):
         self.MS2_methods = MS2_methods
         self.MS1_only_methods = MS1_only_methods
         self.command_history = command_history
-        self.start_time = start_time
         self.sequence = sequence
         self.List_of_empCpds = self.final_empCpds = final_empCpds
         self.parent_study = self.study = study
         self.provenance = provenance
-        self.method_has_MS2 = method_has_MS2
+
         # subdirectories
         self.converted_subdirectory = converted_subdirectory
         self.raw_subdirectory = raw_subdirectory
@@ -89,9 +85,9 @@ class Experiment(Experiment):
         self.tissue = tissue
 
         #lazily evaluated parameters
-        self._ionization_mode = _ionization_mode
-        self._acq_names = _acq_names
-    
+        self._ionization_mode = _ionization_mode # this one can be costly, lets store it
+        self._acq_names = None
+
     @property
     def number_samples(self):
         return len(self.acquisitions)
@@ -121,7 +117,6 @@ class Experiment(Experiment):
             os.path.abspath(experiment_directory),
             _ionization_mode=ionization_mode,
             command_history=[str(time.time()) + ':start_analysis'],
-            start_time=str(time.time()),
             sequence=sequence,
             converted_subdirectory = full_subdirs["converted_subdirectory"],
             raw_subdirectory = full_subdirs["raw_subdirectory"],
@@ -159,7 +154,8 @@ class Experiment(Experiment):
         :returns: an experiment object
 
         """
-        with json.load(open(experiment_json_filepath)) as decoded_JSON:
+        with open(experiment_json_filepath) as json_filehandle:
+            decoded_JSON = json.load(json_filehandle)
             return Experiment(
                 '',
                 decoded_JSON["experiment_directory"],
@@ -171,13 +167,10 @@ class Experiment(Experiment):
                 _ionization_mode=decoded_JSON["_ionization_mode"],
                 cosmetics=decoded_JSON["cosmetics"],
                 used_cosmetics=decoded_JSON["used_cosmetics"],
-                method_has_MS2=decoded_JSON["method_has_MS2"],
                 MS2_methods=decoded_JSON["MS2_methods"],
                 MS1_only_methods=decoded_JSON["MS1_only_methods"],
                 command_history=decoded_JSON["command_history"],
-                _acq_names=decoded_JSON["_acq_names"],
                 study=decoded_JSON["study"],
-                start_time=decoded_JSON["start_time"],
                 sequence=decoded_JSON["sequence"],
                 final_empCpds=decoded_JSON["final_empCpds"],
                 species=decoded_JSON["species"],
@@ -252,7 +245,7 @@ class Experiment(Experiment):
     def delete_feature_table(self, moniker):
         #TODO - add docstring
         if moniker in self.feature_tables:
-            os.remove(self.feature_tables[moniker])
+            file_operations["delete"](self.feature_tables[moniker])
             del self.feature_tables[moniker]
         else:
             raise Exception("No such table: ", moniker)
@@ -260,7 +253,7 @@ class Experiment(Experiment):
     def delete_empCpds(self, moniker):
         #TODO - add docstring
         if moniker in self.empCpds:
-            os.remove(self.empCpds[moniker])
+            file_operations["delete"](self.empCpds[moniker])
             del self.empCpds[moniker]
         else:
             raise Exception("No such empCpds: ", moniker)
@@ -268,19 +261,24 @@ class Experiment(Experiment):
     def retrieve_feature_table(self, moniker, as_object=False):
         #TODO - add docstring
         from . import FeatureTable
-        if as_object:
-            return FeatureTable.FeatureTable.load(moniker, self)
+        if moniker in self.feature_tables:
+            if as_object:
+                return FeatureTable.FeatureTable.load(moniker, self)
+            else:
+                return self.feature_tables[moniker]
         else:
-            return self.feature_tables[moniker]
+            raise Exception("No such table: ", moniker)
         
     def retrieve_empCpds(self, moniker, as_object=False):
         #TODO - add docstring
-
         from . import EmpCpds
-        if as_object:
-            return EmpCpds.empCpds.load(moniker, self)
+        if moniker in self.empCpds:
+            if as_object:
+                return EmpCpds.empCpds.load(moniker, self)
+            else:
+                return self.feature_tables[moniker]
         else:
-            return self.feature_tables[moniker]
+            raise Exception("No such empCpds: ", moniker)
 
     def add_acquisition(self, acquisition, mode="link", method_field="Instrument Method"):
         """
@@ -294,21 +292,14 @@ class Experiment(Experiment):
         """        
         if os.path.exists(acquisition.source_filepath):
             target_path = None
-            method = acquisition.metadata_tags.get(method_field, None)
             if acquisition.source_filepath.endswith(".mzML"):
                 acquisition.raw_filepath = None
-                if method in self.MS2_methods:
-                    acquisition._has_MS2 = True
-                elif method in self.MS1_only_methods:
-                    acquisition._has_MS2 = False
                 if acquisition.has_MS2:
-                    if method:
-                        self.MS2_methods.add(method)
                     target_path = os.path.join(self.ms2_directory, os.path.basename(acquisition.source_filepath))                        
                 else:
-                    if method: 
-                        self.MS1_only_methods.add(method)
                     target_path = os.path.join(self.converted_subdirectory, os.path.basename(acquisition.source_filepath))
+                print(acquisition.name, acquisition.has_MS2)
+
                 acquisition.mzml_filepath = target_path
             elif acquisition.source_filepath.endswith(".raw"):
                 acquisition.raw_filepath = os.path.join(self.raw_subdirectory, os.path.basename(acquisition.source_filepath))
@@ -349,12 +340,12 @@ class Experiment(Experiment):
                 for field, replacement_value in field_map.items():
                     conversion_command = conversion_command.replace(field, replacement_value)
         with mp.Pool(mp.cpu_count()) as workers:
-            for _, raw_acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
-                raw_acquisition.mzml_filepath = output_path
-                if raw_acquisition.has_MS2:
-                    MS2_path = os.path.join(self.ms2_directory, os.path.basename(raw_acquisition.mzml_filepath))
-                    file_operations["move"](raw_acquisition.mzml_filepath, MS2_path)
-                    raw_acquisition.mzml_filepath = MS2_path
+            for _, acquisition, output_path in zip(workers.map(os.system, [' '.join(x) for x in jobs]), raw_acquisitions, output_paths):
+                acquisition.mzml_filepath = output_path
+                if acquisition.has_MS2:
+                    MS2_path = os.path.join(self.ms2_directory, os.path.basename(acquisition.mzml_filepath))
+                    file_operations["move"](acquisition.mzml_filepath, MS2_path)
+                    acquisition.mzml_filepath = MS2_path
             
     def filter_samples(self, filter, return_field=None):
         """
@@ -388,26 +379,28 @@ class Experiment(Experiment):
 
         :return: experiment object
         """        
-        import csv 
+        import pandas as pd
         sample_skip_list = set()
         if sample_skip_list_fp:
             if sample_skip_list_fp.endswith(".txt"):
                 sample_skip_list = set([x.strip() for x in open(sample_skip_list_fp).readlines()])
 
-        if not (os.path.exists(experiment_directory) or os.path.exists(os.path.join(experiment_directory, "experiment.json"))):
+        if not os.path.exists(os.path.join(experiment_directory, "experiment.json")):
             filter = {} if filter is None else filter
-            experiment = Experiment.create_experiment('', experiment_directory, ionization_mode=ionization_mode, sequence=CSV_filepath)
-            with open(CSV_filepath, encoding='utf-8-sig') as CSV_fh:
-                for acquisition_info in csv.DictReader(CSV_fh):
-                    acquisition_info = {k.strip(): v.strip() for k,v in acquisition_info.items()}
-                    if name_field not in acquisition_info or path_field not in acquisition_info:
-                        raise Exception("Name Field or Path Field is Missing!")
-                    if '___' in acquisition_info[name_field]:
-                        acquisition_info[name_field] = acquisition_info[name_field].split('___')[-1]
-                    acquisition = Acquisition.Acquisition.create_acquisition(acquisition_info[name_field], acquisition_info[path_field], acquisition_info)
-                    acquisition.experiment = experiment
-                    if acquisition.filter(filter) and acquisition.name not in sample_skip_list:
-                        experiment.add_acquisition(acquisition)
+            experiment = Experiment.create_experiment(experiment_directory, 
+                                                      experiment_directory, 
+                                                      ionization_mode=ionization_mode, 
+                                                      sequence=CSV_filepath)
+            sequence_df = pd.read_csv(CSV_filepath)
+            for acq_info in sequence_df.apply(row_to_dict, axis=1, args=(sequence_df.columns,)):
+                if name_field not in acq_info or path_field not in acq_info:
+                    raise Exception("Name Field or Path Field is Missing!")
+                if '___' in acq_info[name_field]:
+                    acq_info[name_field] = acq_info[name_field].split('___')[-1]
+                acquisition = Acquisition.Acquisition.create_acquisition(acq_info[name_field], acq_info[path_field], acq_info)
+                acquisition.experiment = experiment
+                if acquisition.filter(filter) and acquisition.name not in sample_skip_list:
+                    experiment.add_acquisition(acquisition)
             if experiment.acquisitions:
                 experiment.save()
                 return experiment
@@ -445,45 +438,58 @@ class Experiment(Experiment):
         """
         import matplotlib.colors as mcolors
 
-        # these colors are too close to being white
-        banned_colors = [
-            "snow", "beige", "honeydew", "azure", 
-            "aliceblue", "lightcyan", "lightyellow", 
-            "white", "oldlace", "antiquewhite", "ivory", 
-            "whitesmoke", "mistyrose", "seashell", "linen", 
-            "antiquewhite", "lightgoldenrodyellow", "cornsilk", 
-            "lemonchiffon", "honeydew", "mintcream", "ghostwhite",
-            "lavenderblush"
-            ]
-        # most of the markers are hard to see, whitelist these
-        allowed_markers = [
-                ".", "o", "v", "^", ">", "<", "1", 
-                "2", "3", "4", "8", "s", "P"
-            ]
-
-        # set the seed so that things are reproducible
-        if seed:
-            random.seed(seed)
+        cosmetic_rules = {
+            "colors": 
+                {
+                "banned": [
+                    "snow", "beige", "honeydew", "azure", 
+                    "aliceblue", "lightcyan", "lightyellow", 
+                    "white", "oldlace", "antiquewhite", "ivory", 
+                    "whitesmoke", "mistyrose", "seashell", "linen", 
+                    "antiquewhite", "lightgoldenrodyellow", "cornsilk", 
+                    "lemonchiffon", "honeydew", "mintcream", "ghostwhite",
+                    "lavenderblush"
+                    ],
+                "allowed": mcolors.CSS4_COLORS
+                },
+            "markers": 
+                {
+                "banned": [],
+                "allowed": [
+                    ".", "o", "v", "^", ">", "<", "1", 
+                    "2", "3", "4", "8", "s", "P"
+                    ],
+                }, 
+            "text":
+                {
+                    "banned": [],
+                    "allowed": []
+                }
+            }
         if cos_type in self.cosmetics and field in self.cosmetics[cos_type]:
             return self.cosmetics[cos_type][field]
-        else:
-            if cos_type == 'color':
-                allowed_colors = [x for x in mcolors.CSS4_COLORS if x not in banned_colors]
-                allowed_cosmetics = [x for x in allowed_colors if x not in self.used_cosmetics]
-            elif cos_type == 'marker':
-                allowed_cosmetics = [x for x in allowed_markers if x not in self.used_cosmetics]
-            elif cos_type == 'text':
-                pass
-            else:
-                raise Exception("invalid cosmetic type: ", cos_type)
-            needs_cosmetic = list(set([acquisition.metadata_tags[field] for acquisition in self.acquisitions]))
-            cosmetic_map = {t: c for t, c in zip(needs_cosmetic, random.sample(allowed_cosmetics, len(needs_cosmetic)))}   
+
+        allowed_cosmetics = {}
+        for cos_type in cosmetic_rules:
+            allowed_cosmetics[cos_type] = []
+            for item in cosmetic_rules[cos_type]["allowed"]:
+                if item not in self.used_cosmetics:
+                    if item not in cosmetic_rules[cos_type]["banned"]:
+                        allowed_cosmetics[cos_type].append(item)
+        
+        if cos_type in allowed_cosmetics:
+            allowed_cosmetics[cos_type] = random.shuffle(allowed_cosmetics[cos_type])
+            cosmetic_map = {}
+            for i, needs_cosmetic in enumerate(set([a.metadata_tags[field] for a in self.acquisitions])):
+                cosmetic_map[needs_cosmetic] = (allowed_cosmetics[cos_type][i])
             self.used_cosmetics.extend(list(cosmetic_map.values()))
             if cos_type not in self.cosmetics:
                 self.cosmetics[cos_type] = {}
             self.cosmetics[cos_type][field] = cosmetic_map
             self.save()
             return cosmetic_map
+        else:
+            raise Exception("No mapping for cosmetic type: ", cos_type)
 
     def batches(self, batch_field):
         """
@@ -502,9 +508,7 @@ class Experiment(Experiment):
             batches[batch_field_value].append(acquisition.name)
         return batches
     
-    def asari(self, asari_cmd):
-        # TODO - clean up asari directory issue
-        # TODO - prevent multiple asari runs
+    def asari(self, asari_cmd, force=False):
         """
         This command will run asari on the mzml acquisitions in an 
         experiment. The details of the command to be ran is defined by
@@ -521,26 +525,32 @@ class Experiment(Experiment):
         """
         import subprocess
         import asari
-        mapping = {
-            '$IONIZATION_MODE': self.ionization_mode,
-            '$CONVERTED_SUBDIR': self.converted_subdirectory,
-            '$ASARI_SUBDIR': self.asari_subdirectory
-        }
-        job = asari_cmd if type(asari_cmd) is list else asari_cmd.split(" ")
-        job = [mapping.get(f, f) for f in asari_cmd]
-        print(job)
-        completed_process = subprocess.run(job)
-        if completed_process.returncode == 0:
-            for x in os.listdir(self.experiment_directory):
-                if x.startswith("asari") and "project" in x:
-                    self.feature_tables['full'] = os.path.join(self.experiment_directory, x, "export/full_feature_table.tsv")
-                    self.feature_tables['preferred'] = os.path.join(self.experiment_directory, x, "preferred_Feature_table.tsv")
-                    self.empCpds['asari'] = os.path.join(self.experiment_directory, x, "Annotated_empiricalCompounds.json")
-            self.provenance["preprocess_software"] = 'Asari'
-            self.provenance["preprocess_parameters"]["version"] = asari.__version__
-            for i, x in enumerate(job):
-                if x.startswith('-') or x.startswith('--'):
-                    self.provenance["preprocess_parameters"][x] = job[i+1]
+        if not ('full' in self.feature_tables and 'preferred' in self.feature_tables) or force:
+            mapping = {
+                '$IONIZATION_MODE': self.ionization_mode,
+                '$CONVERTED_SUBDIR': self.converted_subdirectory,
+                '$ASARI_SUBDIR': self.asari_subdirectory
+            }
+            job = asari_cmd if type(asari_cmd) is list else asari_cmd.split(" ")
+            job = [mapping.get(f, f) for f in asari_cmd]
+            completed_process = subprocess.run(job)
+            if completed_process.returncode == 0:
+                for x in os.listdir(self.experiment_directory):
+                    if x.startswith("asari") and "project" in x:
+                        self.feature_tables['full'] = os.path.join(self.experiment_directory, x, "export/full_feature_table.tsv")
+                        self.feature_tables['preferred'] = os.path.join(self.experiment_directory, x, "preferred_Feature_table.tsv")
+                        self.empCpds['asari'] = os.path.join(self.experiment_directory, x, "Annotated_empiricalCompounds.json")
+                self.provenance["preprocess_software"] = 'Asari'
+                if 'preprocess_parameters' not in self.provenance:
+                    self.provenance['preprocess_parameters'] = {}
+                self.provenance["preprocess_parameters"]["version"] = asari.__version__
+                for i, x in enumerate(job):
+                    if x.startswith('-') or x.startswith('--'):
+                        self.provenance["preprocess_parameters"][x] = job[i+1]
+            else:
+                raise Exception("Error running Asari!")
+        else:
+            raise Exception("Asari has already been ran, pass '--force' to override")
 
             
             

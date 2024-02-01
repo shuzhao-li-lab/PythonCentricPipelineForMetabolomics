@@ -5,6 +5,14 @@ import numpy as np
 import shutil
 from functools import partial
 
+def row_to_dict(row, columns):
+    _d = {}
+    for c in columns:
+        c = c.strip() if type(c) is str else c
+        v = row[c].strip() if type(row[c]) is str else row[c]
+        _d[c] = v
+    return _d
+
 def get_parser(file_extension):
     """
     This will return the correct parser for a given MS2 file from 
@@ -65,13 +73,9 @@ def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
                     except:
                         pass
             elif mz_tree is None:
-                try:
-                    MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
-                    if MS2_spec_obj:
-                        yield MS2_spec_obj
-                except:
-                    pass
-
+                MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                if MS2_spec_obj:
+                    yield MS2_spec_obj
 
 def process_ms2_spectrum(spectrum, filename="not_specified", min_peaks=3, skip_meta=False, skip_filters=False):
     """
@@ -165,15 +169,12 @@ def search_for_mzml(sdir):
 
     :return: list of absolute mzML filepaths in sdir
     """
-    if sdir:
-        mzml_found = []
-        for d, _, fs in os.walk(sdir):
-            for f in fs:
-                if f.endswith(".mzML"):
-                    mzml_found.append(os.path.join(os.path.abspath(d), f))
-        return mzml_found
-    else:
-        return []
+    mzml_found = []
+    for d, _, fs in os.walk(sdir):
+        for f in [f for f in fs if f.endswith(".mzML")]:
+            mzml_found.append(os.path.join(os.path.abspath(d), f))
+    return mzml_found
+
 
 def recursive_encoder(to_encode):
     """

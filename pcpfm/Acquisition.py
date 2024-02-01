@@ -168,28 +168,33 @@ class Acquisition(Sample):
         return recursive_encoder(self.__dict__) 
     
     @property
-    def has_MS2(self, scan_limit=np.inf, method_field="Method"):
+    def has_MS2(self, scan_limit=np.inf, method_field="Instrument Method"):
         """
         Scan the mzml to detect if there are MS2 spectra
 
         :return: has_MS2, True or False
         """
         if self._has_ms2 is None:
-            if method_field in self.metadata_tags:
-                ms_method = self.metadata_tags[method_field]
-                if ms_method in self.experiment.method_has_MS2 and self.experiment.method_has_MS2[ms_method]:
+            method = self.metadata_tags.get(method_field, None)
+            if method:
+                if method in self.experiment.MS2_methods:
                     self._has_ms2 = True
+                    return self._has_ms2
+                elif method in self.experiment.MS1_only_methods:
+                    self._has_ms2 = False
+                    return self._has_ms2
+
             if self.mzml_filepath:
                 fp_to_read = self.mzml_filepath
             elif self.source_filepath.endswith(".mzML") or self.source_filepath.endswith(".mzml") :
                 fp_to_read = self.source_filepath
             else:
                 fp_to_read = None
-            if fp_to_read is not None:
+
+            if fp_to_read:
                 self._has_ms2 = False
-                reader = pymzml.run.Reader(fp_to_read)
                 try:
-                    for i, spec in enumerate(reader):
+                    for i, spec in enumerate(pymzml.run.Reader(fp_to_read)):
                         if spec.ms_level == 2:
                             self._has_ms2 = True
                             break
@@ -197,8 +202,11 @@ class Acquisition(Sample):
                             break
                 except:
                     pass
-        if method_field in self.metadata_tags:
-            self.experiment.method_has_MS2[ms_method] = self._has_ms2
+            if method:
+                if self._has_ms2:
+                    self.experiment.MS2_methods.add(method)
+                else:
+                    self.experiment.MS1_only_methods.add(method)
         return self._has_ms2    
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
@@ -269,7 +277,7 @@ class Acquisition(Sample):
         :param filter: dictionary as described above
         :return: true if acquisition passed filter else false
         """     
-        passed_filter  = True
+        passed_filter = True
         if filter:
             for key, rules in filter.items():
                 values_to_filter = self.metadata_tags[key].strip()
