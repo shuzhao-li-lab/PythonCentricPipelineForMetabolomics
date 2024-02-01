@@ -1,15 +1,28 @@
-import os 
+import os
 import json
 import multiprocessing as mp
 import argparse
 import csv
-
+import zipfile
+import gdown
+import pandas as pd
 from . import Experiment
 from . import EmpCpds
 from . import example_parameters
 from . import Report
 
 class Main():
+    """_summary_
+
+    Raises:
+        e: _description_
+        an: _description_
+        NotImplementedError: _description_
+
+    Returns:
+        _type_: _description_
+    """
+
     @staticmethod
     def process_params():
         # TODO - simplify this somehow if possible
@@ -24,10 +37,11 @@ class Main():
 
         :return: parameters dictionary
         """
-        
+
         params = example_parameters.PARAMETERS
         parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing')
-        parser.add_argument('subcommand', metavar='subcommand', help='one of the subcommands: _____')
+        parser.add_argument('subcommand', metavar='subcommand', 
+                            help='one of the subcommands: _____')
         parser.add_argument('-p', '--parameters')
         parser.add_argument('-m', '--mode', default=None)
         parser.add_argument('--ppm', default=5, type=int)
@@ -96,34 +110,26 @@ class Main():
 
         args = parser.parse_args()
         if args.parameters:
-            params.update(
-                json.load(open(args.parameters))
-            )
+            with open(args.parameters, encoding='utf-8') as param_fh:
+                params.update(json.load(param_fh))
+
         for k, v in args.__dict__.items():
             if v:
                 params[k] = v
         params['multicores'] = min(mp.cpu_count(), params['multicores'])
 
         if 'targets' in params:
-            if type(params['targets']) is str:
+            if isinstance(params['targets'], str):
                 params['targets'] = params['targets'].split()
 
         for k,v in params.items():
-            if type(v) is str and v.endswith(".json"):
-                try:
-                    params[k] = json.load(open(v))
-                except Exception as e:
-                    print("Failure parsing: ", k, " of the config!")
-                    raise e
-        try:
-            if type(params['input']) is str:
-                if not params['input'].endswith(".json"):
-                    params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
-        except:
-            pass
-
+            if isinstance(v, str) and v.endswith(".json"):
+                with open(v, encoding='utf-8') as json_fh:
+                    params[k] = json.load(json_fh)
+        if not params['input'].endswith("experiment.json"):
+            params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
         return params
-    
+
     @staticmethod
     def download_extras(params):
         """
@@ -177,11 +183,9 @@ class Main():
         Please type 'yes' to acknowledge. 
         
         '''
-        import gdown, zipfile
         print(warning)
         user_input = input()
         if user_input == "yes":
-            
             def download_from_cloud_storage(src, dst):
                 gdown.download(src, output=dst)
                 with zipfile.ZipFile(dst, 'r') as zip_ref:
@@ -191,11 +195,12 @@ class Main():
             this_dir = os.path.abspath(os.path.dirname(__file__))
             thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter.zip")
             anno_src_path = os.path.join(this_dir, "annotation_sources.zip")
+            converter_url = 'https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip'
+            annotat_sources = 'https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip'
+            download_from_cloud_storage(converter_url, thermo_parser_path)
+            download_from_cloud_storage(annotat_sources, anno_src_path)
 
-            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip', thermo_parser_path)
-            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path)
 
-    
     @staticmethod
     def preprocess(params):
         """
@@ -209,32 +214,36 @@ class Main():
         """
         preprocess_config = params['preprocessing_config']
         params["sequence"] = os.path.abspath(params["sequence"])
-        with open(params['new_csv_path'], 'w+') as out_csv_fh:
-            for x, entry in enumerate(csv.DictReader(open(params['sequence']))):
-                for new_field, _d in preprocess_config["mappings"].items():
-                    entry[new_field] = []
-                    for new_value, _dd in _d.items():
-                        found = False
-                        for substring in _dd["substrings"]:
-                            for field_to_search in _dd["search"]:
-                                if substring in entry[field_to_search] and found is False:
-                                    found = True
-                                    entry[new_field].append(new_value)
-                        if found is False:
-                            if "else" in _dd:
-                                entry[new_field].append(_dd["else"])
-                    entry[new_field] = "_".join(entry[new_field])
-                if os.path.exists(params["path_field"]):
-                    pass
-                else:
-                    if os.path.exists(os.path.join(os.path.dirname(params['sequence']), entry[params["name_field"]] + ".mzML")):
-                        entry["InferredPath"] = os.path.join(os.path.dirname(params['sequence']), entry[params["name_field"]] + ".mzML")
-                    elif os.path.exists(os.path.join(os.path.dirname(params['sequence']), entry[params["name_field"]] + ".raw")):
-                        entry["InferredPath"] = os.path.join(os.path.dirname(params['sequence']), entry[params["name_field"]] + ".raw")
-                if x == 0:
-                    writer = csv.DictWriter(out_csv_fh, fieldnames=entry.keys())
-                    writer.writeheader()
-                writer.writerow(entry)
+        with open(params['new_csv_path'], 'w+', encoding='utf-8') as out_csv_fh:
+            with open(params['sequence'], encoding='utf-8') as sequence_fh:
+                for x, entry in enumerate(csv.DictReader(sequence_fh)):
+                    for new_field, _d in preprocess_config["mappings"].items():
+                        entry[new_field] = []
+                        for new_value, _dd in _d.items():
+                            found = False
+                            for substring in _dd["substrings"]:
+                                for field_to_search in _dd["search"]:
+                                    if substring in entry[field_to_search] and found is False:
+                                        found = True
+                                        entry[new_field].append(new_value)
+                            if found is False:
+                                if "else" in _dd:
+                                    entry[new_field].append(_dd["else"])
+                        entry[new_field] = "_".join(entry[new_field])
+                    if os.path.exists(params["path_field"]):
+                        pass
+                    else:
+                        sequence_dir = os.path.dirname(params['sequence'])
+                        mzml_name = entry[params["name_field"]] + ".mzML"
+                        raw_name = entry[params["name_field"]] + ".raw"
+                        if os.path.exists(os.path.join(sequence_dir, mzml_name)):
+                            entry["InferredPath"] = os.path.join(sequence_dir, mzml_name)
+                        elif os.path.exists(os.path.join(sequence_dir, raw_name)):
+                            entry["InferredPath"] = os.path.join(sequence_dir, raw_name)
+                    if x == 0:
+                        writer = csv.DictWriter(out_csv_fh, fieldnames=entry.keys())
+                        writer.writeheader()
+                    writer.writerow(entry)
 
     @staticmethod
     def assemble_study(params):
@@ -292,7 +301,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        experiment.convert_raw_to_mzML(params['conversion_command'])
+        experiment.convert_raw_to_mzML(params['conversion_command'], num_cores=params['multicores'])
         experiment.save()
 
     @staticmethod
@@ -393,7 +402,10 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        params['khipu_adducts'] = params['khipu_adducts_pos'] if experiment.ionization_mode == "pos" else params['khipu_adducts_neg']
+        if experiment.ionization_mode == "pos":
+            params['khipu_adducts'] = params['khipu_adducts_pos']
+        else:
+            params['khipu_adducts'] = params['khipu_adducts_neg']
         EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment,
                                                                 params['khipu_isotopes'],
                                                                 params['khipu_adducts'],
@@ -423,8 +435,8 @@ class Main():
         feature_table.blank_mask(params['blank_value'],
                                     params['sample_value'],
                                     params['query_field'],
-                                    params['filter'], 
-                                    float(params['blank_intensity_ratio']), 
+                                    params['filter'],
+                                    float(params['blank_intensity_ratio']),
                                     params['by_batch'],
                                     params['batch_blanking_logic'])
         feature_table.save(params['new_moniker'])
@@ -525,7 +537,7 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
-        feature_table.drop_missing_features(params["by_batch"], 
+        feature_table.drop_missing_features(params["by_batch"],
                                             float(params["feature_retention_percentile"]),
                                             params["feature_drop_logic"])
         feature_table.save(params['new_moniker'])
@@ -615,7 +627,7 @@ class Main():
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.log_transform(params['log_transform_mode'])
         feature_table.save(params["new_moniker"])
-    
+
     @staticmethod
     def MS2_annotate(params):
         Main.L2_annotate(params)
@@ -678,11 +690,12 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         if 'msp_files' in params:
-            try:
-                msp_file = json.loads(params['msp_files'])
-            except:
-                msp_file = params['msp_files']
-                if type(msp_file) is str:
+            msp_file = params['msp_files']
+            if isinstance(msp_file, str):
+                if msp_file.endswith(".json"):
+                    with open(msp_file, encoding='utf-8') as msp_fh:
+                        msp_file = json.load(msp_fh)
+                else:
                     msp_file = [msp_file]
         elif experiment.ionization_mode == "pos":
             msp_file = params['msp_files_pos']
@@ -699,7 +712,7 @@ class Main():
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def L1_annotate(params):
+    def L1b_annotate(params):
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z 
@@ -720,14 +733,16 @@ class Main():
         :param params: This is the master configuration file generated by parsing the command line arguments plus the defaults.
         """
         experiment = Experiment.Experiment.load(params['input'])
-        print("HERE")
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L1_annotate(params['targets'], float(params['annot_rt_tolerance']), float(params['annot_mz_tolerance']), True)
+            empCpd.L1b_annotate(params['targets'],
+                                float(params['annot_rt_tolerance']), 
+                                float(params['annot_mz_tolerance'])
+                                )
             empCpd.save(params['new_moniker'])
-    
+
     @staticmethod
-    def L1_annotate_w_MS2(params):
+    def L1a_annotate(params):
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z 
@@ -754,10 +769,10 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L1_annotate_w_MS2(params['targets'], 
-                                     float(params['annot_rt_tolerance']), 
-                                     float(params['annot_mz_tolerance']),
-                                     ms2_files=params['ms2_dir'])
+            empCpd.L1a_annotate(params['targets'],
+                                float(params['annot_rt_tolerance']), 
+                                float(params['annot_mz_tolerance']),
+                                )
             empCpd.save(params['new_moniker'])
 
     @staticmethod
@@ -776,6 +791,11 @@ class Main():
         Report.Report(experiment, params)
 
     def map_MS2_to_empCpds(params):
+        """_summary_
+
+        Args:
+            params (_type_): _description_
+        """        
         experiment = Experiment.Experiment.load(params['input'])
         empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
         empCpds.map_MS2_to_empCpds(30, 5, ms2_files=params['ms2_dir'])
@@ -798,7 +818,6 @@ class Main():
         :param params: This is the master configuration file generated by 
                     parsing the command line arguments plus the defaults. 
         """
-        import pandas as pd
         experiment = Experiment.Experiment.load(params['input'])
         empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
@@ -846,15 +865,14 @@ class Main():
                                     MS2_match_copy.update({k: v for k, v in peak.items()})
                                     matches.append(MS2_match_copy)
             df = pd.DataFrame(matches)
-            try:
+            if 'other_ids' in df.columns:
                 df.drop(columns="other_ids", inplace=True)
-            except:
-                pass
+
             print(output)
             os.makedirs(output, exist_ok=True)
-
-            pd.DataFrame(matches).to_csv(output + new_moniker + "_feature_annotation_table.tsv", index=False)
-            pd.DataFrame(feature_table.feature_table).to_csv(output + new_moniker + "_feature_table.tsv", index=False)
+            base_dir = output + new_moniker
+            pd.DataFrame(matches).to_csv(base_dir + "_feature_annotation_table.tsv", index=False)
+            pd.DataFrame(feature_table.feature_table).to_csv(base_dir+ "_feature_table.tsv", index=False)
             sample_table = []
             for acquisition in experiment.acquisitions:
                 if acquisition.name in feature_table.sample_columns:
@@ -873,29 +891,24 @@ class Main():
 def main():
     """
     This is the main function for the pipeline
-    """    
-    try:
-        params = Main.process_params()
-    except Exception as e:
-        print("FAILURE PARSING COMMAND LINE ARGUMENTS")
-        print(e)
-    
+    """
+
+    params = Main.process_params()
     if params['subcommand'] not in dir(Main):
         print(params['subcommand'] + " is not a valid subcommand")
         print("valid commands include:")
         for method in dir(Main):
             if not method.startswith('__'):
                 print("\t", method)
-        raise Exception(params['subcommand'] + " is not a valid subcommand")
     else:
         function = getattr(Main, params['subcommand'])
-        #try:
-        function(params)
-        #except Exception as e:
-        #    print("Error executing: " + params['subcommand'])
-        #    print(function.__doc__)
-        #    print(e)
-            
+        try:
+            function(params)
+        except Exception as e:
+            print("Error executing: " + params['subcommand'])
+            print(function.__doc__)
+            print(e)
+
 def CLI():
     main()
 

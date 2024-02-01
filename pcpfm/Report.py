@@ -1,9 +1,8 @@
-from fpdf import FPDF
 import os
-import json
-from mass2chem.formula import calculate_mass, PROTON
-import matplotlib.pyplot as plt
+import platform
+import subprocess
 from . import FeatureTable
+from fpdf import FPDF
 
 class ReportPDF(FPDF):
     """
@@ -78,16 +77,17 @@ class Report():
         valid_sections = []
         for section in style["sections"]:
             try:
-                self.__getattribute__(section["section"])
+                self.getattr(section["section"])
                 valid_sections.append(section)
-            except:
+            except AttributeError:
                 print(section["section"] + "is not a valid section!\nValid sections include: ")
                 for method in dir(Report):
                     if not method.startswith("__") and not method.startswith("_Report__"):
                         print("\t", method)
         section_names = [x["section"] for x in valid_sections]
         if "save" not in section_names:
-            raise Exception("Save section not found in report! will abort")
+            print("Save section not found in report! will abort")
+            exit()
         return valid_sections
 
     def __create_report(self):
@@ -222,7 +222,7 @@ class Report():
 
         for table in self.experiment.feature_tables.keys():
             try:
-                feature_table = self.experiment.retrieve_feature_table(table, True, False, True)
+                feature_table = self.experiment.retrieve_feature_table(table, True)
             except:
                 feature_table = None
             if feature_table:
@@ -327,8 +327,7 @@ class Report():
         Requires: None
         """
 
-        import platform
-        import subprocess
+
         self.__section_head("Software Version Summary")
         with open(self.parameters["requirements_txt"]) as req:
             for line in req:

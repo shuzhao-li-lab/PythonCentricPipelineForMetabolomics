@@ -1,21 +1,27 @@
-import os 
+import os
+from matchms.Spectrum import Spectrum
+import numpy as np
 
-class MS2Spectrum():
-    def __init__(self,
-                 id,
-                 precursor_mz, 
-                 precursor_rt,
-                 list_mz=None,
-                 list_intensity=None,
-                 matchms_spectrum=None,
-                 source='',
-                 instrument=None,
-                 collision_energy=None,
-                 compound_name=None,
-                 annotations=None):
-        #super().__init__(id)
-        source = os.path.basename(source) if source != '' else os.path.basename(source)
-        self.precursor_ion = str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
+class MS2Spectrum:
+    def __init__(
+        self,
+        id,
+        precursor_mz,
+        precursor_rt,
+        list_mz=None,
+        list_intensity=None,
+        matchms_spectrum=None,
+        source="",
+        instrument=None,
+        collision_energy=None,
+        compound_name=None,
+        annotations=None,
+    ):
+        # super().__init__(id)
+        source = os.path.basename(source) if source != "" else os.path.basename(source)
+        self.precursor_ion = (
+            str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
+        )
         self.retention_time = precursor_rt
         self.precursor_ion_mz = precursor_mz
         self.list_mz = list_mz if list_mz is not None else []
@@ -29,29 +35,44 @@ class MS2Spectrum():
         self.annotations = [] if annotations is None else annotations
         self.compound_name = compound_name
         self.source = source
-    
+
     @staticmethod
     def from_embedding(embedding):
-        from matchms.Spectrum import Spectrum
-        import numpy as np
+        """_summary_
+
+        Args:
+            embedding (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """        
         return MS2Spectrum(
-            id = None,
-            precursor_mz = embedding["precursor_ion_mz"],
-            precursor_rt = embedding['retention_time'],
-            list_mz=embedding['list_mz'],
-            list_intensity=embedding['list_intensity'],
-            matchms_spectrum=Spectrum(mz = np.array(list(embedding['list_mz'])), 
-                                        intensities=np.array(embedding['list_intensity']),
-                                        metadata={}),
-            source=embedding['source'],
-            instrument=embedding['instrument'],
-            collision_energy=embedding['collision_energy'],
+            id=None,
+            precursor_mz=embedding["precursor_ion_mz"],
+            precursor_rt=embedding["retention_time"],
+            list_mz=embedding["list_mz"],
+            list_intensity=embedding["list_intensity"],
+            matchms_spectrum=Spectrum(
+                mz=np.array(list(embedding["list_mz"])),
+                intensities=np.array(embedding["list_intensity"]),
+                metadata={},
+            ),
+            source=embedding["source"],
+            instrument=embedding["instrument"],
+            collision_energy=embedding["collision_energy"],
             compound_name=None,
-            annotations=embedding['annotations']
+            annotations=embedding["annotations"],
         )
 
-
     def annotate(self, other_MS2, score, matched_peaks, annotation_level="Unspecified"):
+        """_summary_
+
+        Args:
+            other_MS2 (_type_): _description_
+            score (_type_): _description_
+            matched_peaks (_type_): _description_
+            annotation_level (str, optional): _description_. Defaults to "Unspecified".
+        """        
         self.annotations.append(
             {
                 "msms_score": score,
@@ -61,11 +82,16 @@ class MS2Spectrum():
                 "list_mz": [x[0] for x in other_MS2.matchms_spectrum.peaks],
                 "list_intensity": [x[1] for x in other_MS2.matchms_spectrum.peaks],
                 "annot_source": other_MS2.source,
-                "annotation_level": annotation_level
+                "annotation_level": annotation_level,
             }
         )
 
     def embedding(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """        
         embedding = {}
         for k, v in self.__dict__.items():
             if type(v) in [int, float, str, dict, set, list]:
