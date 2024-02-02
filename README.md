@@ -2,38 +2,26 @@
 
 [![Documentation Status](https://readthedocs.org/projects/pythoncentricpipelineformetabolomics/badge/?version=latest)](https://pythoncentricpipelineformetabolomics.readthedocs.io/en/latest/?badge=latest)
 
-The Python-Centric Pipeline for Metabolomics is an end-to-end LC-MS data processing pipeline based on Asari. 
+The Python-Centric Pipeline for Metabolomics is designed to take raw LC-MS metabolomics data and ready them for downstream statistical analysis. The pipeline can 
+- convert Thermo .raw to mzML (ThermoRawFileParser)
+- process mzML data to feature tables (Asari)
+- perform quality control
+- data normalization and batch correction
+- pre-annotation to group featues to empirical compounds (khipu)
+- perform MS1 annotation using an authentic compound library, a public database (e.g. HMDB, LIPID MAP), or custom database
+- perform MS2 annotation (matchms) using a custom database (default MoNA)
+- output data in standardized formats (.txt, JSON), ready for downstream analysis
 
-The documentation is still a work in progress but should be sufficient for performing an analysis. Please do not hesitate to contact us via the GitHub issues. 
-
-Note that annotation sources including the HMDB, while free for public non-commercial use, is not redistributed in this package. There is a command to download this source and other annotation sources once you agree to respect the license of the annotation sources we will allow the downloading of. This includes currently the HMDB and LC-MS/MS Orbitrap database from MoNA.
+Asari (https://www.nature.com/articles/s41467-023-39889-1) supports a visual dashboard to explore and inspect individual features.
+We are working to add supports of GC and other data types.
 
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
-## Overview
-
 The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
 
-### Inputs
-
-The PCPFM requires a csv file as an input that contains, at a minimum, the following fields:
-- Name: name of the file
-- Filepath: the location of the acquisition data in .raw or .mzML format
-For example
-```
-Sample Type,Name,Filepath
-Blank,SZ_01282024_01,my_experiment/SZ_01282024_01.raw
-QC,SZ_01282024_07,my_experiment/SZ_01282024_07.raw
-Unknown,SZ_01282024_13,my_experiment/SZ_01282024_13
-...  
-```
-
-Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
-
-### Outputs
-
-The output from PCPFM is intended to be immediately usable by existing tools such as MetaboAnalyst. This includes feature tables that are optionally blank masked, normalized, batch corrected, annotated or otherwise curated by PCPFM and empirical compounds as a JSON file representing putative metabolites that can be annotated with MS1, MS2, or authentic standards. 
-
+- Inputs should include a set of raw files (.raw or .mzML) and a csv file for metadata (minimal sample names and file path).
+- Outputs are intended to be immediately usable for downstream analysis (e.g. MetaboAnalyst or common tools in R, Python etc.). 
+This includes feature tables that are optionally blank masked, normalized, batch corrected, annotated or otherwise curated by PCPFM and empirical compounds as a JSON file representing putative metabolites that can be annotated with MS1, MS2, or authentic standards. 
 The organization of the outputs is as such:
 ```
   Experiment Directory/
@@ -72,6 +60,7 @@ The organization of the outputs is as such:
           ...
       experiment.json
 ```
+
 ## Installation
 
 The preferred installation mechanism is pip:
@@ -88,17 +77,38 @@ Additional files such as the LC-MS/MS databases from MoNA, a JMS-compliant versi
 
 After the basic installation is complete. By running this command, you agree to the terms and conditions of those 3rd pary resources. Namely this includes that the HMDB is NOT to be used for commercial purposes. 
 
+Note that annotation sources including the HMDB, while free for public non-commercial use, is not redistributed in this package. There is a command to download this source and other annotation sources once you agree to respect the license of the annotation sources we will allow the downloading of. This includes currently the HMDB and LC-MS/MS Orbitrap database from MoNA.
 
 ## Basic Usage
 
-### Preprocessing Experiment CSV
+### Preparing experiment metadata
+Goal: to organize metadata in a CSV file. 
 
-Some instruments do not allow all values for all fields in a sequence file. This can be fixed by pre-processing the sequence file. 
+An example command: 
+
+`pcpfm preprocess -s ./Sequence.csv --new_csv_path ./NewSequence.csv --name_field='Name' --path_field='Path' --preprocessing_config ./pcpfm/prerpocessing.json`
+
+This command will create a new csv file called ./NewSequence.csv using the rules specified in preprocessing.json assuming the sample should be located either at --path_field or in the csv directory by its 'File Name'.
+
+It is typical that the sequence file contains sufficient information for metadata.
+However, some instruments do not allow all values for all fields in a sequence file. 
+This step is therefore to prepare metadata from the sequence file. 
+
+An example of input CSV file:
+```
+Sample Type,Name,Filepath
+Blank,SZ_01282024_01,my_experiment/SZ_01282024_01.raw
+QC,SZ_01282024_07,my_experiment/SZ_01282024_07.raw
+Unknown,SZ_01282024_13,my_experiment/SZ_01282024_13.raw
+...  
+```
+
+Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
 
 Here a dictionary is used that contains various fields that need to be standardized under the heading "mappings". For each such field there can be multiple values, each a key in a sub directionary containing multiple key: value pairs indicating what substrings when observed in any of the specified csv fields should result in that field being populated with the specified value. 
-```
-For example: 
 
+For example, 
+```
     "sample_type":
         {
         "qstd": {
@@ -107,7 +117,7 @@ For example:
             },
         ...
 ```
-Would result in the "sample_type" field being populated with "qstd" if any of the substrings are observed in either the "File Name" or "Sample ID" fields in the csv file. 
+would result in the "sample_type" field being populated with "qstd" if any of the substrings are observed in either the "File Name" or "Sample ID" fields in the csv file. 
 
 If multiple key: value pairs are true, the specified value is added only once; however, multiple different matches will be concatenated using "_". Thus if something matches the qstd and blank definitions, the type would become "qstd_blank". 
 
@@ -115,38 +125,37 @@ Furthermore pre-processing will attempt to map the specified path to the file to
 
 An example preprocessing configuration is provided under preprocessing_examples.
 
-An example command: `pcpfm preprocess -s ./Sequence.csv --new_csv_path ./NewSequence.csv --name_field='Name' --path_field='Path' --preprocessing_config ./pcpfm/prerpocessing.json
-
-Will create a new csv file called ./NewSequence.csv using the rules specified in preprocessing.json assuming the sample should be located either at --path_field or in the csv directory by its 'File Name'.
 
 ### Assemble Experiment
+Goal: to creat a directory on disk to store the project. 
 
-Now, we must create the experiment object that will be used throught the processing and store intermediates. 
+An example command: 
 
+`pcpfm assemble -s ./sequence.csv --name_field='Name' --path_field='InferredPath' -o . -j my_experiment`
+
+This will create an experiment in the local directory with the name 'my_experiment'.
+The experiment object will be used throught the processing and store intermediates. 
 The experiment will be stored as a dictionary on disk (specified by -o) with a given project name (specified by -j).
-
-For assembly, you will need to specify the field to be used for the sample naming and the filepath field.
-
-For example: `pcpfm assemble -s ./sequence.csv --name_field='Name' --path_field='InferredPath' -o . -j my_experiment` will create an experiment in the local directory with the name 'my_experiment'.
 
 Since a sequence file may contain entries that you do not want to include in the experiment, you can specify a filter or a drop list as follows. The filter is a dictionary in JSON-format, which is passed using --filter <filter_filepath>. All filters contain a top-level key which is the metadata field on which the filter will be applied. This key may have one of two values, either 'includes' or 'lacks'. These may then have an interable as a value with the substrings that must be present or not, depending on which mode was specified, for the filter to be passed. Thus if you have a sequence file with both HILCpos and RPneg acquisiitons, you can use a filter to select only the HILCpos ones if the "Method" column indicates what type of chromatography was used. 
 
-Alternatively, by using --skip_list <names.txt> option and providing a txt file with sample names, any acquisitions with those names will be excluded from the analysis.
+Alternatively, by using `--skip_list <names.txt>` option and providing a txt file with sample names, any acquisitions with those names will be excluded from the analysis.
 
 ### Conversion to mzML
+Goal: to convert .raw files to centroid .mzML files.
 
-If the filepaths specified in the sequence file were .raw files, they need 
-to be converted to .mzML. 
-
-How you convert to mzML is largely left to the end user but provided that the command for conversion can be executed by the user and is in the form of a string that takes an input filepath and output filepath conversion can be done as follows:
+An example command: 
 
 `pcpfm convert -i ./my_experiment --conversion_command "mono ThermoRawFileParser.exe -f=1 -i $RAW_PATH -b $OUT_PATH"`
 
-Alternatively, just use mzML files in the sequence file to avoid this entirely. 
+If users use .mzML files as input, this step is not needed.
 
-### Asari
+How you convert to mzML is largely left to the end user but provided that the command for conversion can be executed by the user and is in the form of a string that takes an input filepath and output filepath conversion can be done as follows:
 
-Now we can extract features with Asari as follows:
+### Feature extraction using Asari
+Goal: to process .mzML files into metabolomic feature tables.
+
+An example command: 
 
 `pcpfm asari -i ./my_experiment`
 
@@ -158,13 +167,11 @@ After asari is ran, two feature table monikers are generated:
 
 'full' and 'preferred' for the full and preferred feature tables respectively
 
-### QAQC
+### Quality Control 
 
-Now we can test acquisition quality using internal standards:
+Goal: to generate report and figures for quality control.
 
-`TODO`
-
-Or with data-driven approaches: 
+An example command: 
 
 `.main.py QAQC -i ./my_experiment --table_moniker <moniker> --all true`
 
@@ -188,7 +195,13 @@ The entire set of commands that are possible here is large and are documented in
     feature_distribution - calculates the number of missing features per sample, both absolute and as z-score
     feature_outlier_detection - calculates the number of missing features per sample, both absolute and as z-score
 ```
-### Feature Processing
+
+An option is using internal spike-in standards for QC:
+
+`TODO`
+
+
+### Data wrangling and standardization
 
 raw feature tables are rarely used for analyses, normalization and blank masking are some of the common processing steps supported by our pipeline. Tables are specififed for processing by their moniker and saved to a new moniker. The new moniker can be the same as the table moniker and this will overwrite an existing table. 
 
@@ -206,7 +219,7 @@ Where query_field is the metadata field to search for the given blank_value and 
 
 Will drop all features whose intensity in the unknown samples is not at least 3 times more than the blank samples. This may need to be done multiple times if you have multiple blank types (e.g., process blanks and solvent blanks.)
 
-#### Drop Samples
+#### Drop Undesired Samples
 
 Once blank masking is performed, extra samples and non-experimental samples should be removed from the experiment before normalization. This can be done most easily using this command:
 
@@ -236,15 +249,16 @@ Next, normalization can be performed based on features present in at least X per
 
 This will normalize each sample's features to the median of the sum of the features present in over 90% of the samples in the experiment. 
 
-#### Drop Missing Features
+#### Drop Infrequent Features
 
-After normalization, rare and uncommon features should be dropped. 
+After normalization, rare and uncommon features can be dropped. 
 
 `pcpfm drop_missing_features --table_moniker preferred_normalized --new_moniker preferred_drop_missing --feature_retention_percentile 0.25 -i ./my_experiment`
 
-#### Interpolate Missing Features
+#### Impute Missing Values
+Goal: to impute missing values by a minimium number.
 
-Remaining missing features can now be interpolated as follows
+An example command: 
 
 `pcpfm interpolate --table_moniker preferred_drop_missing --new_moniker preferred_interpolated --interpolation_ratio 0.5 -i ./my_experiment`
 
@@ -313,16 +327,23 @@ or
 --ms2_min_peaks: number of peaks ms2 spectra must have to be searched and matched to be reported as annoation. 
 --find_experiment_ms2: it True, search for ms2 spectra in the experiment's acquisitions.
 ```
-### Managing Feature Tables and empCpds
+### Display project summary
+Goal: to print a summary of project Feature Tables and empCpds, and their corresponding paths.
 
-To see the set of all monikers and their corresponding paths in an experiment:
+An example command: 
 
 `pcpfm summarize -i <experiment_directory>`
 
-### Generating Final Outputs
+### Outputs and Reporting
 
 Once a feature table and an annotated empirical compound have been created, you can create the three table output using:
 
 `pcpfm generate_output -i <experiment_directory> -em <empCpd_moniker> -tm <table_moniker>`
 
 The resulting tables will be found in a "<experiment_directory>/results/" subdirectory. 
+
+
+--------------------------------------------------------------
+Please do not hesitate to contact us via the GitHub issues. 
+
+Citation to come.
