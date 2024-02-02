@@ -1,8 +1,17 @@
+"""_summary_
+
+"""
+
 import os
 import platform
 import subprocess
-from . import FeatureTable
+import sys
+import uuid
+import datetime
+
 from fpdf import FPDF
+import matplotlib.pyplot as plt
+from . import FeatureTable
 
 class ReportPDF(FPDF):
     """
@@ -50,13 +59,14 @@ class Report():
         self.parameters = parameters
 
         self.default_font = ['Arial', '', 12]
-        self.report = ReportPDF('PCPFM Report - ' + self.experiment.experiment_directory.split("/")[-1])
+        report_title = 'PCPFM Report - ' + self.experiment.experiment_directory.split("/")[-1]
+        self.report = ReportPDF(report_title)
         self.report.add_page()
         self.report.set_font(*self.default_font)
         self.max_width = round(self.report.line_width * 1000,0)
         self.style = self.__preprocess_style(self.parameters["report_config"])
         self.__create_report()
-    
+
     def __preprocess_style(self, style):
         """
         This function takes the provided style and checks that it has 
@@ -69,11 +79,11 @@ class Report():
 
         :return: the style with text added and invalid methods deleted
         """
-        top_level_fields = style.keys()
         for section in style["sections"]:
-            for top_level_field in top_level_fields:
-                if top_level_field in section and section[top_level_field] in style[top_level_field]:
-                    section[top_level_field] = style[top_level_field][section[top_level_field]]
+            for top_level_field in style.keys():
+                if top_level_field in section:
+                    if section[top_level_field] in style[top_level_field]:
+                        section[top_level_field] = style[top_level_field][section[top_level_field]]
         valid_sections = []
         for section in style["sections"]:
             try:
@@ -87,7 +97,7 @@ class Report():
         section_names = [x["section"] for x in valid_sections]
         if "save" not in section_names:
             print("Save section not found in report! will abort")
-            exit()
+            sys.exit()
         return valid_sections
 
     def __create_report(self):
@@ -97,12 +107,14 @@ class Report():
         """
         for section in self.style:
             try:
-                method = self.__getattribute__(section["section"])
-                if "table" in section and section["table"] + "_cleaned" in self.experiment.feature_tables:
-                    section["table"] = section["table"] + "_cleaned"
-                    method(section)
-                else:
-                    method(section)
+                method = getattr(self, section["section"])
+                if method:
+                    if "table" in section:
+                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                            section["table"] = section["table"] + "_cleaned"
+                            method(section)
+                        else:
+                            method(section)
             except:
                 print("Unable to processes section: \n", section)
 
@@ -130,18 +142,18 @@ class Report():
         self.__reset_font()
         self.report.ln(5)
 
-    def __sub_section_head(self, title):
-        """
-        This writes a sub-section header. Large font, ala section_head
-        but not in bold.
-
-        TODO: this seems to be redundant.
-
-        :param title: the title of the sub_section
-        """
-        self.report.cell(80)
-        self.report.cell(30, 10, title, 0, 0, 'C')
-        self.report.ln(5)
+    #def __sub_section_head(self, title):
+    #    """
+    #    This writes a sub-section header. Large font, ala section_head
+    #    but not in bold.
+    #
+    #    TODO: this seems to be redundant.
+    #
+    #    :param title: the title of the sub_section
+    #    """
+    #    self.report.cell(80)
+    #    self.report.cell(30, 10, title, 0, 0, 'C')
+    #    self.report.ln(5)
 
     def __section_line(self, content, options=None):
         """
@@ -204,72 +216,11 @@ class Report():
                 print(section_desc)
 
     def annotation_summary(self, section_desc):
-        """
+        """_summary_
 
-        TODO: this is broken 
-        
-        This method summarizes the annotations generated during the 
-        analysis on a per-table, per-empcpd basis. This counts the
-        number of level-1, level-2, and level-4 annotations. 
-
-        Requires: None
-        """
-        self.__section_head("Annotation Summary")
-        if 'text' in section_desc: 
-            self.__section_text(section_desc['text'])
-        self.__sub_section_head("Feature Tables")
-        self.__section_line("Table Name, # Features, # MS1 Annotated Features, # MS2 Annotated Features", options=["bold"])
-
-        for table in self.experiment.feature_tables.keys():
-            try:
-                feature_table = self.experiment.retrieve_feature_table(table, True)
-            except:
-                feature_table = None
-            if feature_table:
-                num_features = feature_table.num_features
-                num_ms2_annotations = 0
-                if "MS2_annotations" in feature_table.feature_table.columns:
-                    for x in feature_table.feature_table["MS2_annotations"]:
-                        try:
-                            x = str(x)
-                            if 'score' in x:
-                                num_ms2_annotations += 1
-                        except:
-                            pass
-                else:
-                    num_ms2_annotations = 0
-
-                if "MS1_annotations" in feature_table.feature_table.columns:
-                    ms1_annotated_features = [x for x in feature_table.feature_table["MS1_annotations"] if x and x != '[]']
-                    num_ms1_annotations = len(ms1_annotated_features)
-                else:
-                    num_ms1_annotations = 0
-
-                self.__section_line(", ".join([str(x) for x in [table, num_features, num_ms1_annotations, num_ms2_annotations]]))
-        self.__section_head("")
-        self.__sub_section_head("Empirical Compounds")
-        self.__section_line("empCpd Name, # Khipus, # MS1 Annotated Khipus, # MS2 Annotated Khipus", options=["bold"])
-        for empcpd in self.experiment.empCpds.keys():
-            try:
-                empcpd_object = self.experiment.retrieve_empCpds(empcpd, True)
-            except:
-                empcpd_object = None
-            if empcpd_object:
-                num_annotated_ms1 = 0
-                num_annotated_ms2 = 0
-                total = 0
-                for kp_id, khipu in empcpd_object.dict_empCpds.items():
-                    is_MS2_annotated = False
-                    if "mz_only_db_matches" in khipu and khipu["mz_only_db_matches"]:
-                        num_annotated_ms1 += 1
-                    if "MS2_Spectra" in khipu and khipu["MS2_Spectra"]:
-                        for spectrum in khipu["MS2_Spectra"]:
-                            if "Annotations" in spectrum and spectrum["Annotations"]:
-                                is_MS2_annotated = True
-                    if is_MS2_annotated:
-                        num_annotated_ms2 += 1
-                    total += 1
-                self.__section_line(", ".join([str(x) for x in [empcpd, total, num_annotated_ms1, num_annotated_ms2]]))
+        Args:
+            section_desc (_type_): _description_
+        """        
 
     def table_summary(self, section_desc):
         """
@@ -279,14 +230,15 @@ class Report():
         """
 
         self.__section_head("Feature Table Summary")
-        if 'text' in section_desc: 
+        if 'text' in section_desc:
             self.__section_text(section_desc['text'])
         self.__section_line("Table Name, Num Samples, Num Features", options=["bold"])
         tables = [x for x in self.experiment.feature_tables.keys() if "cleaned" not in x]
         for table in tables:
             try:
-                feature_table = self.experiment.retrieve(table, True, False, True)
-                self.__section_line(", ".join([str(x) for x in [table, feature_table.num_samples, feature_table.num_features]]))
+                ft = self.experiment.retrieve_feature_table(table, True)
+                line = ", ".join([str(x) for x in [table, ft.num_samples, ft.num_features]])
+                self.__section_line(line)
             except:
                 pass
 
@@ -297,16 +249,13 @@ class Report():
         Requires: None
         """
         self.__section_head("empCpd Table Summary")
-        if 'text' in section_desc: 
+        if 'text' in section_desc:
             self.__section_text(section_desc['text'])
         self.__section_line("EmpCpd Name, Num Khipus, Num Features", options=["bold"])
         for empcpd in self.experiment.empCpds.keys():
-            try:
-                empcpd_object = self.experiment.retrieve(empcpd, False, True, True)
-                self.__section_line(", ".join([str(x) for x in [empcpd, empcpd_object.num_khipus, empcpd_object.num_features]]))
-            except:
-                pass
-            
+            empcpd_object = self.experiment.retrieve_empcpd(empcpd, True)
+            self.__section_line(", ".join([str(x) for x in [empcpd, empcpd_object.num_khipus, empcpd_object.num_features]]))
+
     def command_history(self, section_desc):
         """
         This summarizes each command that has been executed in the 
@@ -326,21 +275,17 @@ class Report():
 
         Requires: None
         """
-
-
         self.__section_head("Software Version Summary")
-        with open(self.parameters["requirements_txt"]) as req:
+        with open(self.parameters["requirements_txt"], encoding='utf-8') as req:
             for line in req:
                 line = line.strip()
-                output = subprocess.run(["pip", "show", line.rstrip()], capture_output=True, text=True)
+                output = subprocess.run(["pip", "show", line], capture_output=True, text=True, check=False)
                 version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
                 self.__section_line(":".join([line, version]))
-            try:
-                output = subprocess.run(["pip", "show", "pcpfm"], capture_output=True, text=True)
+
+                output = subprocess.run(["pip", "show", "pcpfm"], capture_output=True, text=True, check=False)
                 version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
                 self.__section_line(": ".join(["pcpfm", version]))
-            except:
-                pass
         self.__section_text("OS: ", platform.system())
         self.__section_text("Python Version: " + platform.python_version())
         self.__section_text("Architecture: " + platform.machine())
@@ -353,8 +298,7 @@ class Report():
 
         Requires: None
         """
-        import uuid
-        import matplotlib.pyplot as plt
+
         self.__section_head("Computational Performance")
         tn_minus_one = None
         current_time = None
@@ -365,7 +309,6 @@ class Report():
             current_time = float(command.split(":")[0])
             if command.endswith("start_analysis"):
                 start_time = float(current_time)
-                pass
             else:
                 time_sums = (current_time - tn_minus_one) / 60
                 command_order.append(command)
@@ -384,8 +327,6 @@ class Report():
 
         Requires: None
         """
-        import datetime
-    
         timestamp_string = 'Report generated on ' + str(datetime.datetime.now())
         self.__section_head("Timestamp")
         self.__section_line(timestamp_string)
@@ -398,9 +339,11 @@ class Report():
         """
         if not section_desc["report_name"].endswith(".pdf"):
             section_desc["report_name"] = section_desc["report_name"] + ".pdf"
-        out_path = os.path.join(os.path.abspath(self.experiment.experiment_directory), "reports", section_desc["report_name"])
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        self.report.output(os.path.join(os.path.abspath(self.experiment.experiment_directory), "reports", section_desc["report_name"]))
+        output_subdir = os.path.abspath(self.experiment.output_subdirectory)
+        report_path = os.path.join(output_subdir, section_desc["report_name"])
+        if not report_path.endswith(".pdf"):
+            report_path += ".pdf"
+        self.report.output(report_path)
 
     def figure(self, section_desc):
         """
@@ -417,26 +360,25 @@ class Report():
         provided.
 
         """
-        
-        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"      
+        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"
         if os.path.exists(figure_path):
             self.report.add_page()
             self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
-            self.report.ln(10)            
+            self.report.ln(10)
             self.report.image(figure_path, w=self.max_width)
         else:
             feature_table = self.experiment.retrieve(section_desc["table"], True, False, True)
-            params_for_figure = {k: v for k,v in self.parameters.items()}
+            params_for_figure = dict(self.parameters)
             params_for_figure['all'] = False
             params_for_figure['save_plots'] = True
             if section_desc["name"] in feature_table.qaqc_result_to_key:
                 params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
                 feature_table.QAQC(params_for_figure)
-                figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"                
                 self.report.add_page()
                 self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
                 self.report.ln(10)
                 self.report.image(figure_path, w=self.max_width)
 
-# this updates the docstring for 
-getattr(Report, "figure").__doc__ += "\nValid name values are: \n\t" + "\n\t".join([x for x in FeatureTable.FeatureTable.qaqc_result_to_key.keys()]) 
+# this updates the docstring for report
+qaqc_names = list(FeatureTable.FeatureTable.qaqc_result_to_key.keys())
+getattr(Report, "figure").__doc__ += "\nValid name values are: \n\t" + "\n\t".join(qaqc_names)

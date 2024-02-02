@@ -1,3 +1,6 @@
+"""_summary_
+"""
+
 import os
 
 PARAMETERS = {
@@ -103,7 +106,8 @@ for v in PARAMETERS['targets']:
 PARAMETERS['targets'] = new_target_files
 
 if PARAMETERS["conversion_command"][1] == '/ThermoRawFileParser/ThermoRawFileParser.exe':
-    PARAMETERS["conversion_command"][1] = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
+    path = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
+    PARAMETERS["conversion_command"][1] = path
 
 for k, v in PARAMETERS.items():
     if isinstance(v, str) and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
