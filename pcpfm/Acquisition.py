@@ -23,10 +23,11 @@ class Acquisition(Sample):
         metadata_tags=None,
         raw_filepath=None,
         mzml_filepath=None,
-        __ionization_mode=None,
-        __has_ms2=None,
+        ionization_mode=None,
+        has_ms2=None,
         experiment=None
     ):
+        super().__init__()
         self.name = name
         self.source_filepath = source_filepath
         self.metadata_tags = metadata_tags if metadata_tags is not None else {}
@@ -34,12 +35,12 @@ class Acquisition(Sample):
         self.mzml_filepath = mzml_filepath
 
         #lazily_evaluated
-        self.__ionization_mode = __ionization_mode
-        self.__has_ms2 = __has_ms2
-        self.experiment = None
+        self.__ionization_mode = ionization_mode
+        self.__has_ms2 = has_ms2
+        self.experiment = experiment
 
     @staticmethod
-    def load_acquisition(acquisition_data, experiment=None):
+    def load_acquisition(acquisition_data, experiment):
         """_summary_
 
         Args:
@@ -54,8 +55,8 @@ class Acquisition(Sample):
             metadata_tags=acquisition_data["metadata_tags"],
             raw_filepath=acquisition_data["raw_filepath"],
             mzml_filepath=acquisition_data["mzml_filepath"],
-            __ionization_mode=acquisition_data["__ionization_mode"],
-            __has_ms2=acquisition_data["_has_ms2"],
+            ionization_mode=acquisition_data["_Acquisition__ionization_mode"],
+            has_ms2=acquisition_data["_Acquisition__has_ms2"],
             experiment=experiment
         )
 
@@ -77,8 +78,8 @@ class Acquisition(Sample):
             metadata_dict,
             raw_filepath=None,
             mzml_filepath=None,
-            __ionization_mode=None,
-            __has_ms2=None,
+            ionization_mode=None,
+            has_ms2=None,
             experiment=experiment
         )
 
@@ -96,6 +97,7 @@ class Acquisition(Sample):
                     return self.__ionization_mode
                 self.__ionization_mode = "neg"
                 return self.__ionization_mode
+        return self.__ionization_mode
 
     @property
     def json_repr(self):
@@ -115,36 +117,49 @@ class Acquisition(Sample):
         """
         method_field = "Method"
         if self.__has_ms2 is None:
+            ms_method = None
             if method_field in self.metadata_tags:
                 ms_method = self.metadata_tags[method_field]
-                if (
-                    ms_method in self.experiment.method_has_MS2
-                    and self.experiment.method_has_MS2[ms_method]
-                ):
+                if ms_method in self.experiment.MS2_methods:
                     self.__has_ms2 = True
+                    return self.__has_ms2
+                if ms_method in self.experiment.MS1_only_methods:
+                    self.__has_ms2 = False
+                    return self.__has_ms2
+            fp_to_read = None
             if self.mzml_filepath:
                 fp_to_read = self.mzml_filepath
-            elif self.source_filepath.endswith(
-                ".mzML"
-            ) or self.source_filepath.endswith(".mzml"):
+            elif self.source_filepath.endswith(".mzML"):
                 fp_to_read = self.source_filepath
-            else:
-                fp_to_read = None
-            if fp_to_read is not None:
+            if fp_to_read:
                 self.__has_ms2 = False
                 reader = pymzml.run.Reader(fp_to_read)
                 try:
-                    for i, spec in enumerate(reader):
+                    for _, spec in enumerate(reader):
                         if spec.ms_level == 2:
-                            self._has_ms2 = True
+                            self.__has_ms2 = True
                             break
                 except:
                     pass
-        if method_field in self.metadata_tags:
-            self.experiment.method_has_MS2[ms_method] = self._has_ms2
-        return self._has_ms2
+        if ms_method and self.__has_ms2:
+            self.experiment.MS2_methods.add(ms_method)
+        elif ms_method and not self.__has_ms2:
+            self.experiment.MS1_only_methods.add(ms_method)
+        return self.__has_ms2
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
+        """_summary_
+
+        Args:
+            mz (_type_, optional): _description_. Defaults to None.
+            ppm (int, optional): _description_. Defaults to 5.
+            rt (_type_, optional): _description_. Defaults to None.
+            rt_tol (int, optional): _description_. Defaults to 2.
+            title (_type_, optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """        
         if mz is None:
             mz = []
         if rt is None:
@@ -166,37 +181,36 @@ class Acquisition(Sample):
         )
         if os.path.exists(fig_path):
             return fig_path
-        else:
-            os.makedirs(os.path.dirname(fig_path), exist_ok=True)
-            mz_trees = [IntervalTree()] + [IntervalTree() for _ in mz]
-            rt_trees = [IntervalTree()] + [IntervalTree() for _ in mz]
-            mz_trees[0].addi(-np.inf, np.inf)
-            rt_trees[0].addi(-np.inf, np.inf)
-            for i, (x, y) in enumerate(zip(mz, rt)):
-                mz_trees[i + 1].addi(x - x / 1e6 * ppm, x + x / 1e6 * ppm)
-                rt_trees[i + 1].addi(y - rt_tol, y + rt_tol)
-            bins = [[] for _ in mz_trees]
-            rtimes = []
-            for spec in pymzml.run.Reader(self.mzml_filepath):
-                rtime = round(spec.scan_time[0] * 60, 3)
-                rtimes.append(rtime)
-                for bin in bins:
-                    bin.append(0)
-                matches = [True if rt_tree.at(rtime) else False for rt_tree in rt_trees]
-                match_mask = [i for i, match in enumerate(matches) if match]
-                if match_mask:
-                    for peak in spec.peaks("centroided"):
-                        mz = peak[0]
-                        for match in match_mask:
-                            if mz_trees[match].at(mz):
-                                bins[match][-1] += float(peak[1])
-            fig = plt.figure()
-            for i, bin in enumerate(bins):
-                ax = fig.add_subplot(len(bins), 1, i + 1)
-                ax.plot(rtimes, bin)
-            plt.savefig(fig_path)
-            plt.close()
-            return fig_path
+        os.makedirs(os.path.dirname(fig_path), exist_ok=True)
+        mz_trees = [IntervalTree()] + [IntervalTree() for _ in mz]
+        rt_trees = [IntervalTree()] + [IntervalTree() for _ in mz]
+        mz_trees[0].addi(-np.inf, np.inf)
+        rt_trees[0].addi(-np.inf, np.inf)
+        for i, (x, y) in enumerate(zip(mz, rt)):
+            mz_trees[i + 1].addi(x - x / 1e6 * ppm, x + x / 1e6 * ppm)
+            rt_trees[i + 1].addi(y - rt_tol, y + rt_tol)
+        bins = [[] for _ in mz_trees]
+        rtimes = []
+        for spec in pymzml.run.Reader(self.mzml_filepath):
+            rtime = round(spec.scan_time[0] * 60, 3)
+            rtimes.append(rtime)
+            for b in bins:
+                b.append(0)
+            matches = [bool(rt_tree.at(rtime)) for rt_tree in rt_trees]
+            match_mask = [i for i, match in enumerate(matches) if match]
+            if match_mask:
+                for peak in spec.peaks("centroided"):
+                    mz = peak[0]
+                    for match in match_mask:
+                        if mz_trees[match].at(mz):
+                            bins[match][-1] += float(peak[1])
+        fig = plt.figure()
+        for i, b in enumerate(bins):
+            ax = fig.add_subplot(len(b), 1, i + 1)
+            ax.plot(rtimes, b)
+        plt.savefig(fig_path)
+        plt.close()
+        return fig_path
 
     def filter(self, user_filter):
         """

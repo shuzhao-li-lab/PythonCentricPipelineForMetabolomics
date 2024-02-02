@@ -1,6 +1,6 @@
 import os
 import shutil
-
+import sys
 import matchms
 import scipy.stats
 import numpy as np
@@ -9,6 +9,23 @@ import pandas as pd
 from mass2chem.formula import calculate_formula_mass
 from matchms.Spectrum import Spectrum
 from .MSnSpectrum import MS2Spectrum
+
+def flatten_nested_dicts(nested_dicts):
+    """_summary_
+
+    Args:
+        nested_dicts (_type_): _description_
+
+    Returns:
+        _type_: _description_
+    """    
+    _d = {}
+    for k, v in nested_dicts.items():
+        if not isinstance(v, dict):
+            _d[k] = v
+        else:
+            _d.update(flatten_nested_dicts(v))
+    return _d
 
 
 def row_to_dict(row, columns):
@@ -23,14 +40,14 @@ def row_to_dict(row, columns):
     """
     _d = {}
     for c in columns:
-        c = c.strip() if type(c) is str else c
-        v = row[c].strip() if type(row[c]) is str else row[c]
+        c = c.strip() if isinstance(c, str) else c
+        v = row[c].strip() if isinstance(row[c], str) else row[c]
         _d[c] = v
     return _d
 
 
 def extract_CD_csv(
-    CD_csv, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
+    cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
 ):
     """_summary_
 
@@ -48,8 +65,8 @@ def extract_CD_csv(
         _type_: _description_
     """
     standards_spectra = []
-    for csv in CD_csv:
-        standards = pd.read_csv(csv)
+    for cd_csv in cd_csvs:
+        standards = pd.read_csv(cd_csv)
         for standard in standards.apply(row_to_dict, axis=1, args=(standards.columns,)):
             mzs, intensities = [], []
             for i in range(10):
@@ -66,15 +83,10 @@ def extract_CD_csv(
             mzs = [mz for mz in mzs if (mz and not np.isnan(mz))]
             intensities = [i for i in intensities if (i and not np.isnan(i))]
             mzs, intensities = zip(*sorted(zip(mzs, intensities)))
-            if (
-                mzs
-                and intensities
-                and len(mzs) == len(intensities)
-                and len(mzs) >= min_peaks
-            ):
+            if len(mzs) == len(intensities) and len(mzs) >= min_peaks:
                 spectrum = Spectrum(
-                    mz=np.asarray(list([float(x) for x in mzs])),
-                    intensities=np.asarray(list([float(x) for x in intensities])),
+                    mz=np.asarray((float(x) for x in mzs)),
+                    intensities=np.asarray((float(x) for x in intensities)),
                     metadata=standard,
                 )
                 # assume proton for ionization adduct
@@ -99,7 +111,7 @@ def extract_CD_csv(
                         "cpd_name": standard["CompoundName"],
                         "spectrum": spectrum,
                     },
-                    filename=csv,
+                    filename=cd_csv,
                     min_peaks=min_peaks,
                     skip_meta=True,
                     skip_filters=False,
@@ -108,8 +120,7 @@ def extract_CD_csv(
                 standards_spectra.append(spectrum)
             if spectrum and lazy:
                 yield spectrum
-    if not lazy:
-        return standards_spectra
+    return standards_spectra
 
 
 def get_parser(file_extension):
@@ -121,10 +132,11 @@ def get_parser(file_extension):
 
     :return: appropriate parser method from matchms
     """
-    try:
-        return matchms.importing.__getattribute__("load_from_" + file_extension.lower())
-    except:
-        raise Exception("no matching parser for file type: ", file_extension)
+    method = getattr(matchms.importing, "load_from_" + file_extension.lower())
+    if method:
+        return method
+    print("No matching parser found for: ", file_extension)
+    sys.exit()
 
 
 def get_similarity_method(method_name):
@@ -136,13 +148,14 @@ def get_similarity_method(method_name):
     :return: appropriate similarity method from matchms
     """
 
-    try:
-        return matchms.similarity.__getattribute__(method_name)
-    except:
-        raise Exception("no matching similarity method named: ", method_name)
+    method = getattr(matchms.similarity, method_name)
+    if method:
+        return method
+    print("No matching similarity method found for: ", method_name)
+    sys.exit()
 
 
-def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
+def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
     """_summary_
 
     Args:
@@ -152,26 +165,23 @@ def lazy_extract_MS2_spectra(ms2_files, mz_tree=None):
     Yields:
         _type_: _description_
     """
-    for ms2_file in [ms2_files] if isinstance(ms2_file, str) else ms2_files:
+    for ms2_file in [ms2_files] if isinstance(ms2_files, str) else ms2_files:
         for spectrum in get_parser(ms2_file.split(".")[-1])(
             ms2_file, metadata_harmonization=True
         ):
             spectrum = matchms.filtering.add_precursor_mz(spectrum)
             if spectrum:
-                try:
-                    precursor_mz = spectrum.get("precursor_mz")
-                except:
-                    precursor_mz = None
+                precursor_mz = spectrum.get("precursor_mz", None)
             if precursor_mz:
                 if mz_tree:
                     if mz_tree.at(precursor_mz):
-                        MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
-                        if MS2_spec_obj:
-                            yield MS2_spec_obj
+                        ms2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                        if ms2_spec_obj:
+                            yield ms2_spec_obj
                 else:
-                    MS2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
-                    if MS2_spec_obj:
-                        yield MS2_spec_obj
+                    ms2_spec_obj = process_ms2_spectrum(spectrum, filename=ms2_file)
+                    if ms2_spec_obj:
+                        yield ms2_spec_obj
 
 
 def process_ms2_spectrum(
@@ -206,19 +216,19 @@ def process_ms2_spectrum(
         except:
             pass
 
-        id = []
+        spec_id = []
         if spectrum.get("precursor_mz"):
-            id.append(str(float(spectrum.get("precursor_mz", ""))))
+            spec_id.append(str(float(spectrum.get("precursor_mz", ""))))
         if spectrum.get("retention_time"):
-            id.append(str(float(spectrum.get("retention_time", ""))))
-        id.append(filename)
-        id = "_".join(id)
+            spec_id.append(str(float(spectrum.get("retention_time", ""))))
+        spec_id.append(filename)
+        spec_id = "_".join(spec_id)
         try:
             reference_id = spectrum.get("compound_name")
         except:
-            reference_id = id
+            reference_id = spec_id
         spectrum = MS2Spectrum(
-            id=id,
+            spec_id=spec_id,
             precursor_mz=float(spectrum.get("precursor_mz")),
             precursor_rt=float(spectrum.get("retention_time"))
             if spectrum.get("retention_time")
@@ -232,11 +242,11 @@ def process_ms2_spectrum(
             compound_name=reference_id,
         )
     else:
-        id = []
-        id.append(str(float(spectrum["prec_mz"])))
-        id.append(str(float(spectrum["rt"])))
-        id.append(filename)
-        id = "_".join(id)
+        spec_id = []
+        spec_id.append(str(float(spectrum["prec_mz"])))
+        spec_id.append(str(float(spectrum["rt"])))
+        spec_id.append(filename)
+        spec_id = "_".join(spec_id)
         precursor_mz = spectrum["prec_mz"]
         precursor_rt = spectrum["rt"]
         reference_id = spectrum["cpd_name"]
@@ -251,7 +261,7 @@ def process_ms2_spectrum(
         spectrum.set("precursor_mz", precursor_mz)
 
         spectrum = MS2Spectrum(
-            id=id,
+            spec_id=spec_id,
             precursor_mz=float(precursor_mz),
             precursor_rt=float(precursor_rt),
             list_mz=[],
@@ -268,7 +278,7 @@ def process_ms2_spectrum(
 
 def search_for_mzml(sdir):
     """
-    Given a directory, recusrively search for all files with an .mzml
+    Given a directory, encrively search for all files with an .mzml
     extension and return their paths.
 
     :param sdir: the directory in which to search
@@ -298,22 +308,17 @@ def recursive_encoder(to_encode):
 
     :return: JSON-encodable representation of to_encode
     """
-    if to_encode is None:
-        return None
-    else:
-        to_encode_type = type(to_encode)
-        if to_encode_type in [str, int, float]:
-            return to_encode
-        elif to_encode_type in [list, set]:
-            return [recursive_encoder(x) for x in to_encode]
-        elif to_encode_type in [dict]:
-            return {k: recursive_encoder(v) for k, v in to_encode.items()}
-        elif hasattr(to_encode, "JSON_repr"):
-            return to_encode.JSON_repr
-        elif hasattr(to_encode, "serialize"):
-            return recursive_encoder(to_encode.serialize())
-        else:
-            pass
+    if isinstance(to_encode, (str, int, float, type(None))):
+        return to_encode
+    if isinstance(to_encode, (list, set)):
+        return [recursive_encoder(x) for x in to_encode]
+    if isinstance(to_encode, dict):
+        return {k: recursive_encoder(v) for k, v in to_encode.items()}
+    if hasattr(to_encode, "json_repr"):
+        return to_encode.json_repr
+    if hasattr(to_encode, "serialize"):
+        return recursive_encoder(to_encode.serialize())
+    return None
 
 
 # the following define mappings between strings and functions used in
@@ -333,7 +338,10 @@ descriptive_stat_modes = {
     "mean": np.mean,
 }
 
-log_modes = {"log2": np.log2, "log10": np.log10}
+log_modes = {
+    "log2": np.log2, 
+    "log10": np.log10
+    }
 
 file_operations = {
     "link": os.link,

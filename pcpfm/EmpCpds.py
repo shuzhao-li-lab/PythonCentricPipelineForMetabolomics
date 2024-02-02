@@ -2,33 +2,38 @@ import json
 import os
 import pandas as pd
 
+from jms.io import read_table_to_peaks
+from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
+from intervaltree import IntervalTree
+from khipu.epdsConstructor import epdsConstructor
 from khipu.extended import (
     isotope_search_patterns,
     extended_adducts,
     adduct_search_patterns,
     adduct_search_patterns_neg,
 )
-from intervaltree import IntervalTree
+from .MSnSpectrum import MS2Spectrum
 from .utils import (
     get_similarity_method,
-    lazy_extract_MS2_spectra,
+    lazy_extract_ms2_spectra,
     search_for_mzml,
     row_to_dict,
     extract_CD_csv,
 )
 
-
-class empCpds:
-    def __init__(self, dict_empCpds, experiment, moniker):
+class EmpCpds:
+    """_summary_
+    """
+    def __init__(self, dict_empcpds, experiment, moniker):
         """
-        the empCpds object is a wrapper around dict_empCpds that will associate the dict_empCpds with a moniker and
+        the empCpds object is a wrapper around dict_empcpds that will associate the dict_empcpds with a moniker and
         experiment object.
 
-        :param dict_empCpds: dictionary of empCpds
+        :param dict_empcpds: dictionary of empCpds
         :param experiment: experiment object for these empdpds
         :param moniker: the moniker for this empCpd
         """
-        self.dict_empCpds = dict_empCpds
+        self.dict_empcpds = dict_empcpds
         self.experiment = experiment
         self.moniker = moniker
 
@@ -37,29 +42,35 @@ class empCpds:
 
         self.__mz_trees = {}
         self.__rt_trees = {}
-        self._MS2_spectra = None
+        self.__ms2_spectra = None
 
     @property
-    def MS2_spectra(self):
-        from .MSnSpectrum import MS2Spectrum
+    def ms2_spectra(self):
+        """_summary_
 
-        MS2_spectra = {}
-        if self._MS2_spectra is None:
-            for _, khipu in self.dict_empCpds.items():
+        Returns:
+            _type_: _description_
+        """        
+        if self.__ms2_spectra is None:
+            ms2_spectra = {}
+            for khipu in self.dict_empcpds.values():
                 if "MS2_Spectra" in khipu:
                     for spectrum in khipu["MS2_Spectra"]:
-                        MS2_spectra[
-                            spectrum["precursor_ion"]
-                        ] = MS2Spectrum.from_embedding(spectrum)
-            self._MS2_spectra = MS2_spectra
-        return self._MS2_spectra
+                        ms2_spectra[spectrum["precursor_ion"]] = MS2Spectrum.from_embedding(spectrum)
+            self.__ms2_spectra = ms2_spectra
+        return self.__ms2_spectra
 
     @property
     def feature_id_to_khipu_id(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
         if self._feature_id_to_khipu_id is None:
             feature_id_to_khipu_id = {}
             khipu_id_to_feature_id = {}
-            for kp_id, khipu in self.dict_empCpds.items():
+            for kp_id, khipu in self.dict_empcpds.items():
                 khipu_id_to_feature_id[kp_id] = []
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     feature_id_to_khipu_id[peak["id_number"]] = kp_id
@@ -70,31 +81,70 @@ class empCpds:
 
     @property
     def khipu_id_to_feature_id(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
         if self._feature_id_to_khipu_id is None:
             feature_id_to_khipu_id = {}
             khipu_id_to_feature_id = {}
-            for kp_id, khipu in self.dict_empCpds.items():
+            for kp_id, khipu in self.dict_empcpds.items():
                 khipu_id_to_feature_id[kp_id] = []
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     feature_id_to_khipu_id[peak["id_number"]] = kp_id
-                    khipu_id_to_feature_id.append(peak["id_number"])
+                    khipu_id_to_feature_id[kp_id].append(peak["id_number"])
             self._feature_id_to_khipu_id = feature_id_to_khipu_id
             self._khipu_id_to_feature_id = khipu_id_to_feature_id
         return self._khipu_id_to_feature_id
 
-    def update_annotations(self):
-        # update MS2 annotations
-        for _, khipu in self.dict_empCpds.items():
+    def create_annotation_table(self):
+        """_summary_
+
+        Returns:
+            _type_: _description_
+        """
+        annotation_table = []
+        for kp_id, khipu in self.dict_empcpds.items():
+            for feature in self.khipu_id_to_feature_id[kp_id]:
+                #MS1 annots
+                l1b_annots = khipu.get("Level_1b", [])
+                for l1b_annot in l1b_annots:
+                    l1b_annot_entry = {"feature": feature, "level": "1b"}
+                    l1b_annot_entry.update(l1b_annot)
+                    annotation_table.append(l1b_annot_entry)
+                l4_annots = khipu.get("Level_4", [])
+                for l4_annot in l4_annots:
+                    l4_annot_entry = {"feature": feature, "level": "4"}
+                    l4_annot_entry.update(l4_annot)
+                    annotation_table.append(l4_annot_entry)
+                #MS2 annots
+                for ms2_spectrum in khipu.get("MS2_Spectra", []):
+                    for annotation in ms2_spectrum["annotations"]:
+                        annotation_level = annotation["annotation_level"][0]
+                        ms2_annotation = {"feature": feature, "level": annotation_level}
+                        ms2_annotation.update(annotation)
+                        annotation_table.append(ms2_annotation)
+        return pd.DataFrame(annotation_table)
+    
+    def __update_ms2(self):
+        """_summary_
+        """        
+        for _, khipu in self.dict_empcpds.items():
             if "MS2_Spectra" in khipu:
                 new_spectra = []
                 for spectrum in khipu["MS2_Spectra"]:
                     new_spectra.append(
-                        self.MS2_spectra[spectrum["precursor_ion"]].embedding()
+                        self.ms2_spectra[spectrum["precursor_ion"]].embedding()
                     )
                 khipu["MS2_Spectra"] = new_spectra
 
+    def update_annotations(self):
+        """_summary_
+        """
+        self.__update_ms2()
         # update other fields in the empCpds:
-        for _, khipu in self.dict_empCpds.items():
+        for _, khipu in self.dict_empcpds.items():
             khipu["identity"] = set()
             khipu["Database_referred"] = set()
 
@@ -133,7 +183,7 @@ class empCpds:
             khipu["identity"] = list(khipu["identity"])
             khipu["Database_referred"] = list(khipu["Database_referred"])
 
-    def get_mz_tree(self, mz_tolerance, abs=False):
+    def get_mz_tree(self, mz_tolerance, abs_error=False):
         """
         This method will return an existing m/z based interval tree for
         these empcpds for a given mz_tolerance.
@@ -143,11 +193,11 @@ class empCpds:
 
         :return: interval tree for mz at the provided mz_tolerance
         """
-        if ("feature", str(mz_tolerance), str(abs)) not in self.__mz_trees:
+        if ("feature", str(mz_tolerance), str(abs_error)) not in self.__mz_trees:
             mz_tree = IntervalTree()
-            for _, khipu in self.dict_empCpds.items():
+            for _, khipu in self.dict_empcpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
-                    if abs:
+                    if abs_error:
                         mz_tree.addi(
                             peak["mz"] - mz_tolerance,
                             peak["mz"] + mz_tolerance,
@@ -160,8 +210,8 @@ class empCpds:
                             peak["mz"] + mz_error,
                             peak["id_number"],
                         )
-            self.__mz_trees[("feature", str(mz_tolerance), str(abs))] = mz_tree
-        return self.__mz_trees[("feature", str(mz_tolerance), str(abs))]
+            self.__mz_trees[("feature", str(mz_tolerance), str(abs_error))] = mz_tree
+        return self.__mz_trees[("feature", str(mz_tolerance), str(abs_error))]
 
     def get_rt_tree(self, rt_tolerance):
         """
@@ -174,7 +224,7 @@ class empCpds:
         """
         if ("feature", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
-            for _, khipu in self.dict_empCpds.items():
+            for _, khipu in self.dict_empcpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     rt_tree.addi(
                         peak["rtime"] - rt_tolerance,
@@ -185,9 +235,17 @@ class empCpds:
         return self.__rt_trees[("feature", rt_tolerance)]
 
     def get_precursor_mz_tree(self, mz_tolerance):
+        """_summary_
+
+        Args:
+            mz_tolerance (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         if ("precursor", mz_tolerance) not in self.__mz_trees:
             mz_tree = IntervalTree()
-            for spectrum in self.MS2_spectra.values():
+            for spectrum in self.ms2_spectra.values():
                 precursor_mz = spectrum.precursor_ion_mz
                 mz_error = precursor_mz / 1e6 * mz_tolerance
                 mz_tree.addi(
@@ -199,9 +257,17 @@ class empCpds:
         return self.__mz_trees[("precursor", mz_tolerance)]
 
     def get_precursor_rt_tree(self, rt_tolerance):
+        """_summary_
+
+        Args:
+            rt_tolerance (_type_): _description_
+
+        Returns:
+            _type_: _description_
+        """
         if ("precursor", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
-            for spectrum in self.MS2_spectra.values():
+            for spectrum in self.ms2_spectra.values():
                 precursor_rt = spectrum.retention_time
                 rt_tree.addi(
                     precursor_rt - rt_tolerance,
@@ -218,7 +284,7 @@ class empCpds:
 
         :return: number of empcpds
         """
-        return len(self.dict_empCpds)
+        return len(self.dict_empcpds)
 
     @property
     def num_features(self):
@@ -252,33 +318,22 @@ class empCpds:
         :return: list of matching feature IDs
         :rtype: list
         """
+        mz_matches, rt_matches = set(), set()
         if query_mz and mz_tolerance:
-            if type(mz_tolerance) is str:
+            if isinstance(mz_tolerance, str):
                 if mz_tolerance.endswith("ppm"):
                     mz_tolerance = float(mz_tolerance.rstrip("ppm"))
-                    mz_matches = set(
-                        [x.data for x in self.get_mz_tree(mz_tolerance).at(query_mz)]
-                    )
+                    mz_tree = self.get_mz_tree(mz_tolerance)
+                    mz_matches = {x.data for x in mz_tree.at(query_mz)}
                 elif mz_tolerance.endswith("amu"):
                     mz_tolerance = float(mz_tolerance.rstrip("amu"))
-                    mz_matches = set(
-                        [
-                            x.data
-                            for x in self.get_mz_tree(mz_tolerance, abs=True).at(
-                                query_mz
-                            )
-                        ]
-                    )
+                    mz_tree = self.get_mz_tree(mz_tolerance, abs_error=True)
+                    mz_matches = {x.data for x in mz_tree.at(query_mz)}
             else:
-                mz_matches = set(
-                    [x.data for x in self.get_mz_tree(mz_tolerance).at(query_mz)]
-                )
+                mz_tree = self.get_mz_tree(mz_tolerance)
+                mz_matches = {x.data for x in mz_tree.at(query_mz)}
         if query_rt and rt_tolerance:
-            rt_matches = set(
-                [x.data for x in self.get_rt_tree(rt_tolerance).at(query_rt)]
-            )
-        else:
-            return mz_matches
+            rt_matches = {x.data for x in self.get_rt_tree(rt_tolerance).at(query_rt)}
         return list(rt_matches.intersection(mz_matches))
 
     def save(self, save_as_moniker=None):
@@ -294,8 +349,8 @@ class empCpds:
         self.experiment.empCpds[save_as_moniker] = os.path.join(
             self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json"
         )
-        with open(self.experiment.empCpds[save_as_moniker], "w+") as out_fh:
-            json.dump(self.dict_empCpds, out_fh, indent=4)
+        with open(self.experiment.empCpds[save_as_moniker], "w+", encoding='utf-8') as out_fh:
+            json.dump(self.dict_empcpds, out_fh, indent=4)
         self.experiment.save()
 
     @staticmethod
@@ -308,17 +363,24 @@ class empCpds:
             generated
         :return: the empCpds object for the specified moniker
         """
-        return empCpds(
-            json.load(open(experiment.empCpds[moniker])), experiment, moniker
-        )
+        with open(experiment.empCpds[moniker], encoding='utf-8') as empcpd_fh:
+            return EmpCpds(json.load(empcpd_fh), experiment, moniker)
 
-    def map_MS2_to_empCpds(
+    def map_ms2(
         self,
         mapping_mz_tolerance=5,
         mapping_rt_tolerance=30,
         ms2_files=None,
         scan_experiment=False,
     ):
+        """_summary_
+
+        Args:
+            mapping_mz_tolerance (int, optional): _description_. Defaults to 5.
+            mapping_rt_tolerance (int, optional): _description_. Defaults to 30.
+            ms2_files (_type_, optional): _description_. Defaults to None.
+            scan_experiment (bool, optional): _description_. Defaults to False.
+        """
         # we should first map ms2 spectra to empCpds, then annnotate them.
         mzml_w_ms2 = []
         if ms2_files:
@@ -330,7 +392,7 @@ class empCpds:
                 if acq.has_MS2:
                     mzml_w_ms2.append(acq.mzml_filepath)
 
-        for ms2_object in lazy_extract_MS2_spectra(mzml_w_ms2):
+        for ms2_object in lazy_extract_ms2_spectra(mzml_w_ms2):
             used_khipu = set()
             matching_features = self.search_for_feature(
                 ms2_object.precursor_ion_mz,
@@ -340,24 +402,24 @@ class empCpds:
             )
             for matching_feature in matching_features:
                 kp_id = self.feature_id_to_khipu_id[matching_feature]
-                khipu = self.dict_empCpds[kp_id]
+                khipu = self.dict_empcpds[kp_id]
                 if "MS2_Spectra" not in khipu:
                     khipu["MS2_Spectra"] = []
                 khipu["MS2_Spectra"].append(ms2_object.embedding())
                 used_khipu.add(kp_id)
 
     @staticmethod
-    def construct_empCpds_from_feature_table(
+    def construct_from_feature_table(
         experiment,
-        isotopes=isotope_search_patterns,
+        isotopes=None,
         adducts=None,
-        extended_adducts=extended_adducts,
+        ext_adducts=None,
         feature_table_moniker="full",
-        empCpd_moniker="default",
+        moniker="default",
         add_singletons=False,
         rt_search_window=2,
         mz_tolerance=5,
-        charges=[1, 2, 3],
+        charges=None,
     ):
         """
         For a given feature table, generate the empirical compounds
@@ -381,13 +443,15 @@ class empCpds:
 
         :return: empcpd dict
         """
-        from jms.io import read_table_to_peaks
-        from khipu.epdsConstructor import epdsConstructor
-
-        if experiment.ionization_mode == "pos" and adducts is None:
-            adducts = adduct_search_patterns
-        elif experiment.ionization_mode == "neg" and adducts is None:
-            adducts = adduct_search_patterns_neg
+        charges = [1,2,3] if charges is None else charges
+        ext_adducts = extended_adducts if ext_adducts is None else ext_adducts
+        isotopes = isotope_search_patterns if isotopes is None else isotopes
+        default_adducts = {
+            "pos": adduct_search_patterns,
+            "neg": adduct_search_patterns_neg
+        }
+        if adducts is None:
+            adducts = default_adducts[experiment.ionization_mode]
         peaklist = read_table_to_peaks(
             experiment.feature_tables[feature_table_moniker],
             has_header=True,
@@ -401,7 +465,7 @@ class empCpds:
             p["representative_intensity"] = None
         to_delete = set()
         for p in peaklist:
-            for field in [k for k in p.keys()]:
+            for field in p.keys():
                 if "___" in field:
                     new_field = field.split("___")[-1]
                     p[new_field] = p[field]
@@ -411,34 +475,34 @@ class empCpds:
                 del p[field]
 
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
-        dict_empCpds = ECCON.peaks_to_epdDict(
+        dict_empcpds = ECCON.peaks_to_epdDict(
             isotopes,
             adduct_search_patterns,
-            extended_adducts,
+            ext_adducts,
             mz_tolerance_ppm=mz_tolerance,
             rt_tolerance=rt_search_window,
             charges=charges,
         )
         all_feature_ids = set()
-        for empCpd in dict_empCpds.values():
-            for peak in empCpd["MS1_pseudo_Spectra"]:
+        for empcpd in dict_empcpds.values():
+            for peak in empcpd["MS1_pseudo_Spectra"]:
                 all_feature_ids.add(peak["id_number"])
         # TODO - this should be added to khipu at some point
         if add_singletons:
             for peak in peaklist:
                 if peak["id_number"] not in all_feature_ids:
                     peak["ion_relation"] = None
-                    dict_empCpds[len(dict_empCpds)] = {
-                        "interim_id": len(dict_empCpds),
+                    dict_empcpds[len(dict_empcpds)] = {
+                        "interim_id": len(dict_empcpds),
                         "neutral_formula_mass": "",
                         "neutral_formula": "",
                         "MS1_pseudo_Spectra": [peak],
                     }
-        empCpd = empCpds(dict_empCpds, experiment, empCpd_moniker)
-        empCpd.save()
-        return empCpd
+        empcpd = EmpCpds(dict_empcpds, experiment, moniker)
+        empcpd.save()
+        return empcpd
 
-    def L4_annotate(self, annotation_sources, rt_tolerance=5):
+    def l4_annotate(self, annotation_sources, rt_tolerance=5):
         """
         Given multiple annotation sources in the JSON format compliant with JMS, annotate based on neutral formula
         match to the annotation sources.
@@ -446,36 +510,34 @@ class empCpds:
         :param annotation_sources: list of filepaths to annotation sources in JSON format
         :param rt_tolerance: the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
         """
-        from jms.dbStructures import ExperimentalEcpdDatabase, knownCompoundDatabase
-
         EED = ExperimentalEcpdDatabase(
             mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance
         )
-        EED.build_from_list_empCpds(list(self.dict_empCpds.values()))
+        EED.build_from_list_empCpds(list(self.dict_empcpds.values()))
 
         formula_entry_lookup = {}
         for source in annotation_sources:
-            for entry in json.load(open(source)):
-                if entry["neutral_formula"] not in formula_entry_lookup:
-                    formula_entry_lookup[entry["neutral_formula"]] = []
-                formula_entry_lookup[entry["neutral_formula"]].append(entry)
-            KCD = knownCompoundDatabase()
-            KCD.mass_index_list_compounds(json.load(open(source)))
-            KCD.build_emp_cpds_index()
-            EED.extend_empCpd_annotation(KCD)
+            with open(source, encoding='utf-8') as source_fh:
+                for entry in json.load(source_fh):
+                    if entry["neutral_formula"] not in formula_entry_lookup:
+                        formula_entry_lookup[entry["neutral_formula"]] = []
+                    formula_entry_lookup[entry["neutral_formula"]].append(entry)
+                KCD = knownCompoundDatabase()
+                KCD.mass_index_list_compounds(json.load(source_fh))
+                KCD.build_emp_cpds_index()
+                EED.extend_empCpd_annotation(KCD)
 
-        for empCpd in self.dict_empCpds.values():
-            if "Level_4" not in empCpd:
-                empCpd["Level_4"] = []
-            if "list_matches" in empCpd and empCpd["list_matches"]:
-                for match in empCpd["list_matches"]:
-                    formula_mass, ion_relation, count = match
-                    formula, mass = formula_mass.split("_")
-                    if formula in formula_entry_lookup:
-                        empCpd["Level_4"].extend(formula_entry_lookup[formula])
+        for khipu in self.dict_empcpds.values():
+            if "Level_4" not in khipu:
+                khipu["Level_4"] = []
+            for match in khipu.get(["list_matches"], []):
+                formula_mass, _, _ = match
+                formula, _ = formula_mass.split("_")
+                if formula in formula_entry_lookup:
+                    khipu["Level_4"].extend(formula_entry_lookup[formula])
         self.update_annotations()
 
-    def L2_annotate(
+    def l2_annotate(
         self,
         msp_files,
         mz_tolerance=5,
@@ -483,10 +545,19 @@ class empCpds:
         min_peaks=2,
         score_cutoff=0.50,
     ):
-        msp_files = [msp_files] if type(msp_files) is str else msp_files
+        """_summary_
+
+        Args:
+            msp_files (_type_): _description_
+            mz_tolerance (int, optional): _description_. Defaults to 5.
+            similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
+            min_peaks (int, optional): _description_. Defaults to 2.
+            score_cutoff (float, optional): _description_. Defaults to 0.50.
+        """        
+        msp_files = [msp_files] if isinstance(msp_files, str) else msp_files
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tolerance)
-        for db_ms2_object in lazy_extract_MS2_spectra(
+        for db_ms2_object in lazy_extract_ms2_spectra(
             msp_files, mz_tree=precursor_mz_tree
         ):
             similarity_instance = similarity_method(
@@ -495,17 +566,17 @@ class empCpds:
             for possible_match in [
                 x.data for x in precursor_mz_tree.at(db_ms2_object.precursor_ion_mz)
             ]:
-                expMS2_object = self.MS2_spectra[possible_match]
+                expms2_object = self.ms2_spectra[possible_match]
                 msms_score, n_matches = similarity_instance.pair(
-                    db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum
+                    db_ms2_object.matchms_spectrum, expms2_object.matchms_spectrum
                 ).tolist()
                 if msms_score >= score_cutoff and n_matches >= min_peaks:
-                    expMS2_object.annotate(
+                    expms2_object.annotate(
                         db_ms2_object, msms_score, n_matches, annotation_level="Level_2"
                     )
         self.update_annotations()
 
-    def L1a_annotate(
+    def l1a_annotate(
         self,
         standards_csv,
         mz_tolerance=5,
@@ -514,6 +585,16 @@ class empCpds:
         min_peaks=2,
         score_cutoff=0.50,
     ):
+        """_summary_
+
+        Args:
+            standards_csv (_type_): _description_
+            mz_tolerance (int, optional): _description_. Defaults to 5.
+            rt_tolerance (int, optional): _description_. Defaults to 30.
+            similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
+            min_peaks (int, optional): _description_. Defaults to 2.
+            score_cutoff (float, optional): _description_. Defaults to 0.50.
+        """
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tolerance)
         precursor_rt_tree = self.get_precursor_rt_tree(rt_tolerance)
@@ -529,12 +610,12 @@ class empCpds:
                 if possible_match in [
                     x.data for x in precursor_rt_tree.at(db_ms2_object.retention_time)
                 ]:
-                    expMS2_object = self.MS2_spectra[possible_match]
+                    expms2_object = self.ms2_spectra[possible_match]
                     msms_score, n_matches = similarity_instance.pair(
-                        db_ms2_object.matchms_spectrum, expMS2_object.matchms_spectrum
+                        db_ms2_object.matchms_spectrum, expms2_object.matchms_spectrum
                     ).tolist()
                     if msms_score >= score_cutoff and n_matches >= min_peaks:
-                        expMS2_object.annotate(
+                        expms2_object.annotate(
                             db_ms2_object,
                             msms_score,
                             n_matches,
@@ -542,8 +623,14 @@ class empCpds:
                         )
         self.update_annotations()
 
-    def L1b_annotate(self, standards_csv, mz_tolerance=5, rt_tolerance=10):
+    def l1b_annotate(self, standards_csv, mz_tolerance=5, rt_tolerance=10):
+        """_summary_
 
+        Args:
+            standards_csv (_type_): _description_
+            mz_tolerance (int, optional): _description_. Defaults to 5.
+            rt_tolerance (int, optional): _description_. Defaults to 10.
+        """
         for csv in standards_csv:
             standards = pd.read_csv(csv)
             for standard in standards.apply(
@@ -555,7 +642,7 @@ class empCpds:
                 for feature_match in self.search_for_feature(
                     mz, rtime, mz_tolerance, rt_tolerance
                 ):
-                    kp = self.dict_empCpds[self.feature_id_to_khipu_id[feature_match]]
+                    kp = self.dict_empcpds[self.feature_id_to_khipu_id[feature_match]]
                     if "Level_1b" not in kp:
                         kp["Level_1b"] = []
                     kp["Level_1b"].append((cname, csv))

@@ -126,7 +126,7 @@ class Main():
             if isinstance(v, str) and v.endswith(".json"):
                 with open(v, encoding='utf-8') as json_fh:
                     params[k] = json.load(json_fh)
-        if not params['input'].endswith("experiment.json"):
+        if 'input' in params and not params['input'].endswith("experiment.json"):
             params['input'] = os.path.join(os.path.abspath(params['input']), "experiment.json")
         return params
 
@@ -277,7 +277,7 @@ class Main():
             os.path.join(os.path.abspath(params['output']), str(params['project'])),
             params['sequence'],
             params['mode'],
-            filter=params['filter'],
+            sample_filter=params['filter'],
             name_field=params['name_field'],
             path_field=params['path_field'],
             exp_config=params['experiment_config'],
@@ -790,6 +790,7 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         Report.Report(experiment, params)
 
+    @staticmethod
     def map_MS2_to_empCpds(params):
         """_summary_
 
@@ -801,8 +802,8 @@ class Main():
         empCpds.map_MS2_to_empCpds(30, 5, ms2_files=params['ms2_dir'])
         empCpds.save(params["new_moniker"])
 
+    @staticmethod
     def generate_output(params):
-        #TODO - this needs to be broken into the appropriate other files
         """
         This command generates the three table output for downstream
         analysis. This includes a feature table, an annotation table,
@@ -819,73 +820,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
-        new_moniker = params['new_moniker']
-        matches = []
-        output = experiment.experiment_directory + "/results/"
-        for _, cpd in empCpds.dict_empCpds.items():
-            for peak in cpd["MS1_pseudo_Spectra"]:
-                for match in cpd["mz_only_db_matches"]:
-                    peak_match = {"annotation_level": 4}
-                    if 'SMILES' in match:
-                        match['smiles'] = match['SMILES']
-                        del match['SMILES']
-                    if 'neutral_formula' in match:
-                        if 'chemical_formula' not in match:
-                            match['chemical_formula'] = match['neutral_formula']
-                        del match['neutral_formula']
-                    peak_match.update({k: v for k, v in peak.items()})
-                    if 'isotope' not in peak_match or peak_match['isotope'] is None:
-                        peak_match['isotope'] = "Assume M0"
-                    if 'modification' not in peak_match or peak_match['modification'] is None:
-                        if "neg" in dir:
-                            peak_match["modification"] = "Assume M-H-"
-                        else:
-                            peak_match["modification"] = "Assume M+H+"
-                    if 'ion_relation' not in peak_match or peak_match['ion_relation'] is None:
-                        peak_match['ion_relation'] = peak_match['isotope'] + "," + peak_match['modification']
-
-                    peak_match.update(match)
-                    matches.append(peak_match)
-            if "MS2_Spectra" in cpd: 
-                for MS2_spectrum in cpd["MS2_Spectra"]:
-                        MS2_data = {k: v for k, v in MS2_spectrum.items() if k not in {"Annotations", "exp_spectrum"}}                    
-                        if "Annotations" in MS2_spectrum:
-                            for annotation in MS2_spectrum["Annotations"]:
-                                annotation["primary_db"] = annotation["origin"]
-                                annotation["name"] = annotation["reference_id"]
-                                del annotation["origin"]
-                                del annotation["reference_id"]
-                                MS2_match = {"annotation_level": 2}
-                                MS2_match.update(MS2_data)
-                                MS2_match.update({k: v for k, v in annotation.items() if k not in {"db_spectrum"}})
-                                for peak in cpd["MS1_pseudo_Spectra"]:
-                                    MS2_match_copy = {k: v for k, v in MS2_match.items()}
-                                    MS2_match_copy.update({k: v for k, v in peak.items()})
-                                    matches.append(MS2_match_copy)
-            df = pd.DataFrame(matches)
-            if 'other_ids' in df.columns:
-                df.drop(columns="other_ids", inplace=True)
-
-            print(output)
-            os.makedirs(output, exist_ok=True)
-            base_dir = output + new_moniker
-            pd.DataFrame(matches).to_csv(base_dir + "_feature_annotation_table.tsv", index=False)
-            pd.DataFrame(feature_table.feature_table).to_csv(base_dir+ "_feature_table.tsv", index=False)
-            sample_table = []
-            for acquisition in experiment.acquisitions:
-                if acquisition.name in feature_table.sample_columns:
-                    acq_dict = {}
-                    for k, v in acquisition.__dict__.items():
-                        if type(v) is dict:
-                            for k2, v2 in v.items():
-                                acq_dict[k2] = v2
-                        else:
-                            if type(v) in [str, float, int, list]:
-                                acq_dict[k] = v
-                    sample_table.append(acq_dict)
-            pd.DataFrame(sample_table).to_csv(output + new_moniker + "_sample_annotation.tsv", index=False)
+        experiment.generate_output(params['empCpd_moniker'], params['table_moniker'])
 
 
 def main():
@@ -902,12 +837,12 @@ def main():
                 print("\t", method)
     else:
         function = getattr(Main, params['subcommand'])
-        try:
-            function(params)
-        except Exception as e:
-            print("Error executing: " + params['subcommand'])
-            print(function.__doc__)
-            print(e)
+        #try:
+        function(params)
+        #except Exception as e:
+        #    print("Error executing: " + params['subcommand'])
+        #    print(function.__doc__)
+        #    print(e)
 
 def CLI():
     main()
