@@ -1,3 +1,13 @@
+"""_summary_
+
+Raises:
+    an: _description_
+    NotImplementedError: _description_
+
+Returns:
+    _type_: _description_
+"""
+
 import os
 import json
 import multiprocessing as mp
@@ -5,10 +15,9 @@ import argparse
 import csv
 import zipfile
 import gdown
-import pandas as pd
 from . import Experiment
 from . import EmpCpds
-from . import example_parameters
+from . import default_parameters
 from . import Report
 
 class Main():
@@ -38,7 +47,7 @@ class Main():
         :return: parameters dictionary
         """
 
-        params = example_parameters.PARAMETERS
+        params = default_parameters.PARAMETERS
         parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing')
         parser.add_argument('subcommand', metavar='subcommand', 
                             help='one of the subcommands: _____')
@@ -193,12 +202,13 @@ class Main():
                 os.remove(dst)
 
             this_dir = os.path.abspath(os.path.dirname(__file__))
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter.zip")
-            anno_src_path = os.path.join(this_dir, "annotation_sources.zip")
-            converter_url = 'https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip'
-            annotat_sources = 'https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip'
-            download_from_cloud_storage(converter_url, thermo_parser_path)
-            download_from_cloud_storage(annotat_sources, anno_src_path)
+            base_url = 'https://storage.googleapis.com/pcpfm-data/'
+            converter_url = base_url + 'ThermoRawFileConverter-20240119T131510Z-001.zip'
+            annotat_sources = base_url + '/annotation_sources-20240119T131612Z-001.zip'
+            thermo_path = os.path.join(this_dir, "ThermoRawFileConverter.zip")
+            annot_path = os.path.join(this_dir, "annotation_sources.zip")
+            download_from_cloud_storage(converter_url, thermo_path)
+            download_from_cloud_storage(annotat_sources, annot_path)
 
 
     @staticmethod
@@ -276,11 +286,9 @@ class Main():
         experiment = Experiment.Experiment.construct_experiment_from_CSV(
             os.path.join(os.path.abspath(params['output']), str(params['project'])),
             params['sequence'],
-            params['mode'],
             sample_filter=params['filter'],
             name_field=params['name_field'],
             path_field=params['path_field'],
-            exp_config=params['experiment_config'],
             sample_skip_list_fp=params['skip_list']
         )
         experiment.save()
@@ -406,16 +414,16 @@ class Main():
             params['khipu_adducts'] = params['khipu_adducts_pos']
         else:
             params['khipu_adducts'] = params['khipu_adducts_neg']
-        EmpCpds.empCpds.construct_empCpds_from_feature_table(experiment,
-                                                                params['khipu_isotopes'],
-                                                                params['khipu_adducts'],
-                                                                params['khipu_extended_adducts'],
-                                                                params['table_moniker'],
-                                                                params['empCpd_moniker'],
-                                                                params['add_singletons'],
-                                                                params['khipu_rt_tolerance'],
-                                                                params['ppm'],
-                                                                params['khipu_charges'])
+        EmpCpds.EmpCpds.construct_from_feature_table(experiment,
+                                                    params['khipu_isotopes'],
+                                                    params['khipu_adducts'],
+                                                    params['khipu_extended_adducts'],
+                                                    params['table_moniker'],
+                                                    params['empCpd_moniker'],
+                                                    params['add_singletons'],
+                                                    params['khipu_rt_tolerance'],
+                                                    params['ppm'],
+                                                    params['khipu_charges'])
         experiment.save()
 
     @staticmethod
@@ -435,7 +443,6 @@ class Main():
         feature_table.blank_mask(params['blank_value'],
                                     params['sample_value'],
                                     params['query_field'],
-                                    params['filter'],
                                     float(params['blank_intensity_ratio']),
                                     params['by_batch'],
                                     params['batch_blanking_logic'])
@@ -629,15 +636,7 @@ class Main():
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def MS2_annotate(params):
-        Main.L2_annotate(params)
-
-    @staticmethod
-    def MS1_annotate(params):
-        Main.L4_annotate(params)
-
-    @staticmethod
-    def L4_annotate(params):
+    def l4_annotate(params):
         """
         This will generate MS1 annotations on a provided feature table
         or empcpd list. 
@@ -662,11 +661,11 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L4_annotate(params['targets'], float(params['annot_rt_tolerance']))
+            empCpd.l4_annotate(params['targets'], float(params['annot_rt_tolerance']))
             empCpd.save(params['new_moniker'])
 
     @staticmethod
-    def L2_annotate(params):
+    def l2_annotate(params):
         """
         This will generate MS2 annotations on a provided feature table
         or empCpd list. 
@@ -703,7 +702,7 @@ class Main():
             msp_file = params['msp_files_neg']
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L2_annotate(
+            empCpd.l2_annotate(
                 msp_file,
                 params["annot_mz_tolerance"],
                 params["ms2_similarity_metric"],
@@ -712,7 +711,7 @@ class Main():
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def L1b_annotate(params):
+    def l1b_annotate(params):
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z 
@@ -735,14 +734,14 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L1b_annotate(params['targets'],
+            empCpd.l1b_annotate(params['targets'],
                                 float(params['annot_rt_tolerance']), 
                                 float(params['annot_mz_tolerance'])
                                 )
             empCpd.save(params['new_moniker'])
 
     @staticmethod
-    def L1a_annotate(params):
+    def l1a_annotate(params):
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z 
@@ -769,7 +768,7 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         if 'empCpd_moniker' in params:
             empCpd = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-            empCpd.L1a_annotate(params['targets'],
+            empCpd.l1a_annotate(params['targets'],
                                 float(params['annot_rt_tolerance']), 
                                 float(params['annot_mz_tolerance']),
                                 )
@@ -791,7 +790,7 @@ class Main():
         Report.Report(experiment, params)
 
     @staticmethod
-    def map_MS2_to_empCpds(params):
+    def map_ms2(params):
         """_summary_
 
         Args:
@@ -799,7 +798,7 @@ class Main():
         """        
         experiment = Experiment.Experiment.load(params['input'])
         empCpds = experiment.retrieve_empCpds(params['empCpd_moniker'], True)
-        empCpds.map_MS2_to_empCpds(30, 5, ms2_files=params['ms2_dir'])
+        empCpds.map_ms2(30, 5, ms2_files=params['ms2_dir'])
         empCpds.save(params["new_moniker"])
 
     @staticmethod
