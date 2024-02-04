@@ -1,3 +1,6 @@
+"""_summary_
+
+"""
 import os
 import shutil
 import sys
@@ -83,10 +86,11 @@ def extract_CD_csv(
             mzs = [mz for mz in mzs if (mz and not np.isnan(mz))]
             intensities = [i for i in intensities if (i and not np.isnan(i))]
             mzs, intensities = zip(*sorted(zip(mzs, intensities)))
+            print(mzs)
             if len(mzs) == len(intensities) and len(mzs) >= min_peaks:
                 spectrum = Spectrum(
-                    mz=np.asarray((float(x) for x in mzs)),
-                    intensities=np.asarray((float(x) for x in intensities)),
+                    mz=np.asarray([float(x) for x in mzs]),
+                    intensities=np.asarray([float(x) for x in intensities]),
                     metadata=standard,
                 )
                 # assume proton for ionization adduct
@@ -223,16 +227,11 @@ def process_ms2_spectrum(
             spec_id.append(str(float(spectrum.get("retention_time", ""))))
         spec_id.append(filename)
         spec_id = "_".join(spec_id)
-        try:
-            reference_id = spectrum.get("compound_name")
-        except:
-            reference_id = spec_id
+        reference_id = spectrum.get("compound_name", spec_id)
         spectrum = MS2Spectrum(
             spec_id=spec_id,
             precursor_mz=float(spectrum.get("precursor_mz")),
-            precursor_rt=float(spectrum.get("retention_time"))
-            if spectrum.get("retention_time")
-            else None,
+            precursor_rt=float(spectrum.get("retention_time")) if spectrum.get("retention_time") else None,
             list_mz=[],
             list_intensity=[],
             matchms_spectrum=spectrum,
