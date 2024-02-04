@@ -66,6 +66,7 @@ class Experiment(core.Experiment):
         output_subdirectory=None
     ):
         super().__init__(experiment_name)
+        self.experiment_name = self.id
         self.experiment_directory = os.path.abspath(experiment_directory)
         if acquisitions:
             self.ordered_samples = set(acquisitions)
@@ -194,7 +195,7 @@ class Experiment(core.Experiment):
         with open(experiment_json_filepath, encoding="utf-8") as json_filehandle:
             decoded_JSON = json.load(json_filehandle)
             experiment = Experiment(
-                "",
+                decoded_JSON["id"],
                 decoded_JSON["experiment_directory"],
                 None,
                 qcqa_results=decoded_JSON["qcqa_results"],
@@ -342,7 +343,7 @@ class Experiment(core.Experiment):
         """
         if moniker in self.empCpds:
             if as_object:
-                return EmpCpds.empCpds.load(moniker, self)
+                return EmpCpds.EmpCpds.load(moniker, self)
             return self.feature_tables[moniker]
         print("No such empCpds: ", moniker)
         sys.exit()
@@ -653,6 +654,8 @@ class Experiment(core.Experiment):
                 {a.metadata_tags[field] for a in self.acquisitions}
             ):
                 cosmetic_map[needs_cosmetic] = allowed_cosmetics[provided_cos_type][i]
+            if provided_cos_type not in self.used_cosmetics:
+                self.used_cosmetics[provided_cos_type] = []
             self.used_cosmetics[provided_cos_type].extend(list(cosmetic_map.values()))
             if provided_cos_type not in self.cosmetics:
                 self.cosmetics[provided_cos_type] = {}

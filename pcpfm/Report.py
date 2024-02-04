@@ -87,7 +87,7 @@ class Report():
         valid_sections = []
         for section in style["sections"]:
             try:
-                self.getattr(section["section"])
+                getattr(self, section["section"])
                 valid_sections.append(section)
             except AttributeError:
                 print(section["section"] + "is not a valid section!\nValid sections include: ")
@@ -106,17 +106,17 @@ class Report():
         report element each section specifies.
         """
         for section in self.style:
-            try:
-                method = getattr(self, section["section"])
-                if method:
-                    if "table" in section:
-                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
-                            section["table"] = section["table"] + "_cleaned"
-                            method(section)
-                        else:
-                            method(section)
-            except:
-                print("Unable to processes section: \n", section)
+            #try:
+            method = getattr(self, section["section"])
+            if method:
+                if "table" in section:
+                    if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                        section["table"] = section["table"] + "_cleaned"
+                        method(section)
+                    else:
+                        method(section)
+            #except:
+            #    print("Unable to processes section: \n", section)
 
 
 
@@ -360,14 +360,14 @@ class Report():
         provided.
 
         """
-        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/_" + section_desc["name"] + ".png"
+        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/" + self.experiment.experiment_name + "_" + section_desc["name"] + ".png"
         if os.path.exists(figure_path):
             self.report.add_page()
             self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
             self.report.ln(10)
             self.report.image(figure_path, w=self.max_width)
         else:
-            feature_table = self.experiment.retrieve(section_desc["table"], True, False, True)
+            feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
             params_for_figure = dict(self.parameters)
             params_for_figure['all'] = False
             params_for_figure['save_plots'] = True

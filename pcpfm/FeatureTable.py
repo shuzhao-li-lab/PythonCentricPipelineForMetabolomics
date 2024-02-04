@@ -796,7 +796,6 @@ class FeatureTable:
                         corr_matrix[i][j] = corr.statistic
                     else:
                         corr_matrix[i][j] = corr[0][1]
-
         if log_transform:
             title = correlation_type + "_logtransformed_correlation"
         else:
@@ -831,6 +830,7 @@ class FeatureTable:
 
         :return: QAQC_result dict
         """
+        print("Here")
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
@@ -1595,9 +1595,9 @@ class FeatureTable:
         """
         color_cosmetic_map = {}
         for color in colorby:
-            cosmetic_maps = self.experiment.generate_cosmetic_map(color, "color", seed)
-            for cosmetic_map in cosmetic_maps:
-                color_cosmetic_map.update({("color", k): v for k, v in cosmetic_map.items()})
+            cosmetic_map = self.experiment.generate_cosmetic_map(color, "colors", seed)
+            color_cosmetic_map.update({("colors", k): v for k, v in cosmetic_map.items()})
+        print(color_cosmetic_map)
         return color_cosmetic_map
 
     def __gen_marker_cosmetic_map(self, markerby, seed=None):
@@ -1612,9 +1612,8 @@ class FeatureTable:
         """
         marker_cosmetic_map = {}
         for marker in markerby:
-            cosmetic_maps = self.experiment.generate_cosmetic_map(marker, "marker", seed)
-            for cosmetic_map in cosmetic_maps:
-                marker_cosmetic_map.update({("marker", k): v for k, v in cosmetic_map.items()})
+            cosmetic_map = self.experiment.generate_cosmetic_map(marker, "markers", seed)
+            marker_cosmetic_map.update({("markers", k): v for k, v in cosmetic_map.items()})
         return marker_cosmetic_map
 
     def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
@@ -1650,17 +1649,16 @@ class FeatureTable:
             acquisition = acq_name_map[sample_name.split("___")[-1]]
             for i, x in enumerate(colorby):
                 value_for_cosmetic = acquisition.metadata_tags[x]
-                cosmetic_for_value = combined_cosmetic_map[("color", value_for_cosmetic)]
+                cosmetic_for_value = combined_cosmetic_map[("colors", value_for_cosmetic)]
                 cosmetics["colors"][i].append(cosmetic_for_value)
                 legends["colors"][value_for_cosmetic] = cosmetic_for_value
             for i, x in enumerate(markerby):
                 value_for_cosmetic = acquisition.metadata_tags[x]
-                cosmetic_for_value = combined_cosmetic_map[("marker", value_for_cosmetic)]
+                cosmetic_for_value = combined_cosmetic_map[("markers", value_for_cosmetic)]
                 cosmetics["markers"][i].append(cosmetic_for_value)
                 legends["markers"][value_for_cosmetic] = cosmetic_for_value
             for i, x in enumerate(textby):
                 cosmetics["texts"][i].append(acquisition.metadata_tags[x])
-            break
         return cosmetics["colors"], cosmetics["markers"], cosmetics["texts"], legends["colors"], legends["markers"]
 
     def generate_figure_params(self, params):

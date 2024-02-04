@@ -7,5 +7,6 @@ Currently there are no strict coding style guidelines but please consider the fo
 1. Pep8 coding conventions should be followed when possible.
 2. Readability > performance, unless strictly necessary keep code less optimized but easier to follow
 3. Consider edge cases and please add tests to your contributions. 
+4. Pylint is not to be trusted blindly; however, please ensure all *.py files have a rating > 9.0
 
 If you have questions, please contact me at joshua.mitchell@jax.org.

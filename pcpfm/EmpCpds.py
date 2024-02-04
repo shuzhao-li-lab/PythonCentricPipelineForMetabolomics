@@ -139,10 +139,11 @@ class EmpCpds:
                     )
                 khipu["MS2_Spectra"] = new_spectra
 
-    def update_annotations(self):
+    def update_annotations(self, update_ms2=False):
         """_summary_
         """
-        self.__update_ms2()
+        if update_ms2:
+            self.__update_ms2()
         # update other fields in the empCpds:
         for _, khipu in self.dict_empcpds.items():
             khipu["identity"] = set()
@@ -183,42 +184,42 @@ class EmpCpds:
             khipu["identity"] = list(khipu["identity"])
             khipu["Database_referred"] = list(khipu["Database_referred"])
 
-    def get_mz_tree(self, mz_tolerance, abs_error=False):
+    def get_mz_tree(self, mz_tol, abs_error=False):
         """
         This method will return an existing m/z based interval tree for
-        these empcpds for a given mz_tolerance.
+        these empcpds for a given mz_tol.
 
-        :param mz_tolerance: the mz_tolerance in ppm
+        :param mz_tol: the mz_tol in ppm
         :param abs: if true, assume the mz tolerance provide is in daltons
 
-        :return: interval tree for mz at the provided mz_tolerance
+        :return: interval tree for mz at the provided mz_tol
         """
-        if ("feature", str(mz_tolerance), str(abs_error)) not in self.__mz_trees:
+        if ("feature", str(mz_tol), str(abs_error)) not in self.__mz_trees:
             mz_tree = IntervalTree()
             for _, khipu in self.dict_empcpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     if abs_error:
                         mz_tree.addi(
-                            peak["mz"] - mz_tolerance,
-                            peak["mz"] + mz_tolerance,
+                            peak["mz"] - mz_tol,
+                            peak["mz"] + mz_tol,
                             peak["id_number"],
                         )
                     else:
-                        mz_error = peak["mz"] / 1e6 * mz_tolerance
+                        mz_error = peak["mz"] / 1e6 * mz_tol
                         mz_tree.addi(
                             peak["mz"] - mz_error,
                             peak["mz"] + mz_error,
                             peak["id_number"],
                         )
-            self.__mz_trees[("feature", str(mz_tolerance), str(abs_error))] = mz_tree
-        return self.__mz_trees[("feature", str(mz_tolerance), str(abs_error))]
+            self.__mz_trees[("feature", str(mz_tol), str(abs_error))] = mz_tree
+        return self.__mz_trees[("feature", str(mz_tol), str(abs_error))]
 
     def get_rt_tree(self, rt_tolerance):
         """
         This method will return an existing rt based interval tree for
         these empcpds for a given rt_tolerance
 
-        :param mz_tolerance: the rt_tolerance in sec(s)
+        :param mz_tol: the rt_tolerance in sec(s)
 
         :return: interval tree for rtime at the provided rt tolerance
         """
@@ -234,27 +235,28 @@ class EmpCpds:
             self.__rt_trees[("feature", rt_tolerance)] = rt_tree
         return self.__rt_trees[("feature", rt_tolerance)]
 
-    def get_precursor_mz_tree(self, mz_tolerance):
+    def get_precursor_mz_tree(self, mz_tol):
         """_summary_
 
         Args:
-            mz_tolerance (_type_): _description_
+            mz_tol (_type_): _description_
 
         Returns:
             _type_: _description_
         """
-        if ("precursor", mz_tolerance) not in self.__mz_trees:
+        if ("precursor", mz_tol) not in self.__mz_trees:
             mz_tree = IntervalTree()
             for spectrum in self.ms2_spectra.values():
-                precursor_mz = spectrum.precursor_ion_mz
-                mz_error = precursor_mz / 1e6 * mz_tolerance
+                print(spectrum)
+                precursor_mz = spectrum.prec_mz
+                mz_error = precursor_mz / 1e6 * mz_tol
                 mz_tree.addi(
                     precursor_mz - mz_error,
                     precursor_mz + mz_error,
                     spectrum.precursor_ion,
                 )
-            self.__mz_trees[("precursor", mz_tolerance)] = mz_tree
-        return self.__mz_trees[("precursor", mz_tolerance)]
+            self.__mz_trees[("precursor", mz_tol)] = mz_tree
+        return self.__mz_trees[("precursor", mz_tol)]
 
     def get_precursor_rt_tree(self, rt_tolerance):
         """_summary_
@@ -268,7 +270,7 @@ class EmpCpds:
         if ("precursor", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
             for spectrum in self.ms2_spectra.values():
-                precursor_rt = spectrum.retention_time
+                precursor_rt = spectrum.rtime
                 rt_tree.addi(
                     precursor_rt - rt_tolerance,
                     precursor_rt + rt_tolerance,
@@ -298,7 +300,7 @@ class EmpCpds:
         return len(self.feature_id_to_khipu_id)
 
     def search_for_feature(
-        self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None
+        self, query_mz=None, query_rt=None, mz_tol=None, rt_tolerance=None
     ):
         """
         Given a query_mz and query_rt with corresponding tolerances in ppm and absolute units respectively find all
@@ -311,26 +313,26 @@ class EmpCpds:
         :type query_mz: float, optional
         :param query_rt: the rtime to search for, defaults to None
         :type query_rt: float, optional
-        :param mz_tolerance: the tolerance in ppm for the mz match, defaults to None
-        :type mz_tolerance: float, optional
+        :param mz_tol: the tolerance in ppm for the mz match, defaults to None
+        :type mz_tol: float, optional
         :param rt_tolerance: the tolerance in absolute units for the rt match, defaults to None
         :type rt_tolerance: float, optional
         :return: list of matching feature IDs
         :rtype: list
         """
         mz_matches, rt_matches = set(), set()
-        if query_mz and mz_tolerance:
-            if isinstance(mz_tolerance, str):
-                if mz_tolerance.endswith("ppm"):
-                    mz_tolerance = float(mz_tolerance.rstrip("ppm"))
-                    mz_tree = self.get_mz_tree(mz_tolerance)
+        if query_mz and mz_tol:
+            if isinstance(mz_tol, str):
+                if mz_tol.endswith("ppm"):
+                    mz_tol = float(mz_tol.rstrip("ppm"))
+                    mz_tree = self.get_mz_tree(mz_tol)
                     mz_matches = {x.data for x in mz_tree.at(query_mz)}
-                elif mz_tolerance.endswith("amu"):
-                    mz_tolerance = float(mz_tolerance.rstrip("amu"))
-                    mz_tree = self.get_mz_tree(mz_tolerance, abs_error=True)
+                elif mz_tol.endswith("amu"):
+                    mz_tol = float(mz_tol.rstrip("amu"))
+                    mz_tree = self.get_mz_tree(mz_tol, abs_error=True)
                     mz_matches = {x.data for x in mz_tree.at(query_mz)}
             else:
-                mz_tree = self.get_mz_tree(mz_tolerance)
+                mz_tree = self.get_mz_tree(mz_tol)
                 mz_matches = {x.data for x in mz_tree.at(query_mz)}
         if query_rt and rt_tolerance:
             rt_matches = {x.data for x in self.get_rt_tree(rt_tolerance).at(query_rt)}
@@ -368,7 +370,7 @@ class EmpCpds:
 
     def map_ms2(
         self,
-        mapping_mz_tolerance=5,
+        mapping_mz_tol=5,
         mapping_rt_tolerance=30,
         ms2_files=None,
         scan_experiment=False,
@@ -376,7 +378,7 @@ class EmpCpds:
         """_summary_
 
         Args:
-            mapping_mz_tolerance (int, optional): _description_. Defaults to 5.
+            mapping_mz_tol (int, optional): _description_. Defaults to 5.
             mapping_rt_tolerance (int, optional): _description_. Defaults to 30.
             ms2_files (_type_, optional): _description_. Defaults to None.
             scan_experiment (bool, optional): _description_. Defaults to False.
@@ -395,9 +397,9 @@ class EmpCpds:
         for ms2_object in lazy_extract_ms2_spectra(mzml_w_ms2):
             used_khipu = set()
             matching_features = self.search_for_feature(
-                ms2_object.precursor_ion_mz,
-                ms2_object.retention_time,
-                mapping_mz_tolerance,
+                ms2_object.prec_mz,
+                ms2_object.rtime,
+                mapping_mz_tol,
                 mapping_rt_tolerance,
             )
             for matching_feature in matching_features:
@@ -418,7 +420,7 @@ class EmpCpds:
         moniker="default",
         add_singletons=False,
         rt_search_window=2,
-        mz_tolerance=5,
+        mz_tol=5,
         charges=None,
     ):
         """
@@ -436,7 +438,7 @@ class EmpCpds:
         :param add_singletons: if true, add singletons to the khipus
         :param rt_search_window: the rt window to use for empcpd
             construction, default is 2.
-        :param mz_tolerance: the mz tolerance in ppm to use for
+        :param mz_tol: the mz tolerance in ppm to use for
             empcpd construction, default is 5.
         :param charges: the charges, in absolute units, to consider
             for empcpd construction.
@@ -465,21 +467,20 @@ class EmpCpds:
             p["representative_intensity"] = None
         to_delete = set()
         for p in peaklist:
-            for field in p.keys():
+            for field in list(p.keys()):
                 if "___" in field:
                     new_field = field.split("___")[-1]
                     p[new_field] = p[field]
                     to_delete.add(field)
-        for p in peaklist:
-            for field in to_delete:
-                del p[field]
+        for field in to_delete:
+            del p[field]
 
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empcpds = ECCON.peaks_to_epdDict(
             isotopes,
             adduct_search_patterns,
             ext_adducts,
-            mz_tolerance_ppm=mz_tolerance,
+            mz_tolerance_ppm=mz_tol,
             rt_tolerance=rt_search_window,
             charges=charges,
         )
@@ -510,27 +511,27 @@ class EmpCpds:
         :param annotation_sources: list of filepaths to annotation sources in JSON format
         :param rt_tolerance: the rt_toleance to be used by ExperimentalEcpdDatabase. Defaults to 5.
         """
-        EED = ExperimentalEcpdDatabase(
-            mode=self.experiment.ionization_mode, rt_tolerance=rt_tolerance
-        )
+        ion_mode = self.experiment.ionization_mode
+        EED = ExperimentalEcpdDatabase(mode=ion_mode, rt_tolerance=rt_tolerance)
         EED.build_from_list_empCpds(list(self.dict_empcpds.values()))
 
         formula_entry_lookup = {}
         for source in annotation_sources:
             with open(source, encoding='utf-8') as source_fh:
-                for entry in json.load(source_fh):
+                source_data = json.load(source_fh)
+                for entry in source_data:
                     if entry["neutral_formula"] not in formula_entry_lookup:
                         formula_entry_lookup[entry["neutral_formula"]] = []
                     formula_entry_lookup[entry["neutral_formula"]].append(entry)
                 KCD = knownCompoundDatabase()
-                KCD.mass_index_list_compounds(json.load(source_fh))
+                KCD.mass_index_list_compounds(source_data)
                 KCD.build_emp_cpds_index()
                 EED.extend_empCpd_annotation(KCD)
 
         for khipu in self.dict_empcpds.values():
             if "Level_4" not in khipu:
                 khipu["Level_4"] = []
-            for match in khipu.get(["list_matches"], []):
+            for match in khipu.get("list_matches", []):
                 formula_mass, _, _ = match
                 formula, _ = formula_mass.split("_")
                 if formula in formula_entry_lookup:
@@ -540,7 +541,7 @@ class EmpCpds:
     def l2_annotate(
         self,
         msp_files,
-        mz_tolerance=5,
+        mz_tol=5,
         similarity_method="CosineHungarian",
         min_peaks=2,
         score_cutoff=0.50,
@@ -549,37 +550,34 @@ class EmpCpds:
 
         Args:
             msp_files (_type_): _description_
-            mz_tolerance (int, optional): _description_. Defaults to 5.
+            mz_tol (int, optional): _description_. Defaults to 5.
             similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
             min_peaks (int, optional): _description_. Defaults to 2.
             score_cutoff (float, optional): _description_. Defaults to 0.50.
         """        
         msp_files = [msp_files] if isinstance(msp_files, str) else msp_files
         similarity_method = get_similarity_method(similarity_method)
-        precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tolerance)
-        for db_ms2_object in lazy_extract_ms2_spectra(
-            msp_files, mz_tree=precursor_mz_tree
-        ):
-            similarity_instance = similarity_method(
-                tolerance=db_ms2_object.precursor_ion_mz / 1e6 * mz_tolerance * 2
-            )
-            for possible_match in [
-                x.data for x in precursor_mz_tree.at(db_ms2_object.precursor_ion_mz)
-            ]:
-                expms2_object = self.ms2_spectra[possible_match]
-                msms_score, n_matches = similarity_instance.pair(
-                    db_ms2_object.matchms_spectrum, expms2_object.matchms_spectrum
-                ).tolist()
-                if msms_score >= score_cutoff and n_matches >= min_peaks:
-                    expms2_object.annotate(
-                        db_ms2_object, msms_score, n_matches, annotation_level="Level_2"
+        precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
+        for db_ms2 in extract_CD_csv(msp_files, self.experiment.ionization_mode, lazy=True):
+            match_tol = db_ms2.prec_mz / 1e6 * mz_tol * 2
+            sim_instance = similarity_method(tolerance=match_tol)
+            for possible_match in {x.data for x in precursor_mz_tree.at(db_ms2.prec_mz)}:
+                exp_ms2 = self.ms2_spectra[possible_match]
+                sim_result = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
+                score, n_matches = sim_result.tolist()
+                if score >= score_cutoff and n_matches >= min_peaks:
+                    exp_ms2.annotate(
+                        db_ms2,
+                        score,
+                        n_matches,
+                        annotation_level="Level_2"
                     )
-        self.update_annotations()
+        self.update_annotations(update_ms2=True)
 
     def l1a_annotate(
         self,
         standards_csv,
-        mz_tolerance=5,
+        mz_tol=5,
         rt_tolerance=30,
         similarity_method="CosineHungarian",
         min_peaks=2,
@@ -589,46 +587,38 @@ class EmpCpds:
 
         Args:
             standards_csv (_type_): _description_
-            mz_tolerance (int, optional): _description_. Defaults to 5.
+            mz_tol (int, optional): _description_. Defaults to 5.
             rt_tolerance (int, optional): _description_. Defaults to 30.
             similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
             min_peaks (int, optional): _description_. Defaults to 2.
             score_cutoff (float, optional): _description_. Defaults to 0.50.
         """
         similarity_method = get_similarity_method(similarity_method)
-        precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tolerance)
+        precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
         precursor_rt_tree = self.get_precursor_rt_tree(rt_tolerance)
-        for db_ms2_object in extract_CD_csv(
-            standards_csv, ionization_mode=self.experiment.ionization_mode, lazy=True
-        ):
-            similarity_instance = similarity_method(
-                tolerance=db_ms2_object.precursor_ion_mz / 1e6 * mz_tolerance * 2
-            )
-            for possible_match in [
-                x.data for x in precursor_mz_tree.at(db_ms2_object.precursor_ion_mz)
-            ]:
-                if possible_match in [
-                    x.data for x in precursor_rt_tree.at(db_ms2_object.retention_time)
-                ]:
-                    expms2_object = self.ms2_spectra[possible_match]
-                    msms_score, n_matches = similarity_instance.pair(
-                        db_ms2_object.matchms_spectrum, expms2_object.matchms_spectrum
-                    ).tolist()
-                    if msms_score >= score_cutoff and n_matches >= min_peaks:
-                        expms2_object.annotate(
-                            db_ms2_object,
-                            msms_score,
+        for db_ms2 in extract_CD_csv(standards_csv, self.experiment.ionization_mode, lazy=True):
+            match_tol = db_ms2.prec_mz / 1e6 * mz_tol * 2
+            sim_instance = similarity_method(tolerance=match_tol)
+            for possible_match in {x.data for x in precursor_mz_tree.at(db_ms2.prec_mz)}:
+                if possible_match in {x.data for x in precursor_rt_tree.at(db_ms2.rtime)}:
+                    exp_ms2 = self.ms2_spectra[possible_match]
+                    sim_res = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
+                    score, n_matches = sim_res.tolist()
+                    if score >= score_cutoff and n_matches >= min_peaks:
+                        exp_ms2.annotate(
+                            db_ms2,
+                            score,
                             n_matches,
                             annotation_level="Level_1a",
                         )
-        self.update_annotations()
+        self.update_annotations(update_ms2=True)
 
-    def l1b_annotate(self, standards_csv, mz_tolerance=5, rt_tolerance=10):
+    def l1b_annotate(self, standards_csv, mz_tol=5, rt_tolerance=10):
         """_summary_
 
         Args:
             standards_csv (_type_): _description_
-            mz_tolerance (int, optional): _description_. Defaults to 5.
+            mz_tol (int, optional): _description_. Defaults to 5.
             rt_tolerance (int, optional): _description_. Defaults to 10.
         """
         for csv in standards_csv:
@@ -640,7 +630,7 @@ class EmpCpds:
                     standard[k] for k in ["Confirm Precursor", "RT", "CompoundName"]
                 ]
                 for feature_match in self.search_for_feature(
-                    mz, rtime, mz_tolerance, rt_tolerance
+                    mz, rtime, mz_tol, rt_tolerance
                 ):
                     kp = self.dict_empcpds[self.feature_id_to_khipu_id[feature_match]]
                     if "Level_1b" not in kp:
