@@ -44,8 +44,8 @@ class MS2Spectrum:
             str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
         )
         self.spec_id = spec_id
-        self.retention_time = precursor_rt
-        self.precursor_ion_mz = precursor_mz
+        self.rtime = precursor_rt
+        self.prec_mz = precursor_mz
         self.list_mz = list_mz if list_mz is not None else []
         self.list_intensity = list_intensity if list_intensity is not None else []
         self.instrument = instrument
@@ -99,7 +99,8 @@ class MS2Spectrum:
             {
                 "msms_score": score,
                 "matched_peaks": matched_peaks,
-                "db_precursor_mz": other_ms2.precursor_ion_mz,
+                "db_precursor_mz": other_ms2.prec_mz,
+                "db_precursor_rt": other_ms2.rtime,
                 "reference_id": other_ms2.compound_name,
                 "list_mz": [x[0] for x in other_ms2.matchms_spectrum.peaks],
                 "list_intensity": [x[1] for x in other_ms2.matchms_spectrum.peaks],

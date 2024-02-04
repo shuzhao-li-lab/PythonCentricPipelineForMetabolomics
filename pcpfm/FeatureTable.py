@@ -830,7 +830,6 @@ class FeatureTable:
 
         :return: QAQC_result dict
         """
-        print("Here")
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
@@ -1597,7 +1596,6 @@ class FeatureTable:
         for color in colorby:
             cosmetic_map = self.experiment.generate_cosmetic_map(color, "colors", seed)
             color_cosmetic_map.update({("colors", k): v for k, v in cosmetic_map.items()})
-        print(color_cosmetic_map)
         return color_cosmetic_map
 
     def __gen_marker_cosmetic_map(self, markerby, seed=None):
