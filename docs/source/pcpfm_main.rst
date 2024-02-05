@@ -6,7 +6,6 @@ Main
 ======================
 
 .. automodule:: pcpfm.main
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:

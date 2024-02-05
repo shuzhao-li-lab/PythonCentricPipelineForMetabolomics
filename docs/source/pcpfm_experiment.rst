@@ -6,7 +6,6 @@ Experiment
 ======================
 
 .. automodule:: pcpfm.Experiment
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:

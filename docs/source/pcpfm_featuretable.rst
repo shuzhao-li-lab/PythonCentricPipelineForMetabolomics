@@ -6,7 +6,6 @@ FeatureTable
 ======================
 
 .. automodule:: pcpfm.FeatureTable
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:

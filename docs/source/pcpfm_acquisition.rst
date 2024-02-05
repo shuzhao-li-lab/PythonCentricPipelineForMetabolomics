@@ -6,7 +6,6 @@ Acquisition
 ======================
 
 .. automodule:: pcpfm.Acquisition
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
