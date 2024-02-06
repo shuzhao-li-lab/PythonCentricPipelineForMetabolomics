@@ -107,8 +107,8 @@ class FeatureTable:
         for column in self.feature_table.columns:
             if "___" in column:
                 rename_map[column] = column.split("___")[-1]
-        self.feature_table.rename(rename_map, inplace=True)
-        self.save(new_moniker=self.moniker + "_cleaned")
+        self.feature_table.rename(columns=rename_map, inplace=True)
+        self.save(self.moniker + "_cleaned")
 
     def get_mz_tree(self, mz_tol):
         """
