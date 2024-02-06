@@ -21,7 +21,7 @@ PARAMETERS = {
     "khipu_isotopes": "default_configs/default_isotopes.json",
     "khipu_charges": "default_configs/default_charges.json",
     "auto_drop": "default_configs/default_auto_drop.json",
-    "report_config": "report_templates/default.json",
+    "report_config": "default_configs/default_report.json",
     "moniker": "default",
     "multicores": 4,
     "conversion_command": ['$(which mono)', 

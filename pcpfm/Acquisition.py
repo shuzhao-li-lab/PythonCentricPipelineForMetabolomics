@@ -1,3 +1,12 @@
+'''
+This module implements the Acquisition object which is a set of data collected from a sample.
+
+A sample in this case could mean a biologically-derived sample or a blank or any other unit that 
+is analyzed for analysis.
+
+Each analytical replicate is therefore its own acquisition.
+'''
+
 import os
 import numpy as np
 import pymzml
@@ -11,9 +20,6 @@ from .utils import recursive_encoder
 class Acquisition(Sample):
     """
     The Acquisition object represents a single LC-MS run.
-
-    This super vague constructor was useful during testing, now
-    will explicitly define all the fields.
     """
 
     def __init__(
@@ -27,7 +33,13 @@ class Acquisition(Sample):
         has_ms2=None,
         experiment=None
     ):
-        super().__init__()
+        registry = {
+            "input_file": source_filepath,
+            "name": name,
+            "sample_id": name,
+            "list_retention_time": None
+        }
+        super().__init__(registry, experiment=experiment, mode=None)
         self.name = name
         self.source_filepath = source_filepath
         self.metadata_tags = metadata_tags if metadata_tags is not None else {}
@@ -37,17 +49,19 @@ class Acquisition(Sample):
         #lazily_evaluated
         self.__ionization_mode = ionization_mode
         self.__has_ms2 = has_ms2
-        self.experiment = experiment
+
+    
 
     @staticmethod
     def load_acquisition(acquisition_data, experiment):
-        """_summary_
+        """
+        This takes a dict of acquisition data and returns the Acquisition object
 
         Args:
-            acquisition_data (_type_): _description_
+            acquisition_data (dict): acquisition data
 
         Returns:
-            _type_: _description_
+            object: an acquisition object
         """
         return Acquisition(
             acquisition_data["name"],
@@ -94,8 +108,10 @@ class Acquisition(Sample):
             for spec in pymzml.run.Reader(self.mzml_filepath):
                 if spec["positive scan"]:
                     self.__ionization_mode = "pos"
+                    self.mode = self.__ionization_mode
                     return self.__ionization_mode
                 self.__ionization_mode = "neg"
+                self.mode = self.__ionization_mode
                 return self.__ionization_mode
         return self.__ionization_mode
 
@@ -148,17 +164,21 @@ class Acquisition(Sample):
         return self.__has_ms2
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
-        """_summary_
+        """
+        This method generates TIC plots for the acquisition. If mz and rt is not provided, 
+        this will make the TIC including the entire rt range and all mz values. If mz and rt values
+        are provided as co-indexed lists, then only those regions will be used IN ADDITION to 
+        the entire rt and mz range. These are saved as figures. 
 
         Args:
-            mz (_type_, optional): _description_. Defaults to None.
-            ppm (int, optional): _description_. Defaults to 5.
-            rt (_type_, optional): _description_. Defaults to None.
-            rt_tol (int, optional): _description_. Defaults to 2.
-            title (_type_, optional): _description_. Defaults to None.
+            mz (list, optional): mz values to limit the TIC calculation to. Defaults to None.
+            ppm (int, optional): mass tolerance in ppm for the mz values. Defaults to 5.
+            rt (list, optional): rt values to limit the TIC caclulation to. Defaults to None.
+            rt_tol (int, optional): rt_tolerance in seconds. Defaults to 2.
+            title (string, optional): if provided, sets the title on TIC plot. Defaults to None.
 
         Returns:
-            _type_: _description_
+            str: path to the TIC plot
         """        
         if mz is None:
             mz = []

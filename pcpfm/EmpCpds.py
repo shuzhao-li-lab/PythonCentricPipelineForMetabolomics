@@ -1,3 +1,7 @@
+'''
+This module is concerned with the construction of EmpCpds and their annotation
+'''
+
 import json
 import os
 import pandas as pd
@@ -62,10 +66,11 @@ class EmpCpds:
 
     @property
     def feature_id_to_khipu_id(self):
-        """_summary_
+        """
+        This property provides a mapping from feature ids back to the khipu that contains them.
 
         Returns:
-            _type_: _description_
+            dict: feature to kp id mapping dict
         """
         if self._feature_id_to_khipu_id is None:
             feature_id_to_khipu_id = {}
@@ -81,10 +86,11 @@ class EmpCpds:
 
     @property
     def khipu_id_to_feature_id(self):
-        """_summary_
+        """
+        This property provides a mapping of khipu id to the feature ids in the khipu
 
         Returns:
-            _type_: _description_
+            dict: kp_id to the feature ids
         """
         if self._feature_id_to_khipu_id is None:
             feature_id_to_khipu_id = {}
@@ -99,10 +105,14 @@ class EmpCpds:
         return self._khipu_id_to_feature_id
 
     def create_annotation_table(self):
-        """_summary_
+        """
+        This flattens the empcpd annotations into a dataframe summarizing the annotation on a 
+        per-feature level.
+        
+        This is for the generation of outputs.
 
         Returns:
-            _type_: _description_
+            dataframe: annotation table
         """
         annotation_table = []
         for kp_id, khipu in self.dict_empcpds.items():
@@ -111,7 +121,7 @@ class EmpCpds:
                 l1b_annots = khipu.get("Level_1b", [])
                 for l1b_annot in l1b_annots:
                     l1b_annot_entry = {"feature": feature, "level": "1b"}
-                    l1b_annot_entry.update(l1b_annot)
+                    l1b_annot_entry.update({"name": l1b_annot[0], "source": l1b_annot[1]})
                     annotation_table.append(l1b_annot_entry)
                 l4_annots = khipu.get("Level_4", [])
                 for l4_annot in l4_annots:
@@ -128,7 +138,14 @@ class EmpCpds:
         return pd.DataFrame(annotation_table)
     
     def __update_ms2(self):
-        """_summary_
+        """
+        This method will iterate through all the ms2 spectra in the ms2 property and maps them
+        back to the actual khipu objects. 
+
+        This is not elegant, but it works. 
+
+        This needs to be called whenever the MS2 annotations are updated before saving the 
+        empcpd object.
         """        
         for _, khipu in self.dict_empcpds.items():
             if "MS2_Spectra" in khipu:
@@ -140,7 +157,10 @@ class EmpCpds:
                 khipu["MS2_Spectra"] = new_spectra
 
     def update_annotations(self, update_ms2=False):
-        """_summary_
+        """
+        This method iterates through all khipus and updates the relevant annotation fields. 
+
+        :param update_ms2: if True, update the MS2 annotations, default is False.
         """
         if update_ms2:
             self.__update_ms2()
@@ -236,13 +256,15 @@ class EmpCpds:
         return self.__rt_trees[("feature", rt_tolerance)]
 
     def get_precursor_mz_tree(self, mz_tol):
-        """_summary_
+        """
+        This retrieves or generates the mz tree of all precursor ions for the empCpd MS2 spectra 
+        at a given ppm mass tolerance.
 
         Args:
-            mz_tol (_type_): _description_
+            mz_tol (float): the mz tolerance in ppm
 
         Returns:
-            _type_: _description_
+            intervaltree: an interval tree for all precursor ion mzs at the given mz tolerance.
         """
         if ("precursor", mz_tol) not in self.__mz_trees:
             mz_tree = IntervalTree()
@@ -259,13 +281,15 @@ class EmpCpds:
         return self.__mz_trees[("precursor", mz_tol)]
 
     def get_precursor_rt_tree(self, rt_tolerance):
-        """_summary_
+        """
+        This retrieves or generates the retention time tree of all precursor ions for the empCpd
+        MS2 spectra at a given ppm mass tolerance.
 
         Args:
-            rt_tolerance (_type_): _description_
+            rt_tolerance (float): the rtime tolerance in seconds
 
         Returns:
-            _type_: _description_
+            intervaltree: an interval tree for all precursor ion rtimes at the given rt tolerance.
         """
         if ("precursor", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
@@ -373,14 +397,24 @@ class EmpCpds:
         mapping_mz_tol=5,
         mapping_rt_tolerance=30,
         ms2_files=None,
-        scan_experiment=False,
+        scan_experiment=True,
     ):
-        """_summary_
+        """
+        When MS2 data is acquired, each spectrum will have a retention time and precursor 
+        ion mz. These can be mapped to features in the empCpds before annotation thus 
+        limiting any subsequent searches to just the MS2 spectra that appear to represent
+        features that we care about. 
+
+        By default this method searches all acquisitions in the experiment for MS2 spectra.
+
+        Additional MS2 spectra can be provided as mzml files using the ms2_files param.
 
         Args:
-            mapping_mz_tol (int, optional): _description_. Defaults to 5.
-            mapping_rt_tolerance (int, optional): _description_. Defaults to 30.
-            ms2_files (_type_, optional): _description_. Defaults to None.
+            mapping_mz_tol (float, optional): mz tolerance for the feature, ion precursor mz 
+            match in ppm. Defaults to 5.
+            mapping_rt_tolerance (int, optional): rt tolerance for the feature, ion precursor time match 
+            in seconds. Defaults to 30.
+            ms2_files (str, optional): path to additional ms2 acquisitions. Defaults to None.
             scan_experiment (bool, optional): _description_. Defaults to False.
         """
         # we should first map ms2 spectra to empCpds, then annnotate them.
@@ -488,7 +522,6 @@ class EmpCpds:
         for empcpd in dict_empcpds.values():
             for peak in empcpd["MS1_pseudo_Spectra"]:
                 all_feature_ids.add(peak["id_number"])
-        # TODO - this should be added to khipu at some point
         if add_singletons:
             for peak in peaklist:
                 if peak["id_number"] not in all_feature_ids:
@@ -546,19 +579,31 @@ class EmpCpds:
         min_peaks=2,
         score_cutoff=0.50,
     ):
-        """_summary_
+        """
+        This method add l2 annotations to empirical compounds. This requires that first ms2 spectra
+        be mapped to the empcpd object.
+
+        Level 2 annotations are lower confidence that Level 1 annotations but generated in a similar
+        manner, MS2 similarity, but the references spectra are from a public reference database.
+
+        The similarity method can be any method that is provided by matchms. CosineHungarian is the 
+        default as it is a mathematically sound formulation of the cosine similarity and fast enough
+        to be practical. 
 
         Args:
-            msp_files (_type_): _description_
-            mz_tol (int, optional): _description_. Defaults to 5.
-            similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
-            min_peaks (int, optional): _description_. Defaults to 2.
-            score_cutoff (float, optional): _description_. Defaults to 0.50.
+            msp_files (str): path to directory with ms2 mzml files
+            mz_tol (int, optional): mz tolerance in ppm for the precursor_mz_match. Defaults to 5.
+            similarity_method (str, optional): name of the method for the similarity metric. 
+            Defaults to "CosineHungarian".
+            min_peaks (int, optional): the minimum number of matching peaks between experimental 
+            and reference specturm. Defaults to 2.
+            score_cutoff (float, optional): the minimum score required for an annotation. 
+            ßDefaults to 0.50.
         """        
         msp_files = [msp_files] if isinstance(msp_files, str) else msp_files
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
-        for db_ms2 in extract_CD_csv(msp_files, self.experiment.ionization_mode, lazy=True):
+        for db_ms2 in lazy_extract_ms2_spectra(msp_files, mz_tree=precursor_mz_tree):
             match_tol = db_ms2.prec_mz / 1e6 * mz_tol * 2
             sim_instance = similarity_method(tolerance=match_tol)
             for possible_match in {x.data for x in precursor_mz_tree.at(db_ms2.prec_mz)}:
@@ -614,12 +659,16 @@ class EmpCpds:
         self.update_annotations(update_ms2=True)
 
     def l1b_annotate(self, standards_csv, mz_tol=5, rt_tolerance=10):
-        """_summary_
+        """
+        Level1b annotations are based on mz, rtime tolerance against known standards. 
+
+        This method takes the exported standard library from mz vault and compares a feature's 
+        rtime and mz to the standard's mz and retention time. 
 
         Args:
-            standards_csv (_type_): _description_
-            mz_tol (int, optional): _description_. Defaults to 5.
-            rt_tolerance (int, optional): _description_. Defaults to 10.
+            standards_csv (str): path to mzvault export
+            mz_tol (int, optional): mz tolerance in ppm. Defaults to 5.
+            rt_tolerance (int, optional): rt tolerance in seconds. Defaults to 10.
         """
         for csv in standards_csv:
             standards = pd.read_csv(csv)

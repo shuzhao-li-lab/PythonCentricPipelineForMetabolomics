@@ -4,11 +4,10 @@
 
 import os
 import platform
-import subprocess
 import sys
 import uuid
 import datetime
-
+from pip._vendor import pkg_resources
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 from . import FeatureTable
@@ -115,6 +114,8 @@ class Report():
                         method(section)
                     else:
                         method(section)
+                else:
+                    method(section)
             #except:
             #    print("Unable to processes section: \n", section)
 
@@ -141,19 +142,6 @@ class Report():
         self.report.cell(30, 10, title, 0, 0, 'C')
         self.__reset_font()
         self.report.ln(5)
-
-    #def __sub_section_head(self, title):
-    #    """
-    #    This writes a sub-section header. Large font, ala section_head
-    #    but not in bold.
-    #
-    #    TODO: this seems to be redundant.
-    #
-    #    :param title: the title of the sub_section
-    #    """
-    #    self.report.cell(80)
-    #    self.report.cell(30, 10, title, 0, 0, 'C')
-    #    self.report.ln(5)
 
     def __section_line(self, content, options=None):
         """
@@ -235,12 +223,9 @@ class Report():
         self.__section_line("Table Name, Num Samples, Num Features", options=["bold"])
         tables = [x for x in self.experiment.feature_tables.keys() if "cleaned" not in x]
         for table in tables:
-            try:
-                ft = self.experiment.retrieve_feature_table(table, True)
-                line = ", ".join([str(x) for x in [table, ft.num_samples, ft.num_features]])
-                self.__section_line(line)
-            except:
-                pass
+            ft = self.experiment.retrieve_feature_table(table, True)
+            line = ", ".join([str(x) for x in [table, ft.num_samples, ft.num_features]])
+            self.__section_line(line)
 
     def empcpd_summary(self, section_desc):
         """
@@ -253,7 +238,7 @@ class Report():
             self.__section_text(section_desc['text'])
         self.__section_line("EmpCpd Name, Num Khipus, Num Features", options=["bold"])
         for empcpd in self.experiment.empCpds.keys():
-            empcpd_object = self.experiment.retrieve_empcpd(empcpd, True)
+            empcpd_object = self.experiment.retrieve_empCpds(empcpd, True)
             self.__section_line(", ".join([str(x) for x in [empcpd, empcpd_object.num_khipus, empcpd_object.num_features]]))
 
     def command_history(self, section_desc):
@@ -276,20 +261,15 @@ class Report():
         Requires: None
         """
         self.__section_head("Software Version Summary")
-        with open(self.parameters["requirements_txt"], encoding='utf-8') as req:
-            for line in req:
-                line = line.strip()
-                output = subprocess.run(["pip", "show", line], capture_output=True, text=True, check=False)
-                version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
-                self.__section_line(":".join([line, version]))
-
-                output = subprocess.run(["pip", "show", "pcpfm"], capture_output=True, text=True, check=False)
-                version = [x for x in output.stdout.split("\n") if x.startswith("Version")][0].split(": ")[-1].strip()
-                self.__section_line(": ".join(["pcpfm", version]))
-        self.__section_text("OS: ", platform.system())
-        self.__section_text("Python Version: " + platform.python_version())
-        self.__section_text("Architecture: " + platform.machine())
-        self.__section_text("Uname: " + " ".join(platform.uname()))
+        _package = pkg_resources.working_set.by_key['pcpfm']
+        for req in _package.requires():
+            version = pkg_resources.get_distribution(req.name).version
+            self.__section_line(":".join([req.name, version]))
+        self.__section_line('')
+        self.__section_line("OS: " + platform.system())
+        self.__section_line("Python Version: " + platform.python_version())
+        self.__section_line("Architecture: " + platform.machine())
+        self.__section_line("Uname: " + " ".join(platform.uname()))
 
     def computational_performance(self, section_desc):
         """
@@ -337,8 +317,6 @@ class Report():
 
         Requires: "report_name"
         """
-        if not section_desc["report_name"].endswith(".pdf"):
-            section_desc["report_name"] = section_desc["report_name"] + ".pdf"
         output_subdir = os.path.abspath(self.experiment.output_subdirectory)
         report_path = os.path.join(output_subdir, section_desc["report_name"])
         if not report_path.endswith(".pdf"):
@@ -360,7 +338,8 @@ class Report():
         provided.
 
         """
-        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/" + self.experiment.experiment_name + "_" + section_desc["name"] + ".png"
+
+        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/" + "_" + section_desc["name"] + ".png"
         if os.path.exists(figure_path):
             self.report.add_page()
             self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])

@@ -1,13 +1,18 @@
-"""_summary_
+"""
+MS2Spectrum contains the constructors for MS2 spectra. These are used for L1a and L2 annotations. 
+
+The actual MS2 comparisons are performed by matchms in the EmpCpds object.
 
 """
 
 import os
 from matchms.Spectrum import Spectrum
 import numpy as np
+from metDataModel import core
 
-class MS2Spectrum:
-    """_summary_
+class MS2Spectrum(core.Spectrum):
+    """
+    This represents an MS2 spectrum
     """
     def __init__(
         self,
@@ -26,52 +31,72 @@ class MS2Spectrum:
         """_summary_
 
         Args:
-            id (_type_): _description_
-            precursor_mz (_type_): _description_
-            precursor_rt (_type_): _description_
-            list_mz (_type_, optional): _description_. Defaults to None.
-            list_intensity (_type_, optional): _description_. Defaults to None.
-            matchms_spectrum (_type_, optional): _description_. Defaults to None.
-            source (str, optional): _description_. Defaults to "".
-            instrument (_type_, optional): _description_. Defaults to None.
-            collision_energy (_type_, optional): _description_. Defaults to None.
-            compound_name (_type_, optional): _description_. Defaults to None.
-            annotations (_type_, optional): _description_. Defaults to None.
+            id (str): a string that uniquely identifies the MS2 spectrum
+            precursor_mz (float): the m/z of the precursor ion
+            precursor_rt (float): the retention time for the precurso ion
+            list_mz (list, optional): list of m/z values for the spectrum. Defaults to None.
+            list_intensity (list, optional): list of intensities for the spectrum co-indexed with list_mz. Defaults to None.
+            matchms_spectrum (object, optional): a matchms spectrum object. Defaults to None.
+            source (str, optional): the file from which the ms2 spectrum was created. Defaults to "".
+            instrument (str, optional): the type of instrument from which the spectrum was acquired. Defaults to None.
+            collision_energy (float, optional): the collision energey in eV. Defaults to None.
+            compound_name (str, optional): the name of the compound. Defaults to None.
+            annotations (list, optional): list of annotations for the spectrum. Defaults to None.
         """
-        # super().__init__(id)
+        super().__init__(spec_id)
         source = os.path.basename(source) if source != "" else os.path.basename(source)
         self.precursor_ion = (
             str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
         )
         self.spec_id = spec_id
         self.rtime = precursor_rt
-        self.prec_mz = precursor_mz
-        self.list_mz = list_mz if list_mz is not None else []
-        self.list_intensity = list_intensity if list_intensity is not None else []
+        self.precursor_ion_mz = precursor_mz
         self.instrument = instrument
         self.collision_energy = collision_energy
         self.matchms_spectrum = matchms_spectrum
         if self.matchms_spectrum:
             self.list_mz = [x[0] for x in self.matchms_spectrum.peaks]
             self.list_intensity = [x[1] for x in self.matchms_spectrum.peaks]
+            self.min_mz = min(self.list_mz)
+            self.max_mz = max(self.list_mz)
+        elif list_mz and list_intensity:
+            self.list_mz = list_mz
+            self.list_intensity = list_intensity
+        else:
+            self.list_mz = []
+            self.list_intensity = []
+
+
         self.annotations = [] if annotations is None else annotations
         self.compound_name = compound_name
         self.source = source
+    
+    @property
+    def prec_mz(self):
+        """
+        Simply a shortcut for accessing the precursor_ion_mz field. This is used because the 
+        precursor_ion_mz is long and can yield lines that are too long for pylint.
+
+        Returns:
+            float: precursor ion mz
+        """        
+        return self.precursor_ion_mz
 
     @staticmethod
     def from_embedding(embedding):
-        """_summary_
+        """
+        This recreates the MS2 object from the serialized version of the object
 
         Args:
-            embedding (_type_): _description_
+            embedding (dict): the serialized version of the MSnSpectrum.
 
         Returns:
-            _type_: _description_
+            object: the MSnSpectrum that was serialized
         """
         return MS2Spectrum(
             spec_id=None,
-            precursor_mz=embedding["precursor_ion_mz"],
-            precursor_rt=embedding["retention_time"],
+            precursor_mz=embedding["prec_mz"],
+            precursor_rt=embedding["rtime"],
             list_mz=embedding["list_mz"],
             list_intensity=embedding["list_intensity"],
             matchms_spectrum=Spectrum(
@@ -87,13 +112,14 @@ class MS2Spectrum:
         )
 
     def annotate(self, other_ms2, score, matched_peaks, annotation_level="Unspecified"):
-        """_summary_
+        """
+        Given another MSnSpectrum object, annotate this MSnSpectrum.
 
         Args:
-            other_MS2 (_type_): _description_
-            score (_type_): _description_
-            matched_peaks (_type_): _description_
-            annotation_level (str, optional): _description_. Defaults to "Unspecified".
+            other_MS2 (object): the other MS2 spectrum, typically from a database
+            score (float): the score from the similarity comparison
+            matched_peaks (int): number of peaks 
+            annotation_level (str, optional): a string designating the annotation level. Defaults to "Unspecified".
         """
         self.annotations.append(
             {
@@ -110,10 +136,11 @@ class MS2Spectrum:
         )
 
     def embedding(self):
-        """_summary_
+        """
+        Given an MSnSpectrum, generate a serializable version of the object.
 
         Returns:
-            _type_: _description_
+            dict: serialized version
         """
         embedding = {}
         for k, v in self.__dict__.items():
