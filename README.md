@@ -127,7 +127,7 @@ An example preprocessing configuration is provided under preprocessing_examples.
 
 
 ### Assemble Experiment
-Goal: to creat a directory on disk to store the project. 
+Goal: to create a directory on disk to store the project. 
 
 An example command: 
 
@@ -150,7 +150,7 @@ An example command:
 
 If users use .mzML files as input, this step is not needed.
 
-How you convert to mzML is largely left to the end user but provided that the command for conversion can be executed by the user and is in the form of a string that takes an input filepath and output filepath conversion can be done as follows:
+How the conversion is performed is largely left to the end user; however, any string that is a valid conversion command that can be formulated using $RAW_PATH and $OUT_PATH as proxies for the input raw filepath and output filepath can be used for conversion. The `download extras` command will download a version of the ThermoRawFileParser.exe that can be used on Mac into the default location; however, mono must be installed by the end user. 
 
 ### Feature extraction using Asari
 Goal: to process .mzML files into metabolomic feature tables.
@@ -198,10 +198,14 @@ The entire set of commands that are possible here is large and are documented in
 
 An option is using internal spike-in standards for QC:
 
-`TODO`
+- TO BE IMPLMENTED -
 
 
 ### Data wrangling and standardization
+
+Goal: process raw feature tables into 'clean' data that is useful for downstream analyses. 
+
+For a variety of reasons, raw feature tables are rarely used for analyses. Biases in instrument sensitivity day-to-day and sample-to-sample, contaminants, low quality acquisitions, etc. are all issues that should be remedied before a feature table is used for a final analysis. 
 
 raw feature tables are rarely used for analyses, normalization and blank masking are some of the common processing steps supported by our pipeline. Tables are specififed for processing by their moniker and saved to a new moniker. The new moniker can be the same as the table moniker and this will overwrite an existing table. 
 
@@ -209,9 +213,13 @@ The exact order of the following steps will depend on your desired workflow, but
 
 #### Blank Masking
 
-First, blank mask using the various blank types in an experiment:
+Goal: remove features that are likely due to background ions and contaminants.
 
-`pcpfm blank_masking --blank_value <blank_value>  --sample_value <sample_value> --query_field <query_field> --blank_intensity_ratio <blank_intensity_ratio>`
+This is achieved by comapring the intensiy of a feature in a specified set of study samples to those in the blanks.
+
+An example command is:
+
+`pcpfm blank_masking --blank_value <blank_value> --sample_value <sample_value> --query_field <query_field> --blank_intensity_ratio <blank_intensity_ratio>`
 
 Where query_field is the metadata field to search for the given blank_value and sample_value. For isntance if blanks are designated by "Blank" as the "sample_type" and "Unknown" designates experimental samples this will blank mask the preferred feature table:
 
@@ -219,114 +227,228 @@ Where query_field is the metadata field to search for the given blank_value and 
 
 Will drop all features whose intensity in the unknown samples is not at least 3 times more than the blank samples. This may need to be done multiple times if you have multiple blank types (e.g., process blanks and solvent blanks.)
 
+This assumes that the blanks and study samples are reasonably aligned which may not be a perfect assumption under all conditions. 
+
+Options can be provided including:
+```
+--blank_intensity_ratio: the ratio that feature intensity must exceed when blanks and samples are compared (zeros excluded)
+```
+
 #### Drop Undesired Samples
 
-Once blank masking is performed, extra samples and non-experimental samples should be removed from the experiment before normalization. This can be done most easily using this command:
+Goal: remove samples not needed for downstream analysis namely QC samples, blanks, etc. 
+
+We can drop samples using a variety of commands and the logic of any drop command can be reversed by passing `--drop others true` to the command.
+
+Samples can be dropped based on a metadata field and a value as this example shows: 
 
 `pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker preferred_masked_unknown --drop_value unknown --drop_field sample_type --drop_others true -i ./my_experiment`
 
-Which will drop all samples that are not of the unknown sample_type. 
+Or by the sample name:
 
 `pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker preferred_masked_unknown --drop_name=<sample_name> -i ./my_experiment`
 
-Will drop a sample with exactly the specified name. 
-
-`pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker preferred_masked_unknown --filter=<filter.json> -i ./my_experiment`
-
-Will drop samples matching a specified filter (example provided)
+Or by the QAQC results:
 
 `pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker preferred_masked_unknown --qaqc_filter=<qaqc_filter.json> -i ./my_experiment`
 
-Will drop samples based on the qaqc results for the table. 
+These commands can be repeated to drop all samples you want to drop. 
 
-adding the field `--drop_others true` will invert the samples dropped. 
+NOTE: the metadata values are CASE sensitive! 
+
+Options can be provided including:
+```
+--drop_others: if true, reverse the logic of the match
+--qaqc_filter: specifies how to drop samples by qaqc results (in JSON), see "pcpfm/default_configs/default_auto_drop.json"
+--drop_value: the value for the field that you want to drop
+--drop_field: the field to search for the drop_value in
+```
 
 #### Normalization
 
-Next, normalization can be performed based on features present in at least X percent of the remaining samples. 
+Goal: correct for inter-sample biases in feature intensities induced by instrument variance.
+
+Regardless of how well your instrument may be calibrated or tuned, throughout an experiment, intensity values may vary even if the relative abundances of the metabolites do not change. This is for a variety of reasons but should be accounted for before statistical analysis. 
+
+Normalizing based on TIC is one approach, where the total intensity of each sample is assumed to be the same and deviations from that value are due to non-biological variance. Using the TICs calculated using all features can introduce bias where some samples have more features than others. As such, we use a percentile cutoff so that only common features are used for normalization.
+
+This example command will normalize all samples using features present in 90% of samples and uses the median per-sample TIC to calculate normalization factors:
 
 `pcpfm normalize --table_moniker preferred_masked_unknown --new_moniker preferred_normalized --TIC_normalization_percentile 0.90 --normalize_value median -i ./my_experiment`
 
-This will normalize each sample's features to the median of the sum of the features present in over 90% of the samples in the experiment. 
+When there are multiple batches you may want to explicitly handle this in normalization. In this batch-aware mode, you must specity the field that designates the batches using `--by_batch=<field>`. In this case, each batch will be normalized independently then the batches will be normalized at the batch-level using a per-batch normalization factor. 
+
+Options can be provided including:
+```
+--by_batch: when provided, normalization is performed in two steps, first within batches determined by this field then between batches
+--normalize_value: can be median or mean, determines how to calculate the normalization factor
+--TIC_normalization_percentile: feature must be present in this percent of samples or more to be included for normalization factor calculations
+```
 
 #### Drop Infrequent Features
 
-After normalization, rare and uncommon features can be dropped. 
+Goal: remove features that are uncommon in the experiment, useful for some downstream analyses
+
+Spurious features can arise and can confound downstream analyses; however, some features are genuine and simply rare (think drugs or xenobiotics). This method does not distinguish between spurious and genuine, but rare, features. 
 
 `pcpfm drop_missing_features --table_moniker preferred_normalized --new_moniker preferred_drop_missing --feature_retention_percentile 0.25 -i ./my_experiment`
 
+Options can be provided including:
+```
+--feature_retention_percentile: features present in fewer than this percent of samples are dropped
+```
+
 #### Impute Missing Values
+
 Goal: to impute missing values by a minimium number.
 
-An example command: 
+Missing features can complicate statistical testing since zeros will skew analyses towards significant results. It is often proper to impute values to 'fill in' these missing values. Currently, the imputed value is a multiple of the minimum non-zero value observed for that feature in the feature table. 
 
-`pcpfm interpolate --table_moniker preferred_drop_missing --new_moniker preferred_interpolated --interpolation_ratio 0.5 -i ./my_experiment`
+This example command imputes missing values as .5 * the min value:
+
+`pcpfm impute --table_moniker preferred_drop_missing --new_moniker preferred_interpolated --interpolation_ratio 0.5 -i ./my_experiment`
 
 Interpolation ratio is the multiplier to multiply the minimum value for that feature by. 
 
+Options can be provided including:
+```
+--interpolation_ratio: multiply the minimum value by this amount to get the imputation value
+```
+
 #### Batch Correction and Multi Batch Experiments
 
-batch correction is performed using pycombat and specifying the batch_field:
+Goal: correct for systematic biases across batches in feature intensity.
 
-`pcpfm interpolate --table_moniker preferred_interpolated --new_moniker batch_corrected --by_batch batch -i ./my_experiment`
+Batch effects are best avoided through proper experimental design (randomized and stratified); however, they are not completely avoidable. This command will use the batches, determed by the `--by_batch` flag to batch correct the feature table. Batch correction is performed using pycombat. 
+
+Note that batch correction is difficult and may require non-default options for removing rare features or other params to achieve the desired result. Batch correction cannot handle missing values well either, which are often present in metabolomics data.
+
+`pcpfm batch_correct --table_moniker preferred_interpolated --new_moniker batch_corrected --by_batch batch -i ./my_experiment`
 
 #### Log Transformation
 
-The feature table can now be log transformed:
+Goal: tranform data to minimize error and for more informative downstream statistical analysis
+
+Many statistical tests assume normality, and log transformation typically makes distributions more normal. Furthermore, the intensity error in mass spectrometry data is often multiplicative, which means that log transformation converts this multiplicative noise into additive noise. 
+
+In most cases you will want to log transform the tables before downstream analysis. By default log2 is used. 
+
+The following example command log transforms a feature table:
 
 `pcpfm log_transform --table_moniker batch_corrected --new_moniker for_analysis --by -i ./my_experiment`
+
+Options can be provided including:
+```
+--log_transform: determines the type of log used, can be log2 or log10
+```
 
 ### Annotation
 
 Now, the fun part, Annotation. 
 
-Annotation can be done with MS1 or MS2-based methods. Both empCpds and feature tables can be annotated. But first empCpds must be constructed.
+Annotation is the mapping of features, or groups of features, to suspected chemical entities, be they structures (Level 1a / Level 1b / Level 2 annotations), chemical formulas (Level 4 annotations), or pre-annotations (isotope pattern, adduct via Khipu). 
 
-#### EmpCpd construction
+Annotation can be performed based on MS1 or MS2 data. In our pipeline only empirical compounds, groups of features expected to represent the same chemical entity (or set of isomers) but these annotations can be mapped back to any feature table for downstream use. 
 
-The empCpds are tenative clusters of features representing putative metabolites. They are constructed from a feature table and a specified set of isotopes and adducts. Reasonable defaults for unlabeled experiments are automatic but alternatives can be provided.
+#### EmpCpd construction and Pre-Annotation
 
-`pcpfm build_empCpds --table_moniker preferred --empCpd_moniker preferred -i ./my_experiment` will construct an empCpd with moniker preferred from the feature table using the default parameters (up to z=3 charge, up to m+13C3 isotopologue, 5 sec rt tolerance, and 5 ppm mz tolerance). Preferably the empCpd should be built using either the preferred or full feature tables. 
+Goal: generate EmpCpds from a feature table. EmpCpds are groups of associated features, typically isotopes and adducts, that belong to the same tentative compound and co-elute if there is chromatography. The set of adducts and isotopes can be changed by the end user (see code documentation); however by default charges up to z=3 are used, m+13C3 isotopologues are considered, and common adducts based on chromatography mode are used. Furthermore mz and rt tolerance will affect which features are grouped but for orbitrap lc data the default 5ppm tolerance and 2 sec rt tolerance is sufficient. EmpCpds are saved to moniker similar to feature tables. 
 
-#### MS1 Annotations
+An example command for building the empCpds is:
 
-MS1 annotations can be generated using any JMS compliant target JSON file. By default the pipeline will annotate using the HMDB and the LMSD if installed as described previously. 
+`pcpfm build_empCpds --table_moniker preferred --empCpd_moniker preferred -i ./my_experiment` 
 
-To annoatate the preferred empCpd object:
+Preferably the empCpd should be built using either the preferred or full feature tables. The full is the recommended table. 
 
-`pcpfm MS1_annotate --empCpd_moniker preferred --new_moniker MS1_annotated -i ./my_experiment`
-
-To annotate the preferred feature table:
-
-`pcpfm MS1_annotate --table_moniker preferred --new_moniker MS1_annotated -i ./my_experiment`
+This also effectively pre-annotates the empirical compounds as this assigns them to adducts and isotopologues.
 
 Options can be provided including:
 ```
---annot_mz_tolerance: the ppm tolerance for mz matches
---annot_rt_tolerance: the absolute seconds tolerance for rt matches
---search_isotopologues: when true, search for all m+13Cn isotopologues
---MS1_annoation_name: the column name to save the annoation to in the table
---feature_adducts_pos: a path to .json file containing adduct information for positive mode
---feature_adducts_neg: a path to .json file containing adduct information for negative mode
+--khipu_mz_tolerance: the ppm tolerance for empcpd construction
+--khipu_rt_tolerance: the absolute seconds tolerance for empcpd construction
+--khipu_adducts_pos: a path to .json file containing adduct information for positive mode
+--khipu_adducts_neg: a path to .json file containing adduct information for negative mode
 ```
-#### MS2_Annotations
 
-MS2 annotations can be generated as follows using any .msp file as reference. 
+#### MS1 Annotations - Level 4
 
-`pcpfm MS2_annotate --empCpd_moniker MS1_annotated --new_moniker MS2_MS1_annotated -i ./my_experiment`
+Goal: generate Level 4 annotations (formula and mz-only database matches) for the empirical compounds. 
 
-or 
+If you are a non-commerical user, we recommend that you download the JMS-compliant versions of the HMDB and LMSD using the `download extras` command (see above). These are used as the defaults when no `--targets=<JMS_targets>` is provided.
 
-`pcpfm MS2_annotate --table_moniker MS1_annotated --new_moniker MS2_MS1_annotated -i ./my_experiment`
+To annoatate the preferred empCpd object:
+
+`pcpfm l4_annotate --empCpd_moniker preferred --new_moniker MS1_annotated -i ./my_experiment`
+
+There is no mz tolerance here for the search as the search uses the inferred formula from the EmpCpd which will be determined by the parameters used for construction.
+
+#### MS1 Annotations - Level 1b
+
+Goal: generate Level 1b annotations (rt and mz similarity to authentic standards) for the empirical compounds.
+
+This compares feature rt and mz values to those of authentic standards libraries for the annotation of empirical compounds. This was designed to use authentic standard databases expoerted by Compound Discover however, any CSV file with the fields "Confirm Precursor" for the mz value of the standard, "RT" for the retention time of the standard in Minutes and "CompoundName" for the standard name will work. 
+
+This example command performs the annotation:
+
+`pcpfm l1b_annotate -empCpd_moniker preferred --new_moniker MS1_auth_std_annotate -i ./my_experiment --targets=<auth_std_CSV>`
+
+Options can be provided including:
+```
+--annot_mz_tolerance: the ppm tolerance for annotation
+--annot_rt_tolerance: the absolute seconds tolerance for annotation
+```
+
+#### MS2_Annotation - Map MS2 to EmpCpds
+
+THIS MUST BE DONE BEFORE MS2 ANNOTATION STEPS BELOW
+
+Goal: associate features, and thus EmpCpds, to experimental MS2 spectra. 
+
+Experimental MS2 spectra correspond to precursor ions that are fragmented to yield an MS2 spectrum. Some precursor ions should correspond to features in the feature table while others will not. To minimize computational overhead, we only need to annnotate the ones that can be mapped to a feature. This mapping is done by comparing the precursor retention time and mz to the retention times and mzs of the features. 
+
+This example command maps the MS2 spectra in an experiment (from DDA for example) to empirical compounds:
+
+`pcpfm map_ms2 --empCpd_moniker MS1_annotate --new_moniker MS2_mapped`
+
+Options can be provided including:
+```
+--annot_mz_tolerance: the ppm tolerance for mapping ms2 to features (default = 5)
+--annot_rt_tolerance: the retention time tolerance for ms2 mapping (default = 30)
+--ms2_dir: a path to mzml files containing ms2 spectra you want to map but not present in the experiment (e.g., AcquireX data)
+```
+
+#### MS2_Annotations - Level 2
+
+Goal: generate Level 2 (similarity to reference MS2 spectra) for the empirical compounds. 
+
+MS2 annotations can be generated as follows using any .msp file as reference. If not provided, using `--msp_files_neg` or `--msp_files_pos`, the corresponding MoNA database will be used provided it was downloaded using the `download extras` command.
+
+`pcpfm l2_annotate --empCpd_moniker MS1_annotated --new_moniker MS2_MS1_annotated -i ./my_experiment`
+
+
+Options can be provided including:
 ```
 --msp_files_neg: path to msp file for negative mode
 --msp_files_pos: path to msp file for pos mode
---ms2_dir: directory containing other ms2 spectra to annotate with (AcquireX)
---MS2_annotation_name: column name for annoations in table
 --ms2_similarity_metric: specify alterantive similarity metric
 --ms2_min_peaks: number of peaks ms2 spectra must have to be searched and matched to be reported as annoation. 
---find_experiment_ms2: it True, search for ms2 spectra in the experiment's acquisitions.
 ```
+
+#### MS2_Annotations - Level 1a
+
+Goal: generate Level 1a (similarity to authentic standard MS2) for the empirical compounds. 
+
+MS2 annotations can be generated using an authentic standard library exported in csv format from Compound Discoverer. This will also enforce a retention time similarity between the library entry and the experimental spectrum.
+
+
+`pcpfm MS2_annotate --empCpd_moniker MS1_annotated --new_moniker MS2_MS1_annotated -i ./my_experiment --targets=<path_to_CD_export.csv>`
+
+Options can be provided including:
+```
+--annot_mz_tolerance: the ppm tolerance for annotation
+--annot_rt_tolerance: the absolute seconds tolerance for annotation
+```
+
 ### Display project summary
 Goal: to print a summary of project Feature Tables and empCpds, and their corresponding paths.
 
