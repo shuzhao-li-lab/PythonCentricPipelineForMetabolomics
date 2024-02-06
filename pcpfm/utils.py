@@ -14,13 +14,18 @@ from matchms.Spectrum import Spectrum
 from .MSnSpectrum import MS2Spectrum
 
 def flatten_nested_dicts(nested_dicts):
-    """_summary_
+    """
+    For nested dictionaries, i.e., where the value for a key in a dictionary is a dictionary
+    return a flat, dictionary where the nested keys become top level keys. 
+
+    If the same key is used at different levels, the one encountered last will be the 
+    top level key, value pair.
 
     Args:
-        nested_dicts (_type_): _description_
+        nested_dicts (dict): a dictionary that has a dictionary as a value
 
     Returns:
-        _type_: _description_
+        dict: flattened dict
     """    
     _d = {}
     for k, v in nested_dicts.items():
@@ -32,14 +37,15 @@ def flatten_nested_dicts(nested_dicts):
 
 
 def row_to_dict(row, columns):
-    """_summary_
+    """
+    This method converts a pandas row to a dictionary with key value pairs for each column
 
     Args:
-        row (_type_): _description_
-        columns (_type_): _description_
+        row (pandas row): the row to be converted to dict
+        columns (list): columns to include as keys
 
     Returns:
-        _type_: _description_
+        dict: row as a dict
     """
     _d = {}
     for c in columns:
@@ -52,20 +58,24 @@ def row_to_dict(row, columns):
 def extract_CD_csv(
     cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
 ):
-    """_summary_
+    """
+    For a list of compound discover (CD) CSV libraries, read them into a form that is 
+    usable for level1a annotation.
+
+    In lazy mode, this yields the library entries, else a list of them is return.
 
     Args:
-        CD_csv (_type_): _description_
-        ionization_mode (_type_): _description_
-        min_peaks (int, optional): _description_. Defaults to 1.
-        precursor_to_use (str, optional): _description_. Defaults to "Confirmed".
-        lazy (bool, optional): _description_. Defaults to True.
+        CD_csv (list): list of paths to cd csv libraries
+        ionization_mode (str): the ionization mode for the experiment (and library)
+        min_peaks (int, optional): entries with fewer than these many peaks are discarded. Defaults to 1.
+        precursor_to_use (str, optional): CD library has "confirmed" and "extracted" precursors, specifies which to use as the precursor m/z. Defaults to "Confirmed".
+        lazy (bool, optional): determines if this is a generator or returns a list. Defaults to True.
 
     Returns:
-        _type_: _description_
+        list: list of MS2 spectra
 
     Yields:
-        _type_: _description_
+        MSnSpectrum: object representing an MSnSpectrum
     """
     standards_spectra = []
     for cd_csv in cd_csvs:
@@ -86,7 +96,6 @@ def extract_CD_csv(
             mzs = [mz for mz in mzs if (mz and not np.isnan(mz))]
             intensities = [i for i in intensities if (i and not np.isnan(i))]
             mzs, intensities = zip(*sorted(zip(mzs, intensities)))
-            print(mzs)
             if len(mzs) == len(intensities) and len(mzs) >= min_peaks:
                 spectrum = Spectrum(
                     mz=np.asarray([float(x) for x in mzs]),
@@ -98,13 +107,13 @@ def extract_CD_csv(
                     standard["Theoretical_Precursor"] = (
                         calculate_formula_mass(standard["ChemicalFormula"])
                         + calculate_formula_mass("H")
-                        - 0.00054858
+                        - calculate_formula_mass("e")
                     )
                 else:
                     standard["Theoretical_Precursor"] = (
                         calculate_formula_mass(standard["ChemicalFormula"])
                         - calculate_formula_mass("H")
-                        + 0.00054858
+                        + calculate_formula_mass("e")
                     )
                 spectrum = process_ms2_spectrum(
                     {
@@ -160,14 +169,17 @@ def get_similarity_method(method_name):
 
 
 def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
-    """_summary_
+    """
+    This method takes a list of ms2 files and yields the MS2 spectrum 
+    for each entry. 
 
     Args:
-        ms2_files (_type_): _description_
-        mz_tree (_type_, optional): _description_. Defaults to None.
+        ms2_files (list): list of ms2_files, can be any format matchms supports.
+        mz_tree (interval_tree, optional): interval tree of precursor mzs, if provided, only 
+        spectra whose precuror matches the tree will be returned. Defaults to None.
 
     Yields:
-        _type_: _description_
+        MSnSpectrum: object representing an MSnSpectrum
     """
     for ms2_file in [ms2_files] if isinstance(ms2_files, str) else ms2_files:
         for spectrum in get_parser(ms2_file.split(".")[-1])(

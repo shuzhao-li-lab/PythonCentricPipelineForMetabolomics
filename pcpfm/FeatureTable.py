@@ -1,3 +1,10 @@
+'''
+This module implements the FeatureTable object, which is mostly a 
+wrapper around a pandas dataframe. This also includes methods to 
+QAQC and batch correct the feature table. 
+'''
+
+
 import os
 import sys
 import json
@@ -16,13 +23,8 @@ from matplotlib.patches import Patch
 from . import utils
 
 class FeatureTable:
-    """_summary_
-
-    Returns:
-        _type_: _description_
-
-    Yields:
-        _type_: _description_
+    """
+    A feature table is a data frame of feature for an experiment.
     """
     qaqc_result_to_key = {
         "pca": "pca",
@@ -215,9 +217,6 @@ class FeatureTable:
         """load
 
         This method yields a FeatureTable object when given a feature table moniker.
-
-        _extended_summary_
-
         FeatureTables are registered with the experiment object using a moniker, a 
         string that points to the file path for that feature table. This method 
         queries the experiment object, gets the feature table path, and creates
@@ -320,10 +319,11 @@ class FeatureTable:
         )
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
-        name = "".join(c for c in name if c.isalpha() or c.isdigit() or c==' ').rstrip()
-        return os.path.join(
-            fig_path, self.experiment.experiment_name + "_" + name + ".png"
-        )
+        name = "".join(c for c in name if c.isalpha() or c.isdigit() or c==' ' or c=='_').rstrip()
+
+        fig_path = os.path.join(fig_path, "_" + name + ".png")
+        print(fig_path)
+        return fig_path
 
     def gen_figure(
         self,
@@ -338,8 +338,6 @@ class FeatureTable:
     ):
         """gen_figure
 
-        #todo - this needs to be cleaned up.
-
         A single method is used to generate the figures for the FeatureTable. This allows for 
         consistent looking figures to be generated.
 
@@ -350,7 +348,9 @@ class FeatureTable:
         "clustermap" - make a clustermap using seaborn
         "heatmap" - make a heatmap
 
-        _extended_summary_
+        This will be refactored in the future but this method is responsible for generating
+        all figures related to FeatureTables. The figure paramaters such as color, markers, 
+        etc are stored as a datamember in the FeatureTable object. 
 
         :param figure_type: _description_
         :type figure_type: _type_
@@ -539,7 +539,10 @@ class FeatureTable:
         return list(rt_matches.intersection(mz_matches))
 
     def intensity_distribution(self, skip_zero=True):
-        """_summary_
+        """
+        This method generates various summaries of the intensity distribution in the feature table
+        this includes TICs, LogTICs, median and mean intensity values including and excluding zeros 
+        and including the values after log transforming the intensities.
 
         Args:
             skip_zero (bool, optional): _description_. Defaults to True.
@@ -585,7 +588,11 @@ class FeatureTable:
             )
 
     def properties_distribution(self):
-        """_summary_
+        """
+        This method generates figures for the distribution (a histogram) of every parameter in
+        the feature table that is not id_number, parent_masstrack_id or actual intensities in 
+        the samples. Useful for examining a feature table. 
+
         """
         for column in self.non_sample_columns:
             if column not in ["id_number", "parent_masstrack_id"]:
@@ -629,7 +636,7 @@ class FeatureTable:
 
         :return: QAQC_result dict
         """
-        correlation_result = self.correlation_heatmap(correlation_type=correlation_type)
+        correlation_result = self.correlation_heatmap(correlation_type=correlation_type, full_results=True)
         all_correlations = []
         median_correlations = {}
         for sample_name_1, corr_dict in correlation_result["Result"].items():
@@ -758,7 +765,7 @@ class FeatureTable:
             results.append({"Type": k, "Config": {}, "Result": v})
         return results
 
-    def correlation_heatmap(self, correlation_type, log_transform=False):
+    def correlation_heatmap(self, correlation_type, log_transform=False, full_results=False):
         """correlation_heatmap
 
         Using a specified correlation function generate a correlation heatmap for the feature 
@@ -777,6 +784,7 @@ class FeatureTable:
         :type correlation_type: str
         :param log_transform: if true, log transform before linear correlation, defaults to True
         :type log_transform: bool, optional
+        :param full_results: if true, yield the corr matrix as dictionary, else discard the matrix
         :return: a dict with the correlation results and configuration used to generate result
         :rtype: dict
         """
@@ -808,17 +816,24 @@ class FeatureTable:
             x_label=self.figure_params["text"],
             y_label=self.figure_params["text"],
         )
-        result = {
-            "Type": title,
-            "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
-            "Result": {
-                self.sample_columns[i]: {
-                    self.sample_columns[j]: float(corr_matrix[i][j])
-                    for j in range(corr_matrix.shape[0])
-                }
-                for i in range(corr_matrix.shape[0])
-            },
-        }
+        if full_results:
+            result = {
+                "Type": title,
+                "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
+                "Result": {
+                    self.sample_columns[i]: {
+                        self.sample_columns[j]: float(corr_matrix[i][j])
+                        for j in range(corr_matrix.shape[0])
+                    }
+                    for i in range(corr_matrix.shape[0])
+                },
+            }
+        else:
+            result = {
+                "Type": title,
+                "Config": {"Metric": correlation_type, "LogTransformed": log_transform},
+                "Result": {"CorrMatrix": corr_matrix, "Samples": self.sample_columns}
+            }
         return result
 
     def pca(self, log_transform=True):
@@ -831,6 +846,7 @@ class FeatureTable:
         :return: QAQC_result dict
         """
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
+        print(sample_ftable)
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
         if log_transform and not self.log_transformed:
@@ -1151,11 +1167,14 @@ class FeatureTable:
                     self.feature_table.drop(columns=[sample_column], inplace=True)
 
     def drop_sample_by_name(self, drop_name, drop_others=False):
-        """_summary_
+        """
+        This method drops a sample from a feature table by its name.
+
+        Optionally all other samples that do not match the name can be dropped as well.
 
         Args:
-            drop_name (_type_): _description_
-            drop_others (bool, optional): _description_. Defaults to False.
+            drop_name (_type_): the name to be dropped
+            drop_others (bool, optional): drop other samples if true. Defaults to False.
         """
         if drop_others:
             self.feature_table.drop(
@@ -1165,11 +1184,12 @@ class FeatureTable:
             self.feature_table.drop(columns=drop_name, inplace=True)
 
     def drop_samples_by_filter(self, sample_filter, drop_others=False):
-        """_summary_
+        """
+        Given a sample filter, a dictionary as described elsewhere, drop all other samples.
 
         Args:
-            sample_filter (_type_): _description_
-            drop_others (bool, optional): _description_. Defaults to False.
+            sample_filter (dict): the dictionary specifying the filter 
+            drop_others (bool, optional): if true, reverse the logic of the drop. Defaults to False.
         """
         to_drop = [acq.name for acq in self.experiment.filter_samples(sample_filter)]
         to_drop = [x for x in to_drop if x in self.sample_columns]
@@ -1179,24 +1199,38 @@ class FeatureTable:
         self.feature_table.drop(columns=to_drop, inplace=True)
 
     def drop_samples_by_field(self, value, field, drop_others=False):
-        """_summary_
+        """
+        For a given field and a value for that field drop all samples that match or all samples
+        that do not match. 
 
         Args:
-            value (_type_): _description_
-            field (_type_): _description_
-            drop_others (bool, optional): _description_. Defaults to False.
+            value (str): the value for the field to be dropped
+            field (str): the field corresponding to the value that needs to be dropped
+            drop_others (bool, optional): if true drop samples that do not match. Defaults to False.
         """
         self.drop_samples_by_filter(
             {field: {"includes": [value]}}, drop_others=drop_others
         )
 
     def drop_samples_by_qaqc(self, qaqc_filter, drop_others=False, params=None):
-        """_summary_
+        """
+        This drops samples based on a qaqc result. This requires an additional
+        field in the filter called "conditions" which can accept keys ">" and
+        "<" that control the logic of the comparison. Currently only numerical
+        metrics can be used for dropping. The "Action" field is also need and can
+        accept the values "Keep" and "Drop" which specify what should happen to 
+        the sample that matches the filter. 
+
+        The permitted qaqc results for this filter are described in self.qaqc_results_to_key
+        and if the metric has not been evaluated, it will be evaluated on demand 
+        in this method. 
+
+        #todo - params seems unnecessary here
 
         Args:
-            qaqc_filter (_type_): _description_
-            drop_others (bool, optional): _description_. Defaults to False.
-            params (_type_, optional): _description_. Defaults to None.
+            qaqc_filter (dict): a dict detailing the qaqc filter
+            drop_others (bool, optional): if true, reverse the logic of the drop. Defaults to False.
+            params (dict, optional): the params from main, needed for figure_params. Defaults to None.
         """
         to_drop = []
         max_value, min_value = np.inf, -np.inf
@@ -1378,21 +1412,29 @@ class FeatureTable:
     def TIC_normalize(
         self, tic_normalization_percentile=0.90, by_batch=None, normalize_mode="median"
     ):
-        """TIC_normalize _summary_
+        """TIC_normalize 
+
+        This method will normalize the features of each acquisition based on the TICs of 
+        the samples. In this case, the TICs are calculated only using features that are 
+        present in TIC_normalization_percentile or greater percent of the samples. 
+
+        Normalize mode determines how the normalization factor will be calculated, using
+        either the mean or the median. 
+
+        If by_batch is given, the normalization is performed in batches first with the 
+        batches determined by the field specified by_batch. Then all batches are normalized 
+        to one another. 
 
         _extended_summary_
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
-        :param TIC_normalization_percentile: _description_, defaults to 0.90
-        :type TIC_normalization_percentile: float, optional
-        :param by_batch: _description_, defaults to None
-        :type by_batch: _type_, optional
-        :param sample_type: _description_, defaults to "Unknown"
-        :type sample_type: str, optional
-        :param type_field: _description_, defaults to "Sample Type"
-        :type type_field: str, optional
-        :param normalize_mode: _description_, defaults to 'median'
+        :param TIC_normalization_percentile: only features in more than this 
+        percent of samples are used for TIC calcualtion, defaults to 0.90
+        :type TIC_normalization_percentile: float
+        :param by_batch: the field on which to group samples into batches
+        :type by_batch: str, optional
+
+        :param normalize_mode: the method used to calculate the normalization factors,
+          defaults to 'median'
         :type normalize_mode: str, optional
         """
 
@@ -1478,7 +1520,9 @@ class FeatureTable:
         self.feature_table.drop(columns="percent_inclusion", inplace=True)
 
     def batch_correct(self, by_batch):
-        """batch_correct _summary_
+        """
+        This method batch corrects the feature intensities. The 
+        batches are determined dynamically using the by_batch field. 
 
         _extended_summary_
 
@@ -1527,22 +1571,23 @@ class FeatureTable:
     def drop_missing_features(
         self, by_batch=None, drop_percentile=0.8, logic_mode="or"
     ):
-        """drop_missing_features _summary_
+        """drop_missing_features 
+        
+        This method will drop features that are uncommon in the feature table.
+
+        Drop_percentile is the threshold for inclusion.
 
         _extended_summary_
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
-        :param by_batch: _description_, defaults to None
-        :type by_batch: _type_, optional
-        :param drop_percentile: _description_, defaults to 0.8
+        :param by_batch: if provided, perform the operation on each batch separately. with 
+        batches defined by this field., defaults to None
+        :type by_batch: str, optional
+        :param drop_percentile: features present in this percent or fewer of samples are dropped
+        , defaults to 0.8
         :type drop_percentile: float, optional
-        :param logic_mode: _description_, defaults to "or"
+        :param logic_mode: if by batch, drop any feature that fails the threshold in 'any' batch 
+        or 'all' batches, defaults to "or"
         :type logic_mode: str, optional
-        :param sample_type: _description_, defaults to "Unknown"
-        :type sample_type: str, optional
-        :param type_field: _description_, defaults to "Sample Type"
-        :type type_field: str, optional
         """
 
         def __any(row, columns, drop_percentile):
@@ -1583,14 +1628,17 @@ class FeatureTable:
         self.feature_table.drop(columns="drop_feature", inplace=True)
 
     def __gen_color_cosmetic_map(self, colorby, seed=None):
-        """_summary_
+        """
+        This method generates the cosmetic map for the fields in colorby. Essentially, 
+        this is a mapping of values for the fiels in colorby to colors for plotting.
 
         Args:
-            colorby (_type_): _description_
-            seed (_type_, optional): _description_. Defaults to None.
+            colorby (list): list of fields that need colors
+            seed (int, optional): if provided, this sets the seed for RNG purposes. Should allow reproducible maps. 
+            Defaults to None.
 
         Returns:
-            _type_: _description_
+            dict: map of values to colors
         """
         color_cosmetic_map = {}
         for color in colorby:
@@ -1599,14 +1647,17 @@ class FeatureTable:
         return color_cosmetic_map
 
     def __gen_marker_cosmetic_map(self, markerby, seed=None):
-        """_summary_
+        """
+        This method generates the cosmetic map for the fields in markerby. Essentially, 
+        this is a mapping of values for the fiels in markerby to markers for plotting.
 
         Args:
-            markerby (_type_): _description_
-            seed (_type_, optional): _description_. Defaults to None.
+            colorby (list): list of fields that need markers
+            seed (int, optional): if provided, this sets the seed for RNG purposes. Should allow reproducible maps. 
+            Defaults to None.
 
         Returns:
-            _type_: _description_
+            dict: map of values to markers
         """
         marker_cosmetic_map = {}
         for marker in markerby:
@@ -1615,20 +1666,24 @@ class FeatureTable:
         return marker_cosmetic_map
 
     def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
-        """generate_cosmetic _summary_
+        """generate_cosmetic
 
-        _extended_summary_
+        Plots need colors, markers, and text fields. The colors and markers need to defined
+        on the fly since they may not be known a priori. This method generates this mapping
+        based on the fields in coloryb, markerby and textby. 
 
-        :param colorby: _description_, defaults to None
-        :type colorby: _type_, optional
-        :param markerby: _description_, defaults to None
-        :type markerby: _type_, optional
-        :param textby: _description_, defaults to None
-        :type textby: _type_, optional
-        :param seed: _description_, defaults to None
-        :type seed: _type_, optional
-        :return: _description_
-        :rtype: _type_
+        :param colorby: list of fields that need colors, defaults to None
+        :type colorby: list, optional
+        :param markerby: list of fields that need markers, defaults to None
+        :type markerby: list, optional
+        :param textby: list of fields to be used for text, defaults to None.
+        largely here for future expansion
+        :type textby: list, optional
+        :param seed: if provided, this sets the seed for RNG purposes. Should allow reproducible maps. 
+            Defaults to None.
+        :type seed: int, optional
+        :return: map of field values to colors, markers and text
+        :rtype: dict
         """
         combined_cosmetic_map = {}
         combined_cosmetic_map.update(self.__gen_color_cosmetic_map(colorby, seed))
@@ -1657,13 +1712,16 @@ class FeatureTable:
                 legends["markers"][value_for_cosmetic] = cosmetic_for_value
             for i, x in enumerate(textby):
                 cosmetics["texts"][i].append(acquisition.metadata_tags[x])
-        return cosmetics["colors"], cosmetics["markers"], cosmetics["texts"], legends["colors"], legends["markers"]
+        cos_colors, cos_markers, cos_texts = [cosmetics[x] for x in ["colors", "markers", "texts"]]
+        leg_colors, leg_markers = [legends[x] for x in ["colors", "markers"]]
+        return cos_colors, cos_markers, cos_texts, leg_colors, leg_markers
 
     def generate_figure_params(self, params):
-        """_summary_
+        """
+        This method generates the parameters used for plotting. 
 
         Args:
-            params (_type_): _description_
+            params (dict): the params passed on the CLI. 
         """
         for x in ["color_by", "marker_by", "text_by"]:
             if x in params and isinstance(params[x], str):

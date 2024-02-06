@@ -1,3 +1,13 @@
+'''
+Experiment.py contains the pipeline's implementation of the Experiment object which in turn 
+inherits from the Experiment object in the metdatamodel. 
+
+The Experiment is largely a computational aid and orchestrates an analysis. This includes
+keeping track of intermediate results and acquisitions. 
+
+'''
+
+
 import os
 import random
 import sys
@@ -63,7 +73,7 @@ class Experiment(core.Experiment):
         ms2_directory=None,
         qaqc_figs=None,
         asari_subdirectory=None,
-        output_subdirectory=None
+        output_subdirectory=None,
     ):
         super().__init__(experiment_name)
         self.experiment_name = self.id
@@ -108,15 +118,6 @@ class Experiment(core.Experiment):
         )
         self.__acq_names = None
         self.__ms2_acquisitions = None
-
-    @property
-    def number_samples(self):
-        """_summary_
-
-        Returns:
-            _type_: _description_
-        """
-        return len(self.acquisitions)
     
     def order_samples(self):
         """
@@ -328,7 +329,6 @@ class Experiment(core.Experiment):
         sys.exit()
 
     def retrieve_empCpds(self, moniker, as_object=False):
-        # TODO - add docstring
         """_summary_
 
         Args:
@@ -378,9 +378,9 @@ class Experiment(core.Experiment):
         """
         if os.path.exists(acquisition.source_filepath):
             target_path = None
+            source_basepath = os.path.basename(acquisition.source_filepath)
             if acquisition.source_filepath.endswith(".mzML"):
                 acquisition.raw_filepath = None
-                source_basepath = os.path.basename(acquisition.source_filepath)
                 if acquisition.has_ms2:
                     target_path = os.path.join(self.ms2_directory, source_basepath)
                 else:
@@ -389,9 +389,10 @@ class Experiment(core.Experiment):
                     )
                 acquisition.mzml_filepath = target_path
             elif acquisition.source_filepath.endswith(".raw"):
-                acquisition.raw_filepath = os.path.join(
+                target_path = os.path.join(
                     self.raw_subdirectory, source_basepath
                 )
+                acquisition.raw_filepath = target_path 
             if target_path is not None and not os.path.exists(target_path):
                 file_operations[mode](acquisition.source_filepath, target_path)
                 self.acquisitions.append(acquisition)
@@ -404,6 +405,17 @@ class Experiment(core.Experiment):
         else:
             print("File Not Found: ", acquisition.name, acquisition.source_filepath)
         self.ordered_samples = tuple(self.acquisitions)
+        if self.number_samples is None:
+            self.number_samples = 0
+        self.number_samples += 1
+        if self.species is not set():
+            self.species = set(self.species)
+        self.species.add(acquisition.metadata_tags.get('species'), 'Unknown')
+        self.species = list(self.species)
+        if self.tissue is not set():
+            self.tissue = set(self.tissue)
+        self.tissue.add(acquisition.metadata_tags.get('species'), 'Unknown')
+        self.tissue = list(self.tissue)
 
     def generate_output(self, empCpd_moniker, table_moniker):
         """_summary_
@@ -426,7 +438,6 @@ class Experiment(core.Experiment):
         annotation_table.to_csv(annotation_table_path, sep="\t", index=False)
 
     def convert_raw_to_mzML(self, conversion_command, num_cores=4):
-        # TODO - switch from os.system to subprocess
         """
         Convert all raw files to mzML
 
@@ -450,11 +461,12 @@ class Experiment(core.Experiment):
                 "$RAW_PATH": acquisition.raw_filepath,
                 "$OUT_PATH": output_filepath,
             }
-            if isinstance(conversion_command) is list:
+            print(conversion_command)
+            if isinstance(conversion_command, list):
                 jobs.append(
                     [field_map.get(element, element) for element in conversion_command]
                 )
-            elif isinstance(conversion_command) is str:
+            elif isinstance(conversion_command, str):
                 for field, replacement_value in field_map.items():
                     conversion_command = conversion_command.replace(
                         field, replacement_value
@@ -505,7 +517,6 @@ class Experiment(core.Experiment):
         path_field="Filepath",
         sample_skip_list_fp=None,
     ):
-        # TODO - simplify
         """
         For a given sequence file, create the experiment object, and add all acquisitions
 
