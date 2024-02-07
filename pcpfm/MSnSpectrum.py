@@ -45,9 +45,7 @@ class MS2Spectrum(core.Spectrum):
         """
         super().__init__(spec_id)
         source = os.path.basename(source) if source != "" else os.path.basename(source)
-        self.precursor_ion = (
-            str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
-        )
+        self.precursor_ion_id = (str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source))
         self.spec_id = spec_id
         self.rtime = precursor_rt
         self.precursor_ion_mz = precursor_mz
@@ -95,8 +93,8 @@ class MS2Spectrum(core.Spectrum):
         """
         return MS2Spectrum(
             spec_id=None,
-            precursor_mz=embedding["prec_mz"],
-            precursor_rt=embedding["rtime"],
+            precursor_mz=float(embedding["precursor_ion_mz"]),
+            precursor_rt=float(embedding["rtime"]),
             list_mz=embedding["list_mz"],
             list_intensity=embedding["list_intensity"],
             matchms_spectrum=Spectrum(
@@ -125,7 +123,7 @@ class MS2Spectrum(core.Spectrum):
             {
                 "msms_score": score,
                 "matched_peaks": matched_peaks,
-                "db_precursor_mz": other_ms2.prec_mz,
+                "db_precursor_mz": other_ms2.precursor_ion_mz,
                 "db_precursor_rt": other_ms2.rtime,
                 "reference_id": other_ms2.compound_name,
                 "list_mz": [x[0] for x in other_ms2.matchms_spectrum.peaks],

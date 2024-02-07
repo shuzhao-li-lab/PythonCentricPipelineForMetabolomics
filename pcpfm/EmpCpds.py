@@ -270,14 +270,15 @@ class EmpCpds:
         """
         if ("precursor", mz_tol) not in self.__mz_trees:
             mz_tree = IntervalTree()
-            for spectrum in self.ms2_spectra.values():
-                precursor_mz = spectrum.prec_mz
-                mz_error = precursor_mz / 1e6 * mz_tol
-                mz_tree.addi(
-                    precursor_mz - mz_error,
-                    precursor_mz + mz_error,
-                    spectrum.precursor_ion_id,
-                )
+            for spectra in self.ms2_spectra.values():
+                for spectrum in spectra:
+                    precursor_mz = spectrum.prec_mz
+                    mz_error = precursor_mz / 1e6 * mz_tol
+                    mz_tree.addi(
+                        precursor_mz - mz_error,
+                        precursor_mz + mz_error,
+                        spectrum.precursor_ion_id,
+                    )
             self.__mz_trees[("precursor", mz_tol)] = mz_tree
         return self.__mz_trees[("precursor", mz_tol)]
 
@@ -294,13 +295,14 @@ class EmpCpds:
         """
         if ("precursor", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
-            for spectrum in self.ms2_spectra.values():
-                precursor_rt = spectrum.rtime
-                rt_tree.addi(
-                    precursor_rt - rt_tolerance,
-                    precursor_rt + rt_tolerance,
-                    spectrum.precursor_ion_id,
-                )
+            for spectra in self.ms2_spectra.values():
+                for spectrum in spectra:
+                    precursor_rt = spectrum.rtime
+                    rt_tree.addi(
+                        precursor_rt - rt_tolerance,
+                        precursor_rt + rt_tolerance,
+                        spectrum.precursor_ion_id,
+                    )
             self.__mz_trees[("precursor", rt_tolerance)] = rt_tree
         return self.__mz_trees[("precursor", rt_tolerance)]
 
@@ -505,14 +507,14 @@ class EmpCpds:
             p["id"] = p["id_number"]
             p["representative_intensity"] = None
         to_delete = set()
-        for p in peaklist:
-            for field in list(p.keys()):
-                if "___" in field:
-                    new_field = field.split("___")[-1]
-                    p[new_field] = p[field]
-                    to_delete.add(field)
-        for field in to_delete:
-            del p[field]
+        #for p in peaklist:
+        #    for field in list(p.keys()):
+        #        if "___" in field:
+        #            new_field = field.split("___")[-1]
+        #            p[new_field] = p[field]
+        #            to_delete.add(field)
+        #for field in to_delete:
+        #    del p[field]
 
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empcpds = ECCON.peaks_to_epdDict(

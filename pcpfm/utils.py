@@ -201,7 +201,7 @@ def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
 
 
 def process_ms2_spectrum(
-    spectrum, filename="not_specified", min_peaks=3, skip_meta=False, skip_filters=False
+    spectrum, filename="not_specified", min_peaks=1, skip_meta=False, skip_filters=False
 ):
     """
     This is the default MS2 processing used by the pipeline.
