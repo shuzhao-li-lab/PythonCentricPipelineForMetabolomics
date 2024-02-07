@@ -7,6 +7,7 @@ import platform
 import sys
 import uuid
 import datetime
+import textwrap
 from pip._vendor import pkg_resources
 from fpdf import FPDF
 import matplotlib.pyplot as plt
@@ -97,13 +98,44 @@ class Report():
         if "save" not in section_names:
             print("Save section not found in report! will abort")
             sys.exit()
-        return valid_sections
+
+        expanded_sections_ft = []
+        all_feature_tables = list(self.experiment.feature_tables.keys())
+        for section in valid_sections:
+            table_moniker = section.get("table", None)
+            if table_moniker == "*":
+                for feature_table in all_feature_tables:
+                    new_section = dict(section)
+                    new_section["table"] = feature_table
+                    expanded_sections_ft.append(new_section)
+            elif isinstance(table_moniker, list):
+                for feature_table in table_moniker:
+                    new_section = dict(section)
+                    new_section["table"] = feature_table
+                    expanded_sections_ft.append(new_section)
+            else:
+                expanded_sections_ft.append(dict(section))
+
+        expanded_sections_ft_empcpd = []
+        all_empcpds = list(self.experiment.empCpds.keys())
+        for section in expanded_sections_ft:
+            empcpd_moniker = section.get("empcpd", None)
+            if empcpd_moniker == "*":
+                for empcpd in all_empcpds:
+                    new_section = dict(section)
+                    new_section["empcpd"] = empcpd
+                    expanded_sections_ft_empcpd.append(new_section)
+            else:
+                expanded_sections_ft_empcpd.append(dict(section))
+        return expanded_sections_ft_empcpd
 
     def __create_report(self):
         """
         This function iterates through valid sections and generates the
         report element each section specifies.
         """
+
+
         for section in self.style:
             #try:
             method = getattr(self, section["section"])
@@ -181,10 +213,7 @@ class Report():
         text = ' '.join(text.split(None))
         text = ' '.join(text.split("\n"))
         i = 0
-        chunk_size = int(self.max_width // 2)
-        while (i * chunk_size) < len(text):
-            i += 1
-            line = text[chunk_size * (i - 1): min(chunk_size * i, len(text))]
+        for line in textwrap.wrap(text, width=100):
             self.__section_line(line, options=options)
         self.report.ln(5)
         self.report.ln(5)
@@ -203,12 +232,60 @@ class Report():
             except:
                 print(section_desc)
 
+    def experiment_summary(self, section_desc):
+        """_summary_
+
+        Args:
+            section_desc (_type_): _description_
+        """ 
+        self.__section_head("Experiment Summary")
+        if 'text' in section_desc:
+            self.__section_text(section_desc['text'])
+        self.__section_line("empCpd list", options=["bold"])
+        for empcpd_moniker in self.experiment.empCpds.keys():
+            self.__section_line(empcpd_moniker)
+        self.__section_line(' ')
+        self.__section_line("Feature Table list", options=["bold"])
+        for feature_table_moniker in self.experiment.feature_tables.keys():
+            self.__section_line(feature_table_moniker)
+
+
     def annotation_summary(self, section_desc):
         """_summary_
 
         Args:
             section_desc (_type_): _description_
-        """        
+        """     
+        self.__section_head("Annotation Summary")
+        if 'text' in section_desc:
+            self.__section_text(section_desc['text'])
+        self.__section_line("Name, #EmpCpds, #l4 Annotated, #l2 Annotated, #l1b Annotated, #l1a Annotated", options=["bold"])
+        for empcpd_moniker in self.experiment.empCpds.keys():
+            empcpds = self.experiment.retrieve_empCpds(empcpd_moniker, True)
+            num_l4_annotated = 0
+            num_l2_annotated = 0
+            num_l1b_annotated = 0
+            num_l1a_annotated = 0
+            for kp in empcpds.dict_empcpds.values():
+                num_l1b_annotated += int(bool(kp.get("Level_1b", [])))
+                num_l4_annotated += int(bool(kp.get("Level_4")))
+                has_l2 = False
+                has_l1a = False
+                for ms2_spectrum in kp.get("MS2_Spectra", []):
+                    for annotation in ms2_spectrum.get("annotations", []):
+                        if annotation["annotation_level"] == "Level_2":
+                            has_l2 = True
+                        elif annotation["annotation_level"] == "Level_1a":
+                            has_l1a = True
+            num_l2_annotated += int(has_l2)
+            num_l1a_annotated += int(has_l1a)
+            line = ", ".join([str(x) for x in [empcpd_moniker, 
+                                               str(len(empcpds.dict_empcpds)), 
+                                               num_l4_annotated, 
+                                               num_l2_annotated, 
+                                               num_l1b_annotated, 
+                                               num_l1a_annotated]])
+            self.__section_line(line)
 
     def table_summary(self, section_desc):
         """

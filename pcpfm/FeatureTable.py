@@ -848,9 +848,7 @@ class FeatureTable:
 
         :return: QAQC_result dict
         """
-        print(self.sample_columns)
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
-        print(sample_ftable)
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
         if log_transform and not self.log_transformed:
