@@ -51,7 +51,7 @@ class Main():
         parser.add_argument('-j', '--project')
         parser.add_argument('-o', '--output')
         parser.add_argument('-i', '--input')
-        parser.add_argument('--name_field', default='Name')
+        parser.add_argument('--name_field', default='File Name')
         parser.add_argument('--path_field', default='Filepath')
         parser.add_argument('--asari_command')
         parser.add_argument('-tm', '--table_moniker')
@@ -442,7 +442,7 @@ class Main():
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.drop_samples_by_qaqc(params['auto_drop'], False, params=params)
         feature_table.save(params['new_moniker'])
-        
+
     @staticmethod
     def drop_samples(params):
         """
