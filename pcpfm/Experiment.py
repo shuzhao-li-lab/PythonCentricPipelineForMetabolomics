@@ -733,7 +733,7 @@ class Experiment(core.Experiment):
                                 "full": os.path.join(
                                     self.experiment_directory,
                                     x,
-                                    "export/full_feature_table.tsv",
+                                    "export/full_Feature_table.tsv",
                                 ),
                                 "preferred": os.path.join(
                                     self.experiment_directory,
