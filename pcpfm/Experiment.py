@@ -517,7 +517,7 @@ class Experiment(core.Experiment):
         experiment_directory,
         csv_filepath,
         sample_filter=None,
-        name_field="Name",
+        name_field="File Name",
         path_field="Filepath",
         sample_skip_list_fp=None,
     ):
@@ -548,23 +548,27 @@ class Experiment(core.Experiment):
                 experiment_directory, experiment_directory, sequence=csv_filepath
             )
             sequence_df = pd.read_csv(csv_filepath)
-            for acq_info in sequence_df.apply(
-                row_to_dict, axis=1, args=(sequence_df.columns,)
-            ):
-                if name_field not in acq_info or path_field not in acq_info:
-                    print("Name Field or Path Field is Missing!")
-                    sys.exit()
-                #if "___" in acq_info[name_field]:
-                #    acq_info[name_field] = acq_info[name_field].split("___")[-1]
-                acquisition = acq_constructor(
-                    acq_info[name_field], acq_info[path_field], acq_info
-                )
-                acquisition.experiment = experiment
-                if (
-                    acquisition.filter(sample_filter)
-                    and acquisition.name not in sample_skip_list
-                ):
-                    experiment.add_acquisition(acquisition)
+            for acq_info in sequence_df.apply(row_to_dict, axis=1, args=(sequence_df.columns,)):
+                acq_path = acq_info.get(path_field, None)
+                acq_name = acq_info.get(name_field, None)
+                if acq_path is None and acq_name:
+                    print("Acquisition path not found, looking in local directory...")
+                    csv_directory = os.path.dirname(csv_filepath)
+                    possible_mzml_path = os.path.join(csv_directory, acq_name + ".mzML")
+                    possible_raw_path = os.path.join(csv_directory, acq_name + ".raw")
+                    if os.path.exists(possible_mzml_path):
+                        print("\tmzml found")
+                        acq_path = possible_mzml_path
+                    elif os.path.exists(possible_raw_path):
+                        print("\traw found")
+                        acq_path = possible_raw_path
+                if acq_name and acq_path:
+                    acquisition = acq_constructor(acq_name, acq_path, acq_info)
+                    acquisition.experiment = experiment
+                    if acquisition.filter(sample_filter) and acquisition.name not in sample_skip_list:
+                        experiment.add_acquisition(acquisition)
+                else:
+                    print("Skipping: ", acq_name, " no acquisition data found")
             if experiment.acquisitions:
                 experiment.save()
                 return experiment
