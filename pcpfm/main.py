@@ -437,6 +437,13 @@ class Main():
         feature_table.save(params['new_moniker'])
 
     @staticmethod
+    def drop_outliers(params):
+        experiment = Experiment.Experiment.load(params['input'])
+        feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
+        feature_table.drop_samples_by_qaqc(params['auto_drop'], False, params=params)
+        feature_table.save(params['new_moniker'])
+        
+    @staticmethod
     def drop_samples(params):
         """
         This method drop samples from a feature table. There are 
