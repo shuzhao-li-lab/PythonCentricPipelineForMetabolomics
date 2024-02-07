@@ -147,8 +147,6 @@ class FeatureTable:
 
         Return a list of the column names in the feature table that are sample names.
 
-        _extended_summary_
-
         This is used when filtering the feature tables. When we search the experiment 
         for a set of samples with a given filter, this returns samples in the experiment
         that may not be in the feature table. We can use this list tofilter out the 
@@ -1259,7 +1257,7 @@ class FeatureTable:
                     for qaqc_result in result:
                         qcqa_results = self.experiment.qcqa_results[self.moniker]
                         qcqa_results[qaqc_result["Type"]] = qaqc_result
-                        self.experiment[qaqc_result["Type"]] = qaqc_result
+                        self.experiment.qcqa_results[self.moniker][qaqc_result["Type"]] = qaqc_result
                 else:
                     print("No method found for " + field)
             qaqc_results_for_field = self.experiment.qcqa_results[self.moniker].get(field, None)
@@ -1381,9 +1379,11 @@ class FeatureTable:
         self.feature_table.drop(columns="mask_feature", inplace=True)
 
     def impute_missing_features(self, ratio=0.5, by_batch=None, method="min"):
-        """interpolate_missing_features _summary_
+        """impute_missing_features 
 
-        _extended_summary_
+        Fill zero values with a small value to make downstream stats more robust. This value is 
+        a multiplier of the minimum value for that feature observed across all samples, excluding
+        zeros.
 
         :param new_moniker: _description_
         :type new_moniker: _type_
@@ -1431,8 +1431,6 @@ class FeatureTable:
         If by_batch is given, the normalization is performed in batches first with the 
         batches determined by the field specified by_batch. Then all batches are normalized 
         to one another. 
-
-        _extended_summary_
 
         :param TIC_normalization_percentile: only features in more than this 
         percent of samples are used for TIC calcualtion, defaults to 0.90
@@ -1533,16 +1531,14 @@ class FeatureTable:
 
         _extended_summary_
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
-        :param by_batch: _description_
-        :type by_batch: _type_
+        :param new_moniker: the moniker to save the new table to
+        :type new_moniker: str
+        :param by_batch: the field on which to batch sampels
+        :type by_batch: str
         """
         if len(self.experiment.batches(by_batch).keys()) > 1:
             batch_idx_map = {}
-            for batch_idx, (_, acquisition_list) in enumerate(
-                self.experiment.batches(by_batch).items()
-            ):
+            for batch_idx, (_, acquisition_list) in enumerate(self.experiment.batches(by_batch).items()):
                 for acquisition in acquisition_list:
                     batch_idx_map[acquisition] = batch_idx
             batches = [batch_idx_map[x] for x in self.sample_columns]
@@ -1706,7 +1702,12 @@ class FeatureTable:
         }
         acq_name_map = {acq.name: acq for acq in self.experiment.acquisitions}
         for sample_name in self.sample_columns:
-            acquisition = acq_name_map[sample_name]
+            if sample_name in acq_name_map:
+                acquisition = acq_name_map[sample_name]
+            else:
+                new_sample_name = sample_name + ".mzML"
+                acquisition = acq_name_map[new_sample_name]
+
             #acquisition = acq_name_map[sample_name.split("___")[-1]]
             for i, x in enumerate(colorby):
                 value_for_cosmetic = acquisition.metadata_tags[x]
