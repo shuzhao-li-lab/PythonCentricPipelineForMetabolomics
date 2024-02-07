@@ -60,7 +60,10 @@ class EmpCpds:
             for khipu in self.dict_empcpds.values():
                 if "MS2_Spectra" in khipu:
                     for spectrum in khipu["MS2_Spectra"]:
-                        ms2_spectra[spectrum["precursor_ion"]] = MS2Spectrum.from_embedding(spectrum)
+                        if spectrum["precursor_ion_id"] not in ms2_spectra:
+                            ms2_spectra[spectrum["precursor_ion_id"]] = [MS2Spectrum.from_embedding(spectrum)]
+                        else:
+                            ms2_spectra[spectrum["precursor_ion_id"]].append(MS2Spectrum.from_embedding(spectrum))
             self.__ms2_spectra = ms2_spectra
         return self.__ms2_spectra
 
@@ -147,13 +150,12 @@ class EmpCpds:
         This needs to be called whenever the MS2 annotations are updated before saving the 
         empcpd object.
         """        
-        for _, khipu in self.dict_empcpds.items():
+        for khipu in self.dict_empcpds.values():
             if "MS2_Spectra" in khipu:
                 new_spectra = []
                 for spectrum in khipu["MS2_Spectra"]:
-                    new_spectra.append(
-                        self.ms2_spectra[spectrum["precursor_ion"]].embedding()
-                    )
+                    for match in self.ms2_spectra[spectrum["precursor_ion_id"]]:
+                        new_spectra.append(match.embedding())
                 khipu["MS2_Spectra"] = new_spectra
 
     def update_annotations(self, update_ms2=False):
@@ -269,13 +271,12 @@ class EmpCpds:
         if ("precursor", mz_tol) not in self.__mz_trees:
             mz_tree = IntervalTree()
             for spectrum in self.ms2_spectra.values():
-                print(spectrum)
                 precursor_mz = spectrum.prec_mz
                 mz_error = precursor_mz / 1e6 * mz_tol
                 mz_tree.addi(
                     precursor_mz - mz_error,
                     precursor_mz + mz_error,
-                    spectrum.precursor_ion,
+                    spectrum.precursor_ion_id,
                 )
             self.__mz_trees[("precursor", mz_tol)] = mz_tree
         return self.__mz_trees[("precursor", mz_tol)]
@@ -298,7 +299,7 @@ class EmpCpds:
                 rt_tree.addi(
                     precursor_rt - rt_tolerance,
                     precursor_rt + rt_tolerance,
-                    spectrum.precursor_ion,
+                    spectrum.precursor_ion_id,
                 )
             self.__mz_trees[("precursor", rt_tolerance)] = rt_tree
         return self.__mz_trees[("precursor", rt_tolerance)]
@@ -397,7 +398,7 @@ class EmpCpds:
         mapping_mz_tol=5,
         mapping_rt_tolerance=30,
         ms2_files=None,
-        scan_experiment=True,
+        scan_experiment=False,
     ):
         """
         When MS2 data is acquired, each spectrum will have a retention time and precursor 
@@ -425,15 +426,16 @@ class EmpCpds:
 
         if scan_experiment:
             for acq in self.experiment.acquisitions:
-                if acq.has_MS2:
+                if acq.has_ms2:
                     mzml_w_ms2.append(acq.mzml_filepath)
-
+        
+        matched_ms2_objects = 0
         for ms2_object in lazy_extract_ms2_spectra(mzml_w_ms2):
             used_khipu = set()
             matching_features = self.search_for_feature(
                 ms2_object.prec_mz,
                 ms2_object.rtime,
-                mapping_mz_tol,
+                mapping_mz_tol * 2,
                 mapping_rt_tolerance,
             )
             for matching_feature in matching_features:
@@ -441,8 +443,11 @@ class EmpCpds:
                 khipu = self.dict_empcpds[kp_id]
                 if "MS2_Spectra" not in khipu:
                     khipu["MS2_Spectra"] = []
-                khipu["MS2_Spectra"].append(ms2_object.embedding())
-                used_khipu.add(kp_id)
+                if kp_id not in used_khipu:
+                    matched_ms2_objects += 1
+                    khipu["MS2_Spectra"].append(ms2_object.embedding())
+                    used_khipu.add(kp_id)
+        print(matched_ms2_objects)
 
     @staticmethod
     def construct_from_feature_table(
@@ -576,7 +581,7 @@ class EmpCpds:
         msp_files,
         mz_tol=5,
         similarity_method="CosineHungarian",
-        min_peaks=2,
+        min_peaks=1,
         score_cutoff=0.50,
     ):
         """
@@ -598,8 +603,9 @@ class EmpCpds:
             min_peaks (int, optional): the minimum number of matching peaks between experimental 
             and reference specturm. Defaults to 2.
             score_cutoff (float, optional): the minimum score required for an annotation. 
-            ßDefaults to 0.50.
+            Defaults to 0.50.
         """        
+        match = 0
         msp_files = [msp_files] if isinstance(msp_files, str) else msp_files
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
@@ -607,16 +613,19 @@ class EmpCpds:
             match_tol = db_ms2.prec_mz / 1e6 * mz_tol * 2
             sim_instance = similarity_method(tolerance=match_tol)
             for possible_match in {x.data for x in precursor_mz_tree.at(db_ms2.prec_mz)}:
-                exp_ms2 = self.ms2_spectra[possible_match]
-                sim_result = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
-                score, n_matches = sim_result.tolist()
-                if score >= score_cutoff and n_matches >= min_peaks:
-                    exp_ms2.annotate(
-                        db_ms2,
-                        score,
-                        n_matches,
-                        annotation_level="Level_2"
-                    )
+                for exp_ms2 in self.ms2_spectra[possible_match]:
+                    sim_result = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
+                    score, n_matches = sim_result.tolist()
+                    if score >= score_cutoff and n_matches >= min_peaks:
+                        print("HIT")
+                        match += 1
+                        exp_ms2.annotate(
+                            db_ms2,
+                            score,
+                            n_matches,
+                            annotation_level="Level_2"
+                        )
+        print(match)
         self.update_annotations(update_ms2=True)
 
     def l1a_annotate(
@@ -625,7 +634,7 @@ class EmpCpds:
         mz_tol=5,
         rt_tolerance=30,
         similarity_method="CosineHungarian",
-        min_peaks=2,
+        min_peaks=1,
         score_cutoff=0.50,
     ):
         """_summary_
@@ -646,16 +655,16 @@ class EmpCpds:
             sim_instance = similarity_method(tolerance=match_tol)
             for possible_match in {x.data for x in precursor_mz_tree.at(db_ms2.prec_mz)}:
                 if possible_match in {x.data for x in precursor_rt_tree.at(db_ms2.rtime)}:
-                    exp_ms2 = self.ms2_spectra[possible_match]
-                    sim_res = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
-                    score, n_matches = sim_res.tolist()
-                    if score >= score_cutoff and n_matches >= min_peaks:
-                        exp_ms2.annotate(
-                            db_ms2,
-                            score,
-                            n_matches,
-                            annotation_level="Level_1a",
-                        )
+                    for exp_ms2 in self.ms2_spectra[possible_match]:
+                        sim_res = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
+                        score, n_matches = sim_res.tolist()
+                        if score >= score_cutoff and n_matches >= min_peaks:
+                            exp_ms2.annotate(
+                                db_ms2,
+                                score,
+                                n_matches,
+                                annotation_level="Level_1a",
+                            )
         self.update_annotations(update_ms2=True)
 
     def l1b_annotate(self, standards_csv, mz_tol=5, rt_tolerance=10):
