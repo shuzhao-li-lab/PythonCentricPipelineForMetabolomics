@@ -344,7 +344,7 @@ class Experiment(core.Experiment):
         if moniker in self.empCpds:
             if as_object:
                 return EmpCpds.EmpCpds.load(moniker, self)
-            return self.feature_tables[moniker]
+            return self.empCpds[moniker]
         print("No such empCpds: ", moniker)
         sys.exit()
 
@@ -440,6 +440,13 @@ class Experiment(core.Experiment):
         empCpds = self.retrieve_empCpds(empCpd_moniker, True)
         annotation_table = empCpds.create_annotation_table()
         annotation_table.to_csv(annotation_table_path, sep="\t", index=False)
+
+        print(table_moniker, empCpd_moniker)
+
+
+        file_operations["copy"](self.retrieve_empCpds(empCpd_moniker, False), self.output_subdirectory)
+        file_operations["copy"](self.retrieve_feature_table(table_moniker, False), self.output_subdirectory)
+        file_operations["copy"](os.path.join(self.experiment_directory, "experiment.json"), self.output_subdirectory)
 
     def convert_raw_to_mzML(self, conversion_command, num_cores=4):
         """

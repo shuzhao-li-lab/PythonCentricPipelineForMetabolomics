@@ -48,6 +48,7 @@ class MS2Spectrum(core.Spectrum):
         self.precursor_ion_id = (str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source))
         self.spec_id = spec_id
         self.rtime = precursor_rt
+        self.retention_time = precursor_rt
         self.precursor_ion_mz = precursor_mz
         self.instrument = instrument
         self.collision_energy = collision_energy
