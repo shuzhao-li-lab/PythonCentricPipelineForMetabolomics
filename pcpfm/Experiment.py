@@ -408,13 +408,17 @@ class Experiment(core.Experiment):
         if self.number_samples is None:
             self.number_samples = 0
         self.number_samples += 1
-        if self.species is not set():
+        if self.species is None:
+            self.species = set()
+        elif self.species is not set():
             self.species = set(self.species)
-        self.species.add(acquisition.metadata_tags.get('species'), 'Unknown')
+        self.species.add(acquisition.metadata_tags.get('species', 'Unknown'))
         self.species = list(self.species)
-        if self.tissue is not set():
+        if self.tissue is None:
+            self.tissue = set()
+        elif self.tissue is not set():
             self.tissue = set(self.tissue)
-        self.tissue.add(acquisition.metadata_tags.get('species'), 'Unknown')
+        self.tissue.add(acquisition.metadata_tags.get('species', 'Unknown'))
         self.tissue = list(self.tissue)
 
     def generate_output(self, empCpd_moniker, table_moniker):
@@ -550,8 +554,8 @@ class Experiment(core.Experiment):
                 if name_field not in acq_info or path_field not in acq_info:
                     print("Name Field or Path Field is Missing!")
                     sys.exit()
-                if "___" in acq_info[name_field]:
-                    acq_info[name_field] = acq_info[name_field].split("___")[-1]
+                #if "___" in acq_info[name_field]:
+                #    acq_info[name_field] = acq_info[name_field].split("___")[-1]
                 acquisition = acq_constructor(
                     acq_info[name_field], acq_info[path_field], acq_info
                 )

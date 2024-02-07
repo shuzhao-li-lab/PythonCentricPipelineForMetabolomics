@@ -260,6 +260,7 @@ class Acquisition(Sample):
         if user_filter:
             for key, rules in user_filter.items():
                 values_to_filter = self.metadata_tags[key].strip()
+                print(values_to_filter)
                 if "includes" in rules:
                     for must_include in rules["includes"]:
                         passed_filter = (

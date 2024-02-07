@@ -538,7 +538,7 @@ class Main():
         feature_table.save(params['new_moniker'])
 
     @staticmethod
-    def interpolate(params):
+    def impute(params):
         """
         Replace remaining missing values with a value to aid statistics
         
@@ -557,7 +557,7 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
-        feature_table.interpolate_missing_features(float(params['interpolation_ratio']),
+        feature_table.impute_missing_features(float(params['interpolation_ratio']),
                                                     params['by_batch'],
                                                     params['interpolate_method'])
         feature_table.save(params['new_moniker'])
@@ -705,7 +705,7 @@ class Main():
         values. 
 
         - **--targets**: a list of csv filepaths with mz, retention times, compound \
-            names with column names, "mz", "rtime", "CompoundName"
+            names with column names, "mz", "R", "CompoundName"
         - **--annot_mz_tolerance**: the ppm cutoff for the precursor ion search, default = 5 ppm
         - **--annot_rt_tolerance**: the rtime cutoff, in sec, for the precursor ion search, default = 30 sec
 
@@ -853,5 +853,3 @@ def CLI():
 
 if __name__ == '__main__':
     main()
-
-    

@@ -66,7 +66,7 @@ class FeatureTable:
         self.feature_table = feature_table
         self.moniker = moniker
 
-        self.clean_columns()
+        #self.clean_columns()
         self.__mz_trees = {}
         self.__rt_trees = {}
 
@@ -159,8 +159,13 @@ class FeatureTable:
         """
         sample_columns = []
         for x in self.feature_table.columns:
-            if x.split("___")[-1] in self.experiment.sample_names:
+            if x in self.experiment.sample_names:
+            #if x.split("___")[-1] in self.experiment.sample_names:
                 sample_columns.append(x)
+            else:
+                new_x = x + ".mzML"
+                if new_x in self.experiment.sample_names:
+                    sample_columns.append(x)
         return sample_columns
 
     @property
@@ -845,6 +850,7 @@ class FeatureTable:
 
         :return: QAQC_result dict
         """
+        print(self.sample_columns)
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
         print(sample_ftable)
         scaler = StandardScaler()
@@ -1253,6 +1259,7 @@ class FeatureTable:
                     for qaqc_result in result:
                         qcqa_results = self.experiment.qcqa_results[self.moniker]
                         qcqa_results[qaqc_result["Type"]] = qaqc_result
+                        self.experiment[qaqc_result["Type"]] = qaqc_result
                 else:
                     print("No method found for " + field)
             qaqc_results_for_field = self.experiment.qcqa_results[self.moniker].get(field, None)
@@ -1373,7 +1380,7 @@ class FeatureTable:
         ]
         self.feature_table.drop(columns="mask_feature", inplace=True)
 
-    def interpolate_missing_features(self, ratio=0.5, by_batch=None, method="min"):
+    def impute_missing_features(self, ratio=0.5, by_batch=None, method="min"):
         """interpolate_missing_features _summary_
 
         _extended_summary_
@@ -1386,7 +1393,7 @@ class FeatureTable:
         :type by_batch: _type_, optional
         """
 
-        def __calc_interp_value(row, sample_names):
+        def __calc_impute_value(row, sample_names):
             values = [x for x in row[sample_names] if x > 0]
             if values:
                 return utils.descriptive_stat_modes[method](values) * ratio
@@ -1395,14 +1402,14 @@ class FeatureTable:
         if by_batch:
             for _, b_sample_names in self.experiment.batches(by_batch).values():
                 b_sample_names = list(set(b_sample_names).intersection(set(self.sample_columns)))
-                i_v = self.feature_table.apply(__calc_interp_value, axis=1, args=(b_sample_names,))
+                i_v = self.feature_table.apply(__calc_impute_value, axis=1, args=(b_sample_names,))
                 self.feature_table["interp_value"] = i_v
                 for sample_name in b_sample_names:
                     interp_values = self.feature_table[[sample_name, "interp_value"]].max(axis=1)
                     self.feature_table[sample_name] = interp_values
                 self.feature_table.drop(columns="interp_value", inplace=True)
         else:
-            i_v = self.feature_table.apply(__calc_interp_value, axis=1, args=(self.sample_columns,))
+            i_v = self.feature_table.apply(__calc_impute_value, axis=1, args=(self.sample_columns,))
             self.feature_table["interp_value"] =  i_v
             for sample_name in self.sample_columns:
                 interp_values = self.feature_table[[sample_name, "interp_value"]].max(axis=1)
@@ -1699,7 +1706,8 @@ class FeatureTable:
         }
         acq_name_map = {acq.name: acq for acq in self.experiment.acquisitions}
         for sample_name in self.sample_columns:
-            acquisition = acq_name_map[sample_name.split("___")[-1]]
+            acquisition = acq_name_map[sample_name]
+            #acquisition = acq_name_map[sample_name.split("___")[-1]]
             for i, x in enumerate(colorby):
                 value_for_cosmetic = acquisition.metadata_tags[x]
                 cosmetic_for_value = combined_cosmetic_map[("colors", value_for_cosmetic)]
