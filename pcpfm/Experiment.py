@@ -7,7 +7,6 @@ keeping track of intermediate results and acquisitions.
 
 '''
 
-
 import os
 import random
 import sys
@@ -32,6 +31,8 @@ class Experiment(core.Experiment):
     will explicitly define all the fields.
     """
 
+
+    # this needs to be removed but determines where intermediates are stored
     subdirectories = {
         "converted_subdirectory": "converted_acquisitions/",
         "raw_subdirectory": "raw_acquisitions/",
@@ -44,6 +45,7 @@ class Experiment(core.Experiment):
         "output_subdirectory": "output/"
     }
 
+    # need to minimize parameters
     def __init__(
         self,
         experiment_name,
@@ -118,11 +120,11 @@ class Experiment(core.Experiment):
         )
         self.__acq_names = None
         self.__ms2_acquisitions = None
-    
+
     def order_samples(self):
         """
-        _summary_
-        """        
+        This updates the ordered_samples param, part of metdatamodel implementation.
+        """
         self.ordered_samples = tuple(self.acquisitions)
 
     @staticmethod
@@ -170,7 +172,6 @@ class Experiment(core.Experiment):
         """
         This saves the experiment object as a JSON object inside the
         experiment directory.
-
         """
         save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
         self.command_history.append(str(time.time()) + ":" + ";".join(sys.argv))
@@ -279,13 +280,12 @@ class Experiment(core.Experiment):
         return self.__ionization_mode
 
     def delete_feature_table(self, moniker):
-        """_summary_
+        """
+        This method will safely delete a feature table and unregister it with the experiment.
 
         Args:
-            moniker (_type_): _description_
+            moniker (str): the table moniker to delete
 
-        Raises:
-            Exception: _description_
         """
         if moniker in self.feature_tables:
             file_operations["delete"](self.feature_tables[moniker])
@@ -294,13 +294,12 @@ class Experiment(core.Experiment):
             print("No such table: ", moniker)
 
     def delete_empCpds(self, moniker):
-        """_summary_
+        """
+        This method will safely delete an empcpd and unregister it with the experiment.
 
         Args:
-            moniker (_type_): _description_
+            moniker (str): the empcpd moniker to delete
 
-        Raises:
-            Exception: _description_
         """
         if moniker in self.empCpds:
             file_operations["delete"](self.empCpds[moniker])
@@ -309,17 +308,15 @@ class Experiment(core.Experiment):
             print("No such empCpds: ", moniker)
 
     def retrieve_feature_table(self, moniker, as_object=False):
-        """_summary_
+        """
+        For a given moniker return either the feature table object or its path.
 
         Args:
-            moniker (_type_): _description_
-            as_object (bool, optional): _description_. Defaults to False.
-
-        Raises:
-            Exception: _description_
+            moniker (str): the table to retrieve
+            as_object (bool, optional): if true, return the object else its path. Defaults to False.
 
         Returns:
-            _type_: _description_
+            str or object: the feature table or its path
         """
         if moniker in self.feature_tables:
             if as_object:
@@ -329,17 +326,15 @@ class Experiment(core.Experiment):
         sys.exit()
 
     def retrieve_empCpds(self, moniker, as_object=False):
-        """_summary_
+        """
+        For a given moniker return either the empcpd object or its path.
 
         Args:
-            moniker (_type_): _description_
-            as_object (bool, optional): _description_. Defaults to False.
-
-        Raises:
-            Exception: _description_
+            moniker (str): the empcpd to retrieve
+            as_object (bool, optional): if true, return the object else its path. Defaults to False.
 
         Returns:
-            _type_: _description_
+            str or object: the feature table or its path
         """
         if moniker in self.empCpds:
             if as_object:
@@ -349,10 +344,11 @@ class Experiment(core.Experiment):
         sys.exit()
 
     def create_sample_annotation_table(self):
-        """_summary_
+        """
+        Create the sample annotation table which maps samples to their metadata. 
 
         Returns:
-            _type_: _description_
+            dataframe: the table as a dataframe
         """
         annotation_table = []
         for acquisition in self.acquisitions:
@@ -368,13 +364,14 @@ class Experiment(core.Experiment):
 
     def add_acquisition(self, acquisition, mode="link"):
         """
-        This method adds an acquisition to the list of acquisitions in the experiment, ensures there are no duplicates
-        and then links or copies the acquisition, currently only as a .raw file, to the experiment directory
+        This method adds an acquisition to the list of acquisitions in the experiment, ensures 
+        there are no duplicates and then links or copies the acquisition, currently only as a 
+        .raw file, to the experiment directory
 
         :param acquisition: an Acquistiion object
         :param mode: how to move acquisitions into the experiment, default "link", can be "copy"
-        :param method_field: this is the field to check for the method name, used to shortcircuit MS2
-            determination
+        :param method_field: this is the field to check for the method name, used to shortcircuit 
+            MS2 determination
         """
         if os.path.exists(acquisition.source_filepath):
             target_path = None
@@ -422,7 +419,10 @@ class Experiment(core.Experiment):
         self.tissue = list(self.tissue)
 
     def generate_output(self, empCpd_moniker, table_moniker):
-        """_summary_
+        """
+        This generates and stores the the feature table, sample annotation table, and the 
+        feature annotation table to the output directory. It also copies the JSON for the 
+        desried empcpd and experiment to the directory. 
 
         Args:
             empCpd_moniker (_type_): _description_
@@ -440,9 +440,6 @@ class Experiment(core.Experiment):
         empCpds = self.retrieve_empCpds(empCpd_moniker, True)
         annotation_table = empCpds.create_annotation_table()
         annotation_table.to_csv(annotation_table_path, sep="\t", index=False)
-
-        print(table_moniker, empCpd_moniker)
-
 
         file_operations["copy"](self.retrieve_empCpds(empCpd_moniker, False), self.output_subdirectory)
         file_operations["copy"](self.retrieve_feature_table(table_moniker, False), self.output_subdirectory)
@@ -498,8 +495,8 @@ class Experiment(core.Experiment):
 
     def filter_samples(self, sample_filter, return_field=None):
         """
-        Find the set of acquisitions that pass the provided filter and return either the acquisition object or the
-        specified field of each passing sample
+        Find the set of acquisitions that pass the provided filter and return either the 
+        acquisition object or the specified field of each passing sample
 
         :param filter: a filter dictionary
         :param return_field: option, defaul None, if provided and valid
@@ -572,8 +569,9 @@ class Experiment(core.Experiment):
                 if acq_name and acq_path:
                     acquisition = acq_constructor(acq_name, acq_path, acq_info)
                     acquisition.experiment = experiment
-                    if acquisition.filter(sample_filter) and acquisition.name not in sample_skip_list:
-                        experiment.add_acquisition(acquisition)
+                    if acquisition.filter(sample_filter):
+                        if acquisition.name not in sample_skip_list:
+                            experiment.add_acquisition(acquisition)
                 else:
                     print("Skipping: ", acq_name, " no acquisition data found")
             if experiment.acquisitions:
