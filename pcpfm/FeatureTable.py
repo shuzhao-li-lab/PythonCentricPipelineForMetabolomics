@@ -4,7 +4,6 @@ wrapper around a pandas dataframe. This also includes methods to
 QAQC and batch correct the feature table. 
 '''
 
-
 import os
 import sys
 import json
@@ -26,6 +25,8 @@ class FeatureTable:
     """
     A feature table is a data frame of feature for an experiment.
     """
+
+    # this maps qaqc results to keys in the self.method_map. This is used for qaqc filtering
     qaqc_result_to_key = {
         "pca": "pca",
         "tsne": "tsne",
@@ -217,8 +218,7 @@ class FeatureTable:
 
     @staticmethod
     def load(moniker, experiment):
-        """load
-
+        """
         This method yields a FeatureTable object when given a feature table moniker.
         FeatureTables are registered with the experiment object using a moniker, a 
         string that points to the file path for that feature table. This method 
@@ -304,8 +304,7 @@ class FeatureTable:
             os.removedirs(self.experiment.qaqc_figs + "/" + new_moniker)
 
     def save_fig_path(self, name):
-        """save_fig_path
-
+        """
         Given a desired name for a figure, this returns the path to which this figure should be
         saved.
 
@@ -339,8 +338,7 @@ class FeatureTable:
         skip_annot=False,
         bins=100,
     ):
-        """gen_figure
-
+        """
         A single method is used to generate the figures for the FeatureTable. This allows for 
         consistent looking figures to be generated.
 
@@ -510,8 +508,7 @@ class FeatureTable:
     def search_for_feature(
         self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None
     ):
-        """search_for_feature
-
+        """
         Given a query_mz and query_rt with corresponding tolerances in ppm and absolute units 
         respectively find all features by id_number that have a matching mz and rtime.
 
@@ -548,7 +545,7 @@ class FeatureTable:
         and including the values after log transforming the intensities.
 
         Args:
-            skip_zero (bool, optional): _description_. Defaults to True.
+            skip_zero (bool, optional): if true, don't include zero values. Defaults to True.
         """
         if self.log_transformed:
             self.gen_figure(
@@ -920,11 +917,13 @@ class FeatureTable:
 
     def missing_feature_percentiles(self):
         """
-        Calculate the distribution of missing features with respect to percent of smaples with feature
+        Calculate the distribution of missing features with respect to percent of smaples with 
+        feature
 
         Args:
             feature_vector_matrix (np.ndarray): the selected feature matrix
-            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+            interactive_plot (bool, optional): if True, interactive plots are made. 
+                Defaults to False.
 
         Returns:
             result: dictionary storing the result of this QCQA operation
@@ -963,13 +962,16 @@ class FeatureTable:
 
     def missing_feature_distribution(self, intensity_cutoff=0):
         """
-        Count the number of missing features or featuers below the specified intensity cutoff per features
+        Count the number of missing features or featuers below the specified intensity cutoff per 
+        features
 
         Args:
             feature_vector_matrix (np.ndarray): the selected feature matrix
             acquisition_names (list[str]): list of acquisition names
-            intensity_cutoff (int, optional): values below this intesnity are considered missing. Defaults to 0.
-            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+            intensity_cutoff (int, optional): values below this intesnity are considered missing. 
+                Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. 
+                Defaults to False.
 
         Returns:
             result: dictionary storing the result of this QCQA operation
@@ -1009,8 +1011,10 @@ class FeatureTable:
         Args:
             feature_vector_matrix (np.ndarray): the selected feature matrix
             acquisition_names (list[str]): list of acquisition names
-            intensity_cutoff (int, optional): values with greater intensiy are considered. Defaults to 0.
-            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+            intensity_cutoff (int, optional): values with greater intensiy are considered. 
+                Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. 
+                Defaults to False.
 
         Returns:
             result: dictionary storing the result of this QCQA operation
@@ -1049,7 +1053,8 @@ class FeatureTable:
         Args:
             feature_vector_matrix (np.ndarray): the selected feature matrix
             acquisition_names (list[str]): list of acquisition names
-            intensity_cutoff (int, optional): values above this intensity are considered. Defaults to 0.
+            intensity_cutoff (int, optional): values above this intensity are considered. 
+                Defaults to 0.
             interactive_plot (bool, optional): if True, plots are interactive. Defaults to False.
 
         Returns:
@@ -1087,8 +1092,10 @@ class FeatureTable:
         Args:
             feature_vector_matrix (np.ndarray): the selected feature matrix
             acquisition_names (list[str]): list of acquisition names
-            intensity_cutoff (int, optional): values below this intensity are considered missing. Defaults to 0.
-            interactive_plot (bool, optional): if True, interactive plots are made. Defaults to False.
+            intensity_cutoff (int, optional): values below this intensity are considered missing. 
+                Defaults to 0.
+            interactive_plot (bool, optional): if True, interactive plots are made. 
+                Defaults to False.
 
         Returns:
             result: dictionary storing the result of this QCQA operation
@@ -1232,7 +1239,8 @@ class FeatureTable:
         Args:
             qaqc_filter (dict): a dict detailing the qaqc filter
             drop_others (bool, optional): if true, reverse the logic of the drop. Defaults to False.
-            params (dict, optional): the params from main, needed for figure_params. Defaults to None.
+            params (dict, optional): the params from main, needed for figure_params. 
+                Defaults to None.
         """
         to_drop = []
         max_value, min_value = np.inf, -np.inf
