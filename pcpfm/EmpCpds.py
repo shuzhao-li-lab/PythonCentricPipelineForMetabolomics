@@ -64,6 +64,7 @@ class EmpCpds:
                             ms2_spectra[spectrum["precursor_ion_id"]] = [MS2Spectrum.from_embedding(spectrum)]
                         else:
                             ms2_spectra[spectrum["precursor_ion_id"]].append(MS2Spectrum.from_embedding(spectrum))
+            print(len(ms2_spectra))
             self.__ms2_spectra = ms2_spectra
         return self.__ms2_spectra
 
