@@ -1,0 +1,2 @@
+sequence_path, project_name, filter, ms2_dir
+/Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/workflows/nextflow/bowen_cell_wo_QC.csv, ansone_2021, /Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/filters/rpneg.json, /Users/mitchjo/Datasets/ForPCPFM/AcquireX_Datasets/Plasma_5_min_RPneg/Pooled
