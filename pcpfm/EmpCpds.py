@@ -1,5 +1,5 @@
 '''
-This module is concerned with the construction of EmpCpds and their annotation
+This module is concerned with the construction of EmpCpds and their annotation.
 '''
 
 import json
@@ -26,12 +26,13 @@ from .utils import (
 )
 
 class EmpCpds:
-    """_summary_
+    """
+    This object is largely a warpper around the dict_empcpds returned from Khipu.
     """
     def __init__(self, dict_empcpds, experiment, moniker):
         """
-        the empCpds object is a wrapper around dict_empcpds that will associate the dict_empcpds with a moniker and
-        experiment object.
+        the empCpds object is a wrapper around dict_empcpds that will associate the dict_empcpds
+        with a moniker and experiment object.
 
         :param dict_empcpds: dictionary of empCpds
         :param experiment: experiment object for these empdpds
@@ -44,16 +45,18 @@ class EmpCpds:
         self._feature_id_to_khipu_id = None
         self._khipu_id_to_feature_id = None
 
+        # these are lazily evaluated
         self.__mz_trees = {}
         self.__rt_trees = {}
         self.__ms2_spectra = None
 
     @property
     def ms2_spectra(self):
-        """_summary_
+        """
+        This is a lazily evaluated data store for MS2 spectra
 
         Returns:
-            _type_: _description_
+            dict: ms2_id to ms2_spetra dictionary.
         """        
         if self.__ms2_spectra is None:
             ms2_spectra = {}
@@ -64,7 +67,6 @@ class EmpCpds:
                             ms2_spectra[spectrum["precursor_ion_id"]] = [MS2Spectrum.from_embedding(spectrum)]
                         else:
                             ms2_spectra[spectrum["precursor_ion_id"]].append(MS2Spectrum.from_embedding(spectrum))
-            print(len(ms2_spectra))
             self.__ms2_spectra = ms2_spectra
         return self.__ms2_spectra
 
