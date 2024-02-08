@@ -106,6 +106,8 @@ class Main():
         parser.add_argument('--add_singletons')
         parser.add_argument('--extra_asari', default=None)
         parser.add_argument('--targets')
+        parser.add_argument('--annot_rt_tolerance')
+        parser.add_argument('--annot_mz_tolerance')
 
         args = parser.parse_args()
         if args.parameters:
