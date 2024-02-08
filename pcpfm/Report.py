@@ -1,5 +1,8 @@
-"""_summary_
+"""
+This module implements the report object which is a wrapper around an fpdf object. 
 
+The reports are meant to be a high-level overview of an experiment, the feature tables,
+empcpds, etc and summarize some of the qaqc results.
 """
 
 import os
@@ -133,25 +136,27 @@ class Report():
         """
         This function iterates through valid sections and generates the
         report element each section specifies.
+
+        The way this works is that the section field should have a value whose name is the same
+        as a method of the object, it finds and executes that method. As a result, every method
+        must have the same call signature which results in some undesirable warnings from the IDE
+        but is otherwise fine. This can be fixed in the future using something like the inspect
+        module to see what the function requires and only pass that data.
         """
-
-
         for section in self.style:
-            #try:
-            method = getattr(self, section["section"])
-            if method:
-                if "table" in section:
-                    if section["table"] + "_cleaned" in self.experiment.feature_tables:
-                        section["table"] = section["table"] + "_cleaned"
-                        method(section)
+            try:
+                method = getattr(self, section["section"])
+                if method:
+                    if "table" in section:
+                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                            section["table"] = section["table"] + "_cleaned"
+                            method(section)
+                        else:
+                            method(section)
                     else:
                         method(section)
-                else:
-                    method(section)
-            #except:
-            #    print("Unable to processes section: \n", section)
-
-
+            except:
+                print("Unable to processes section: \n", section)
 
     def __reset_font(self):
         """
@@ -233,10 +238,10 @@ class Report():
                 print(section_desc)
 
     def experiment_summary(self, section_desc):
-        """_summary_
+        """
+        This will list the empcpds and feature tables in the experiment.
 
-        Args:
-            section_desc (_type_): _description_
+        Requires: None
         """ 
         self.__section_head("Experiment Summary")
         if 'text' in section_desc:
@@ -251,10 +256,13 @@ class Report():
 
 
     def annotation_summary(self, section_desc):
-        """_summary_
+        """
+        This summarizes the annotations for each empcpd in the experiment.
+
+        This counts the number of annotations per empcpd at each level.
 
         Args:
-            section_desc (_type_): _description_
+            Requires: None
         """     
         self.__section_head("Annotation Summary")
         if 'text' in section_desc:
