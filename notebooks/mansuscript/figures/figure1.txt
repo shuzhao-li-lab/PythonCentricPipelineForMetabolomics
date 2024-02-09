@@ -1,2 +1,0 @@
-A) was made manually using biorender
-B) this emprical compound was modified from an empirical compound generated from dataset _____, _____, lines ____ to ___. 
