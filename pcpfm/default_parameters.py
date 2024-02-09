@@ -1,4 +1,7 @@
-"""_summary_
+"""
+Default parameters for processing
+
+This needs to be cleaned up.
 """
 
 import os
@@ -25,7 +28,7 @@ PARAMETERS = {
     "moniker": "default",
     "multicores": 4,
     "conversion_command": ['$(which mono)', 
-                           '/Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/ThermoRawFileConverter/ThermoRawFileParser.exe', 
+                           '$BUILTIN_CONVERTER', 
                            '-f=1', 
                            '-i', 
                            '$RAW_PATH', 
@@ -105,7 +108,7 @@ for v in PARAMETERS['targets']:
     new_target_files.append(os.path.join(this_abs_dir, v))
 PARAMETERS['targets'] = new_target_files
 
-if PARAMETERS["conversion_command"][1] == '/ThermoRawFileParser/ThermoRawFileParser.exe':
+if PARAMETERS["conversion_command"][1] == '$BUILTIN_CONVERTER':
     path = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
     PARAMETERS["conversion_command"][1] = path
 
