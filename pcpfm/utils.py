@@ -1,4 +1,5 @@
-"""_summary_
+"""
+Misc helper functions.
 
 """
 import os

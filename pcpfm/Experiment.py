@@ -135,12 +135,13 @@ class Experiment(core.Experiment):
         This requires a name for the experiment, the directory to which
         to write intermediates and optionally the ionization mode.
 
-        :param experiment_name: a moniker for the experiment
-        :param experiment_directory: where to store the results
-        :param ionization_mode: the ionization mode of the acquisitions
-            can be 'pos', 'neg', or None for auto-detection.
+        Args:
+            experiment_name (str): a moniker for the experiment
+            experiment_directory (str): if true, return the object else its path. Defaults to False.
+            ionization_mode (str): the ionization mode of the acquisitions can be 'pos', 'neg', or None for auto-detection.
 
-        :return: experiment object
+        Returns:
+            experiment object
         """
         to_create = [os.path.abspath(experiment_directory)]
         for subdir in Experiment.subdirectories.values():
@@ -190,8 +191,11 @@ class Experiment(core.Experiment):
         """
         Reconstitute the experiment object from a saved JSON file representing the object
 
-        :param experiment_json_filepath: path to the JSON file
-        :returns: an experiment object
+        Args:
+            experiment_json_filepath (str): path to the JSON file
+        
+        Returns:
+            an experiment object
 
         """
         with open(experiment_json_filepath, encoding="utf-8") as json_filehandle:
@@ -243,7 +247,8 @@ class Experiment(core.Experiment):
         This returns all acquisitions in the experiment that have MS2.
         Lazily evaluated.
 
-        :return: list of acquisitions with MS2
+        Returns:
+            list of acquisitions with MS2
         """
         if self.__ms2_acquisitions is None:
             self.__ms2_acquisitions = [acq for acq in self.acquisitions if acq.has_ms2]
@@ -255,7 +260,8 @@ class Experiment(core.Experiment):
         This returns the name of all acquisitions in the experiment
         Lazily evaluated.
 
-        :return: names of all samples in the experiment
+        Returns:
+            names of all samples in the experiment
         """
         if self.__acq_names is None:
             self.__acq_names = [acq.name for acq in self.acquisitions]
@@ -268,7 +274,8 @@ class Experiment(core.Experiment):
         of the experiment's acquisitions.
         Lazily evaluated.
 
-        :return: the ionization mode 'pos' or 'neg'
+        Returns:
+            the ionization mode 'pos' or 'neg'
         """
         ion_modes = []
         if self.__ionization_mode is None:
@@ -368,9 +375,11 @@ class Experiment(core.Experiment):
         there are no duplicates and then links or copies the acquisition, currently only as a 
         .raw file, to the experiment directory
 
-        :param acquisition: an Acquistiion object
-        :param mode: how to move acquisitions into the experiment, default "link", can be "copy"
-        :param method_field: this is the field to check for the method name, used to shortcircuit 
+        Args:
+
+        acquisition (object): an Acquistiion object
+        mode (str): how to move acquisitions into the experiment, default "link", can be "copy"
+        method_field (str): this is the field to check for the method name, used to shortcircuit 
             MS2 determination
         """
         if os.path.exists(acquisition.source_filepath):
@@ -425,8 +434,8 @@ class Experiment(core.Experiment):
         desried empcpd and experiment to the directory. 
 
         Args:
-            empCpd_moniker (_type_): _description_
-            table_moniker (_type_): _description_
+            empCpd_moniker (str): moniker of empcpd to use
+            table_moniker (str): moniker of table to use
         """
         feature_table_path = os.path.join(self.output_subdirectory, "feature_table.tsv")
         feature_table = self.retrieve_feature_table(table_moniker, True)
@@ -449,7 +458,9 @@ class Experiment(core.Experiment):
         """
         Convert all raw files to mzML
 
-        :param conversion_command: This specifies the command to call
+        Args
+
+        conversion_command (str or list): This specifies the command to call
             to perform the conversion. Can be list or space-delimited
             string. Must contain $RAW_PATH and $OUT_PATH where the
             input and output file names will go.
@@ -498,8 +509,10 @@ class Experiment(core.Experiment):
         Find the set of acquisitions that pass the provided filter and return either the 
         acquisition object or the specified field of each passing sample
 
-        :param filter: a filter dictionary
-        :param return_field: option, defaul None, if provided and valid
+        Args:
+
+        filter (dict): a filter dictionary
+        return_field (str, optional): if provided and valid
             the field specified is return per matching acquisition.
 
         :return: list of matching acquisitions or the return_field value of the acquisitions
@@ -528,16 +541,18 @@ class Experiment(core.Experiment):
         """
         For a given sequence file, create the experiment object, and add all acquisitions
 
-        :param experiment_directory: path to store experiment and intermediates
-        :param csv_filepath: filepath to sequence CSV
-        :param ionization: default None, can be 'pos' or 'neg'. The ionization mode of
-            the experiment. If None, it will be determined automatically
-        :param filter: a filter dictionary, only matching entries are included
-        :param name_field: the column from which to extract the acquisition name
-        :param path_field: the column from which to extract the acquisition filepath
-        :param sample_skip_list: path to a txt file with sample names to exclude
+        Args:
+            experiment_directory (str): path to store experiment and intermediates
+            csv_filepath (str): filepath to sequence CSV
+            ionization (str, optional): default None, can be 'pos' or 'neg'. The ionization mode of
+                the experiment. If None, it will be determined automatically
+            filter (dict, optional): a filter dictionary, only matching entries are included
+            name_field (str, optional): the column from which to extract the acquisition name
+            path_field (str, optional): the column from which to extract the acquisition filepath
+            sample_skip_list (str, optional): path to a txt file with sample names to exclude
 
-        :return: experiment object
+        Returns:
+            experiment object
         """
         acq_constructor = Acquisition.Acquisition.create_acquisition
         sample_skip_list = set()
@@ -601,12 +616,16 @@ class Experiment(core.Experiment):
         markers, text, etc. used in figure generation. This allows for
         consistency across runs as the mapping is stored in the object.
 
-        :param field: field for which to generate the mapping
-        :param cos_type: 'color', 'marker', or 'text'
-        :param seed: used for shuffling, by setting this value, the
+        Args:
+
+
+        field (str, optional): field for which to generate the mapping
+        cos_type (str, optional): 'color', 'marker', or 'text'
+        seed (int, optional): used for shuffling, by setting this value, the
             same exact mapping can be generated each time.
 
-        :return: the mapping of fields to cosmetic types.
+        Returns:
+            dict: the mapping of fields to cosmetic types.
         """
 
         cosmetic_rules = {
@@ -712,7 +731,9 @@ class Experiment(core.Experiment):
         experiment. The details of the command to be ran is defined by
         asari_cmd.
 
-        :param asari_cmd: can be string or space delimited list, must
+        Args:
+
+        asari_cmd (str or list): can be string or space delimited list, must
             contain the fields $IONIZATION_MODE, $CONVERTED_SUBDIR, and
             $ASARI_SUBDIR which will be populated by this function.
 
@@ -720,6 +741,7 @@ class Experiment(core.Experiment):
             $ASARI_SUBDIR is where the results will be output
             $IONIZATION_MODE is the ionization mode of the experiment
 
+        force (bool): if true, rerun asari if previously ran
         """
 
         if (

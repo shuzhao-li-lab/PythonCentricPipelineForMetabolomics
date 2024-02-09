@@ -69,7 +69,7 @@ class MS2Spectrum(core.Spectrum):
         self.annotations = [] if annotations is None else annotations
         self.compound_name = compound_name
         self.source = source
-    
+
     @property
     def prec_mz(self):
         """
@@ -78,7 +78,7 @@ class MS2Spectrum(core.Spectrum):
 
         Returns:
             float: precursor ion mz
-        """        
+        """
         return self.precursor_ion_mz
 
     @staticmethod
@@ -90,7 +90,7 @@ class MS2Spectrum(core.Spectrum):
             embedding (dict): the serialized version of the MSnSpectrum.
 
         Returns:
-            object: the MSnSpectrum that was serialized
+            MS2Spectrum: the MSnSpectrum that was serialized
         """
         return MS2Spectrum(
             spec_id=None,
