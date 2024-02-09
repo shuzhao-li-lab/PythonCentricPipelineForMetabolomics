@@ -15,6 +15,9 @@ The Python-Centric Pipeline for Metabolomics is designed to take raw LC-MS metab
 Asari (https://www.nature.com/articles/s41467-023-39889-1) supports a visual dashboard to explore and inspect individual features.
 We are working to add supports of GC and other data types.
 
+Note that to replicate the presented results you will need to run the `download extras` command. See below.
+
+
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
