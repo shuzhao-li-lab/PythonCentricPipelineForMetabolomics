@@ -1,0 +1,5 @@
+Panel A, B and C was made using excel and the data from bowen 2023 workflows followed by the bowen_2023_analysis
+
+Panel D is made form hand using data from the compare_pcpfm_metaboanalystR.ipynb results. MetaboanalystR was ran using the provided script. 
+
+Panel E and F from the Ansone notebook

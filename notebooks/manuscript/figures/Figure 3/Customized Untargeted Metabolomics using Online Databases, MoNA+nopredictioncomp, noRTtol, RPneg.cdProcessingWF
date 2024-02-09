@@ -1,0 +1,627 @@
+﻿<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<Workflow Name="Customized Untargeted Metabolomics using Online Databases, MoNA+nopredictioncomp, noRTtol, RPneg" Description="Untargeted Metabolomics workflow: Find and identify the differences between samples. &#xA;- Performs retention time alignment, unknown compound detection, and compound grouping across all samples. Predicts elemental compositions for all compounds,  fills gaps across all samples, and hides chemical background (using Blank samples).  Identifies compounds using mzCloud (ddMS2) and ChemSpider (formula or exact mass).  Applies mzLogic algorithm to rank order ChemSpider results. Maps compounds to biological pathways using Metabolika. Applies QC-based batch normalization if QC samples are available. Calculates differential analysis (t-test or ANOVA), determines p-values, adjusted p-values, ratios, fold change, CV, etc.). Generate Molecular Network to visualize compounds that might be related.&#xA;- set search mzVault for newlib_HILICpos internal library&#xA;- set Peak rating to 0 and number of files to 0" CreationDate="1/1/0001 12:00:00 AM" CreatedFromUser="thapam" WaitForEarlierJobs="False" ContinueJob="False" Version="10" WorkflowType="Processing" TemplateName="Customized Untargeted Metabolomics using Online Databases, MoNA+nopredictioncomp, noRTtol, RPneg">
+	<WorkflowTree>
+		<WorkflowNode ProcessingNodeNumber="6" ProcessingNodeName="SpectrumFilesNode" FriendlyName="Input Files" Description="Selects the spectrum file(s) to be processed." MainVersion="1" MinorVersion="4" Guid="848160ba-2f76-46ca-a281-f7bf66990a5b" Category="1. Input / Output" ParentProcessingNodeNumber="-1" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+				<ProcessingNodeInterface Kind="Functional" Name="IStartProcessing" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="InMemoryAndFileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/SpectrumFiles">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="SpectrumFileNames" FriendlyName="File Name(s)" Category="Input Data" IsAdvanced="False" IntendedPurpose="SpectrumContainer" PurposeDetails="" IsValueSet="False" IsHidden="True" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="594.812622070313" Y="55" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="33" ProcessingNodeName="SpectrumSelectorNode" FriendlyName="Select Spectra" Description="Selects and retrieves the spectra for further processing." MainVersion="1" MinorVersion="27" Guid="238d2f70-3dd9-4e2b-a77d-f24933797cf6" Category="2. Spectrum Processing" ParentProcessingNodeNumber="6" Comment="" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Data Input" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/SpectrumFiles">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/CentroidData</DataTypeAttribute>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/ProfileData</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<NodeGroupConstraints>
+				<NodeGroupConstraint Name="Spectrum Extraction" Constraint="NotTogetherWithGroup" />
+			</NodeGroupConstraints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="PrecursorSelectionStrategy" FriendlyName="Precursor Selection" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="PrecursorSelectionStrategy" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Use MS(n - 1) Precursor">Use MS(n - 1) Precursor</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SelectedPeakPickingAlgorithm" FriendlyName="Peak Picking Algorithm" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="PD">PD</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseCaching" FriendlyName="Use Caching" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseIsotopePatternInPrecursorPeakReevaluation" FriendlyName="Use Isotope Pattern in Precursor Reevaluation" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ProvideProfilePoints" FriendlyName="Provide Profile Spectra" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Automatic">Automatic</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoreChromatograms" FriendlyName="Store Chromatograms" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SimulationAlgorithm" FriendlyName="Simulation Algorithm" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="Averagine">Averagine</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UsePatternCache" FriendlyName="Use Pattern Cache" Category="5. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="LowerRetentionTimeLimit" FriendlyName="Lower RT Limit" Category="1. Spectrum Properties Filter" IsAdvanced="False" IntendedPurpose="LowestRetentionTimeToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UpperRetentionTimeLimit" FriendlyName="Upper RT Limit" Category="1. Spectrum Properties Filter" IsAdvanced="False" IntendedPurpose="HighestRetentionTimeToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FirstScan" FriendlyName="First Scan" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="FirstScanToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="LastScan" FriendlyName="Last Scan" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="LastScanToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RemoveSpecifiedScans" FriendlyName="Ignore Specified Scans" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="LowestChargeState" FriendlyName="Lowest Charge State" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="MinimumPrecursorCharge" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="HighestChargeState" FriendlyName="Highest Charge State" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="MaximumPrecursorCharge" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinimumPrecursorMass" FriendlyName="Min. Precursor Mass" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="MinimumPrecursorMassToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0 Da">0 Da</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaximumPrecursorMass" FriendlyName="Max. Precursor Mass" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="MaximumPrecursorMassToProcess" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5000 Da">5000 Da</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="TotalIntensityThreshold" FriendlyName="Total Intensity Threshold" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinimumPeakCount" FriendlyName="Minimum Peak Count" Category="1. Spectrum Properties Filter" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1">1</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MassAnalyzerFilter" FriendlyName="Mass Analyzer" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue="Any">Any</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MSOrderFilter" FriendlyName="MS Order" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Any">Any</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ActivationTypeFilter" FriendlyName="Activation Type" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue="Any">Any</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinimumCollisionEnergy" FriendlyName="Min. Collision Energy" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaximumCollisionEnergy" FriendlyName="Max. Collision Energy" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1000">1000</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ScanTypeFilter" FriendlyName="Scan Type" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Any">Any</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PolarityFilter" FriendlyName="Polarity Mode" Category="2. Scan Event Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Is -">Is -</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MassRangeFilter" FriendlyName="MS1 Mass Range" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="CompensationVoltageFilter" FriendlyName="FAIMS CV" Category="2. Scan Event Filters" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SignalToNoiseThreshold" FriendlyName="S/N Threshold (FT-only)" Category="3. Peak Filters" IsAdvanced="True" IntendedPurpose="SignalToNoiseThreshold" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1.5">1.5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedChargeReplacements" FriendlyName="Unrecognized Charge Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1">1</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedMassAnalyzerReplacement" FriendlyName="Unrecognized Mass Analyzer Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="ITMS">ITMS</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedMsOrderReplacement" FriendlyName="Unrecognized MS Order Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="MS2">MS2</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedActivationTypeReplacement" FriendlyName="Unrecognized Activation Type Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="CID">CID</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedPolarityTypeReplacement" FriendlyName="Unrecognized Polarity Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="+">+</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedMSResolutionReplacement" FriendlyName="Unrecognized MS Resolution@200 Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="60000">60000</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UnrecognizedMSnResolutionReplacement" FriendlyName="Unrecognized MSn Resolution@200 Replacements" Category="4. Replacements for Unrecognized Properties" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="30000">30000</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PrecursorClippingRangeBefore" FriendlyName="Precursor Clipping Range Before" Category="5. Precursor Pattern Extraction" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="2.5 Da">2.5 Da</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PrecursorClippingRangeAfter" FriendlyName="Precursor Clipping Range After" Category="5. Precursor Pattern Extraction" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="True" IsConfig="False" DisplayValue="5.5 Da">5.5 Da</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="595.812622070313" Y="155.926605224609" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="46" ProcessingNodeName="ChromAlignNode" FriendlyName="Align Retention Times (ChromAlign)" Description="Align retention times of multiple LC/MS data files using the ChromAlign algorithm." MainVersion="0" MinorVersion="1" Guid="6c1b187a-a44b-4cf8-b327-184678b32d4b" Category="2. Spectrum Processing" ParentProcessingNodeNumber="33" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Single" ConnectionRequirement="RequiredAtDesignTime" Mode="Manual" DisplayName="Incoming Spectra" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="ReferenceFileName" FriendlyName="Reference File" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="594.812622070313" Y="256.853210449219" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="32" ProcessingNodeName="GapFillingNode" FriendlyName="Fill Gaps" Description="Fills the gaps for missing peaks in detected compounds." MainVersion="1" MinorVersion="3" Guid="bf7dcfa2-6f6d-48ca-96cf-1ca24f719353" Category="5. Compound Detection" ParentProcessingNodeNumber="31;46" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/UnknownCompounds</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Single" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/GapsFilled</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtProcessingTime" Mode="OnlyImplicitConnectionToNearestParents" DisplayName="Incoming Spectra" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="MassTolerance" FriendlyName="Mass Tolerance" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5 ppm">5 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SNThreshold" FriendlyName="S/N Threshold" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1.5">1.5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseRealPeakDetection" FriendlyName="Use Real Peak Detection" Category="1. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="123.5" Y="559.633056640625" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="45" ProcessingNodeName="QCCorrectionNodeSERRF" FriendlyName="Apply SERRF QC Correction" Description="Corrects the area of detected compounds by QC samples via the SERRF algorithm (Fan et al., 2019)." MainVersion="1" MinorVersion="1" Guid="08217467-f0cd-42bb-9589-9512b96b9d77" Category="6. Peak Area Refinement" ParentProcessingNodeNumber="32" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Single" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/QCCorrected</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Single" ConnectionRequirement="RequiredAtDesignTime" Mode="Manual" DisplayName="Incoming Gap Filled Compound Areas" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/GapsFilled</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="RequiredQcPercentage" FriendlyName="Min. QC Coverage [%]" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="50">50</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxQcRSDBefore" FriendlyName="Max. QC Area RSD [%]" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="30">30</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxQcRSDAfter" FriendlyName="Max. Corrected QC Area RSD [%]" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="25">25</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxNumberFilesBetweenQCFiles" FriendlyName="Max. # Files Between QC Files" Category="1. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="15">15</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="NumberOfTrees" FriendlyName="# Trees" Category="2. Random Forest Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="200">200</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="CorrectBlankFiles" FriendlyName="Correct Blank Files" Category="1. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ExpectedNumberOfBatches" FriendlyName="# Batches" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="2">2</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="InterpolateQcAreas" FriendlyName="Interpolate Gap-filled QC Areas" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="123.5" Y="660.559631347656" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="28" ProcessingNodeName="BackgroundAnnotationNode" FriendlyName="Mark Background Compounds" Description="Annotates and filters background compounds." MainVersion="1" MinorVersion="1" Guid="05a24e14-95db-490b-90c6-020d6d3e07f4" Category="6. Peak Area Refinement" ParentProcessingNodeNumber="45" Comment="" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Single" ConnectionRequirement="RequiredAtDesignTime" Mode="Manual" DisplayName="Incoming Compound Areas" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Single" ConnectionRequirement="Optional" Mode="Manual" DisplayName="Outgoing Compound Areas" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/BackgroundAnnotated</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="MaxSampleToBlankRatio" FriendlyName="Max. Sample/Blank" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxBlankToSampleRatio" FriendlyName="Max. Blank/Sample" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="HideBackground" FriendlyName="Hide Background" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="123.5" Y="761.486267089844" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="50" ProcessingNodeName="UnknownDetectorNodePycoPrism" FriendlyName="Detect Compounds" Description="Detects unknown compounds." MainVersion="1" MinorVersion="0" Guid="05d9a859-1a59-4c0e-b0c9-76988ed893bb" Category="5. Compound Detection" ParentProcessingNodeNumber="46" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Single" ConnectionRequirement="RequiredAtDesignTime" Mode="Manual" DisplayName="Incoming Spectra" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/UnknownCompoundInstances">
+							<DataTypeAttributes />
+						</DataContract>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/UnknownCompoundIonInstances">
+							<DataTypeAttributes />
+						</DataContract>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ChromatogramPeaks">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/PeakConsolidationProvider">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<NodeGroupConstraints>
+				<NodeGroupConstraint Name="PPD Nodes" Constraint="NotTogetherWithGroup" />
+				<NodeGroupConstraint Name="Pyco Nodes" Constraint="None" />
+				<NodeGroupConstraint Name="Unknown Detector Nodes" Constraint="NotTogetherWithGroup" />
+				<NodeGroupConstraint Name="Unknown Detector Nodes" Constraint="None" />
+			</NodeGroupConstraints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="PycoSnThreshold" FriendlyName="Chromatographic S/N Threshold" Category="3. Peak Detection" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/SNThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1.5">1.5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PycoRemoveBaseline" FriendlyName="Remove Baseline" Category="3. Peak Detection" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/RemoveBaseline" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PycoGapRatioThreshold" FriendlyName="Gap Ratio Threshold" Category="3. Peak Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/GapRatioThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.35">0.35</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PycoWidthThreshold" FriendlyName="Max. Peak Width [min]" Category="3. Peak Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/WidthThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1">1</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PycoMinRelativeValleyDepthForResolutionThreshold" FriendlyName="Min. Relative Valley Depth" Category="3. Peak Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/MinRelativeValleyDepthThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.1">0.1</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ElementsWithIsotopesInUse" FriendlyName="Group Isotopes for" Category="4. Isotope Pattern Detection" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Br; Cl">Br; Cl</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UsePqfsForIsotopeGrouping" FriendlyName="Use Peak Quality for Isotope Grouping" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RemoveFeaturesWithOnlyBadQualityPeaks" FriendlyName="Filter out Features with Bad Peaks Only" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PeakQualityZigZagIndexThreshold" FriendlyName="Zig-Zag Index Threshold" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="MCEConfigurationParameterDetails/PeakQualityZigZagIndexThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.2">0.2</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PeakQualityJaggednessThreshold" FriendlyName="Jaggedness Threshold" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="MCEConfigurationParameterDetails/PeakQualityJaggednessThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.4">0.4</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PeakQualityModalityThreshold" FriendlyName="Modality Threshold" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="MCEConfigurationParameterDetails/PeakQualityModalityThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.9">0.9</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RemoveFalsePositiveIsotopes" FriendlyName="Remove Potentially False Positive Isotopes" Category="4. Isotope Pattern Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="AbstractIons" FriendlyName="Ions" Category="5. Compound Detection" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="[2M+ACN+H]+1; [2M+ACN+Na]+1; [2M+FA-H]-1; [2M+H]+1; [2M+K]+1; [2M+Na]+1; [2M+NH4]+1; [2M-H]-1; [2M-H+HAc]-1; [M+2H]+2; [M+3H]+3; [M+ACN+2H]+2; [M+ACN+H]+1; [M+ACN+Na]+1; [M+Cl]-1; [M+DMSO+H]+1; [M+FA-H]-1; [M+H]+1; [M+H+K]+2; [M+H+MeOH]+1; [M+H+Na]+2; [M+H+NH4]+2; [M+H-H2O]+1; [M+H-NH3]+1; [M+K]+1; [M+Na]+1; [M+NH4]+1; [M-2H]-2; [M-2H+K]-1; [M-H]-1; [M-H+HAc]-1; [M-H+TFA]-1; [M-H-H2O]-1">&lt;AbstractIons Version=&quot;1&quot;&gt;
+  &lt;AbstractIon ID=&quot;15&quot; ComponentsString=&quot;2M+ACN+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;16&quot; ComponentsString=&quot;2M+ACN+Na&quot; /&gt;
+  &lt;AbstractIon ID=&quot;31&quot; ComponentsString=&quot;2M+FA-H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;7&quot; ComponentsString=&quot;2M+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;12&quot; ComponentsString=&quot;2M+K&quot; /&gt;
+  &lt;AbstractIon ID=&quot;13&quot; ComponentsString=&quot;2M+Na&quot; /&gt;
+  &lt;AbstractIon ID=&quot;14&quot; ComponentsString=&quot;2M+NH4&quot; /&gt;
+  &lt;AbstractIon ID=&quot;33&quot; ComponentsString=&quot;2M-H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;32&quot; ComponentsString=&quot;2M-H+HAc&quot; /&gt;
+  &lt;AbstractIon ID=&quot;17&quot; ComponentsString=&quot;M+2H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;22&quot; ComponentsString=&quot;M+3H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;18&quot; ComponentsString=&quot;M+ACN+2H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;8&quot; ComponentsString=&quot;M+ACN+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;11&quot; ComponentsString=&quot;M+ACN+Na&quot; /&gt;
+  &lt;AbstractIon ID=&quot;28&quot; ComponentsString=&quot;M+Cl&quot; /&gt;
+  &lt;AbstractIon ID=&quot;10&quot; ComponentsString=&quot;M+DMSO+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;25&quot; ComponentsString=&quot;M+FA-H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;1&quot; ComponentsString=&quot;M+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;19&quot; ComponentsString=&quot;M+H+K&quot; /&gt;
+  &lt;AbstractIon ID=&quot;9&quot; ComponentsString=&quot;M+H+MeOH&quot; /&gt;
+  &lt;AbstractIon ID=&quot;20&quot; ComponentsString=&quot;M+H+Na&quot; /&gt;
+  &lt;AbstractIon ID=&quot;21&quot; ComponentsString=&quot;M+H+NH4&quot; /&gt;
+  &lt;AbstractIon ID=&quot;3&quot; ComponentsString=&quot;M+H-H2O&quot; /&gt;
+  &lt;AbstractIon ID=&quot;6&quot; ComponentsString=&quot;M+H-NH3&quot; /&gt;
+  &lt;AbstractIon ID=&quot;4&quot; ComponentsString=&quot;M+K&quot; /&gt;
+  &lt;AbstractIon ID=&quot;2&quot; ComponentsString=&quot;M+Na&quot; /&gt;
+  &lt;AbstractIon ID=&quot;5&quot; ComponentsString=&quot;M+NH4&quot; /&gt;
+  &lt;AbstractIon ID=&quot;29&quot; ComponentsString=&quot;M-2H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;30&quot; ComponentsString=&quot;M-2H+K&quot; /&gt;
+  &lt;AbstractIon ID=&quot;23&quot; ComponentsString=&quot;M-H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;26&quot; ComponentsString=&quot;M-H+HAc&quot; /&gt;
+  &lt;AbstractIon ID=&quot;27&quot; ComponentsString=&quot;M-H+TFA&quot; /&gt;
+  &lt;AbstractIon ID=&quot;24&quot; ComponentsString=&quot;M-H-H2O&quot; /&gt;
+&lt;/AbstractIons&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="BaseAbstractIons" FriendlyName="Base Ions" Category="5. Compound Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="[M+H]+1; [M-H]-1">&lt;AbstractIons Version=&quot;1&quot;&gt;
+  &lt;AbstractIon ID=&quot;1&quot; ComponentsString=&quot;M+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;23&quot; ComponentsString=&quot;M-H&quot; /&gt;
+&lt;/AbstractIons&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RemoveSinglets" FriendlyName="Remove Singlets" Category="5. Compound Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MassTolerance" FriendlyName="Mass Tolerance [ppm]" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="MassTolerance" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5 ppm">5 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinPeakIntensity" FriendlyName="Min. Peak Intensity" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="MinPeakIntensity" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10000">10000</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinimumNumberOfScansPerPeak" FriendlyName="Min. # Scans per Peak" Category="1. General Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="PycoPeakDetectorParameterDetails/NumberPointsThreshold" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseReferenceIsotopeOnly" FriendlyName="Use Most Intense Isotope Only" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="NumberOfGapsAllowedToInterpolate" FriendlyName="Max. Number of Gaps to Correct" Category="2. Trace Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="2">2</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="NumberOfRequiredAdjacentValuesToInterpolate" FriendlyName="Min. Number of Adjacent Non-Zeros" Category="2. Trace Detection" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="2">2</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DetectPersistentIons" FriendlyName="Detect Persistent Background Ions" Category="6. AcquireX Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="597.812622070313" Y="357.779815673828" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="31" ProcessingNodeName="UnknownCompoundConsolidatorNode" FriendlyName="Group Compounds" Description="Groups all detected compounds by molecular weight and retention time across all files." MainVersion="1" MinorVersion="6" Guid="81b7fcba-4d94-4687-b1b2-829be48081e0" Category="5. Compound Detection" ParentProcessingNodeNumber="46;50" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtProcessingTime" Mode="OnlyImplicitConnectionToNearestParents" DisplayName="Incoming Spectra" ConnectionDataHandlingType="InMemory" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MSnSpectra">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/UnknownCompoundInstances">
+							<DataTypeAttributes />
+						</DataContract>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/UnknownCompoundIonInstances">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompounds">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/UnknownCompounds</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Single" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompoundAreas">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/UnknownCompounds</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedUnknownCompounds">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="MassTolerance" FriendlyName="Mass Tolerance" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="MassTolerance" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5 ppm">5 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RTTolerance" FriendlyName="RT Tolerance [min]" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="RetentionTimeTolerance" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.5">0.5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseTraceAlignment" FriendlyName="Align Peaks" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="BestHitMS2Ions" FriendlyName="Preferred Ions" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="[M+H]+1; [M-H]-1">&lt;AbstractIons Version=&quot;1&quot;&gt;
+  &lt;AbstractIon ID=&quot;1&quot; ComponentsString=&quot;M+H&quot; /&gt;
+  &lt;AbstractIon ID=&quot;23&quot; ComponentsString=&quot;M-H&quot; /&gt;
+&lt;/AbstractIons&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="AreaIntegration" FriendlyName="Area Integration" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="AreaIntegrationParameterDetails/AreaIntegrationModel" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="All Ions">All Ions</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="AreaContribution" FriendlyName="Area Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="3">3</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="CvContribution" FriendlyName="CV Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10">10</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfFwhmContribution" FriendlyName="FWHM to Base Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfJaggednessContribution" FriendlyName="Jaggedness Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfModalityContribution" FriendlyName="Modality Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfZigZagIndexContribution" FriendlyName="Zig-Zag Index Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PeakRatingThreshold" FriendlyName="Peak Rating Threshold" Category="3. Peak Rating Filter" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="NumberOfFiles" FriendlyName="Number of Files" Category="3. Peak Rating Filter" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="593.812622070313" Y="457.706420898438" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="25" ProcessingNodeName="UnknownCompoundAnnotationAssignmentNode" FriendlyName="Assign Compound Annotations" Description="Assigns compound annotations found by annotation nodes." MainVersion="1" MinorVersion="4" Guid="e1d2d731-d012-4783-a858-57077cef45ab" Category="7. Compound Identification" ParentProcessingNodeNumber="31;51" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompounds">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/AnnotationsAssigned</DataTypeAttribute>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/UnknownCompounds</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="Outgoing Annotations" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedUnknownCompounds">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/AnnotationsAssigned</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompounds">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/UnknownCompounds</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming unknown Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedUnknownCompounds">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="OnlyImplicitConnectionToAllParentsInSameBranch" DisplayName="Incoming Annotation Proposals" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/CompoundAnnotationProposals">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="OnlyImplicitConnectionToAllParentsInSameBranch" DisplayName="Incoming Annotation Proposal Scores" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/CompoundAnnotationProposalScores">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="MassTolerance" FriendlyName="Mass Tolerance" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="MassTolerance" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5 ppm">5 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource1" FriendlyName="Data Source #1" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Predicted Compositions">Predicted Compositions</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource2" FriendlyName="Data Source #2" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="mzCloud Search">mzCloud Search</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource3" FriendlyName="Data Source #3" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="mzVault Search">mzVault Search</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource4" FriendlyName="Data Source #4" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="ChemSpider Search">ChemSpider Search</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource5" FriendlyName="Data Source #5" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource6" FriendlyName="Data Source #6" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="DataSource7" FriendlyName="Data Source #7" Category="2. Data Sources" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseMzLogicScore" FriendlyName="Use mzLogic" Category="3. Scoring Rules" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseSpectralDistance" FriendlyName="Use Spectral Distance" Category="3. Scoring Rules" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SFitMinValue" FriendlyName="SFit Threshold" Category="3. Scoring Rules" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="20">20</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SFitMaxDifference" FriendlyName="SFit Range" Category="3. Scoring Rules" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="20">20</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ClearNameColumn" FriendlyName="Clear Names" Category="4. Reprocessing" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="1301.78149414063" Y="559.633056640625" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="49" ProcessingNodeName="MolecularNetworkingNode" FriendlyName="Generate Molecular Networks" Description="Connects compounds by fragmentation spectra similarity and composition change." MainVersion="1" MinorVersion="0" Guid="922c51f0-c23d-4367-a39d-19a17dc38113" Category="9. Compound Scoring" ParentProcessingNodeNumber="25" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/CompoundSimilarityConnection">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming Annotated Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompounds">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/AnnotationsAssigned</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="UseFullSpectrumTree" FriendlyName="Use Full MSn Tree" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchMassShift" FriendlyName="Match Mass Shift" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="FIShScoringParameterPurpose/MatchMassShift" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchTransformationShifts" FriendlyName="Match Transformations" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="FIShScoringParameterPurpose/MatchTransformationShifts" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="VariateTransformationSteps" FriendlyName="Variate Transformations" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="FIShScoringParameterPurpose/VariateTransformationSteps" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SNThreshold" FriendlyName="S/N Threshold" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="3">3</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MassTolerance" FriendlyName="Mass Tolerance" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="2.5 mmu">2.5 mmu</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MinFragmentMass" FriendlyName="Min. Fragment m/z" Category="1. Spectral Similarity" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="50">50</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="TransformationsPhase1" FriendlyName="Phase I" Category="2. Transformations" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/TransformationsPhase1" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Dehydration (H2 O -&gt; ); Desaturation (H2 -&gt; ); Hydration ( -&gt; H2 O); Nitro Reduction (O2 -&gt; H2); Oxidation ( -&gt; O); Oxidative Deamination to Alcohol (H2 N -&gt; H O); Oxidative Deamination to Ketone (H3 N -&gt; O); Oxidative Debromination (Br -&gt; H O); Oxidative Dechlorination (Cl -&gt; H O); Oxidative Defluorination (F -&gt; H O); Reduction ( -&gt; H2); Reductive Debromination (Br -&gt; H); Reductive Dechlorination (Cl -&gt; H); Reductive Defluorination (F -&gt; H); Thiourea to Urea (S -&gt; O)">&lt;Transformations Version=&quot;1&quot;&gt;
+  &lt;Transformation ID=&quot;5&quot; Name=&quot;Dehydration&quot; LeavingGroup=&quot;H2 O&quot; ArrivingGroup=&quot;&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;2&quot; /&gt;
+  &lt;Transformation ID=&quot;4&quot; Name=&quot;Desaturation&quot; LeavingGroup=&quot;H2&quot; ArrivingGroup=&quot;&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;3&quot; Name=&quot;Hydration&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;H2 O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;7&quot; Name=&quot;Nitro Reduction&quot; LeavingGroup=&quot;O2&quot; ArrivingGroup=&quot;H2&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;2&quot; /&gt;
+  &lt;Transformation ID=&quot;1&quot; Name=&quot;Oxidation&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;15&quot; Name=&quot;Oxidative Deamination to Alcohol&quot; LeavingGroup=&quot;H2 N&quot; ArrivingGroup=&quot;H O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;14&quot; Name=&quot;Oxidative Deamination to Ketone&quot; LeavingGroup=&quot;H3 N&quot; ArrivingGroup=&quot;O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;11&quot; Name=&quot;Oxidative Debromination&quot; LeavingGroup=&quot;Br&quot; ArrivingGroup=&quot;H O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;13&quot; Name=&quot;Oxidative Dechlorination&quot; LeavingGroup=&quot;Cl&quot; ArrivingGroup=&quot;H O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;12&quot; Name=&quot;Oxidative Defluorination&quot; LeavingGroup=&quot;F&quot; ArrivingGroup=&quot;H O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;2&quot; Name=&quot;Reduction&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;H2&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;8&quot; Name=&quot;Reductive Debromination&quot; LeavingGroup=&quot;Br&quot; ArrivingGroup=&quot;H&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;10&quot; Name=&quot;Reductive Dechlorination&quot; LeavingGroup=&quot;Cl&quot; ArrivingGroup=&quot;H&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;9&quot; Name=&quot;Reductive Defluorination&quot; LeavingGroup=&quot;F&quot; ArrivingGroup=&quot;H&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;3&quot; /&gt;
+  &lt;Transformation ID=&quot;6&quot; Name=&quot;Thiourea to Urea&quot; LeavingGroup=&quot;S&quot; ArrivingGroup=&quot;O&quot; Phase=&quot;Phase1&quot; MaxOccurrence=&quot;1&quot; /&gt;
+&lt;/Transformations&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="TransformationsPhase2" FriendlyName="Phase II" Category="2. Transformations" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/TransformationsPhase2" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Acetylation (H -&gt; C2 H3 O); Arginine Conjugation (H O -&gt; C6 H13 N4 O2); Cysteine Conjugation 1 (H -&gt; C3 H6 N O2 S); Cysteine Conjugation 2 ( -&gt; C3 H7 N O2 S); Glucoside Conjugation (H -&gt; C6 H11 O5); Glucuronide Conjugation (H -&gt; C6 H9 O6); Glutamine Conjugation (H O -&gt; C5 H9 N2 O3); Glycine Conjugation (H O -&gt; C2 H4 N O2); GSH Conjugation (on Bromine) (Br -&gt; C10 H16 N3 O6 S); GSH Conjugation (on Chlorine) (Cl -&gt; C10 H16 N3 O6 S); GSH Conjugation (on Fluorine) (F -&gt; C10 H16 N3 O6 S); GSH Conjugation 1 ( -&gt; C10 H15 N3 O6 S); GSH Conjugation 2 ( -&gt; C10 H17 N3 O6 S); Methylation (H -&gt; C H3); Ornitine Conjugation (H O -&gt; C5 H11 N2 O2); Palmitoyl Conjugation (H -&gt; C16 H31 O); Stearyl Conjugation (H -&gt; C18 H35 O); Sulfation (H -&gt; H O3 S); Taurine Conjugation (H O -&gt; C2 H6 N O3 S)">&lt;Transformations Version=&quot;1&quot;&gt;
+  &lt;Transformation ID=&quot;16&quot; Name=&quot;Acetylation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C2 H3 O&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;29&quot; Name=&quot;Arginine Conjugation&quot; LeavingGroup=&quot;H O&quot; ArrivingGroup=&quot;C6 H13 N4 O2&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;33&quot; Name=&quot;Cysteine Conjugation 1&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C3 H6 N O2 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;34&quot; Name=&quot;Cysteine Conjugation 2&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;C3 H7 N O2 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;20&quot; Name=&quot;Glucoside Conjugation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C6 H11 O5&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;19&quot; Name=&quot;Glucuronide Conjugation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C6 H9 O6&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;27&quot; Name=&quot;Glutamine Conjugation&quot; LeavingGroup=&quot;H O&quot; ArrivingGroup=&quot;C5 H9 N2 O3&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;26&quot; Name=&quot;Glycine Conjugation&quot; LeavingGroup=&quot;H O&quot; ArrivingGroup=&quot;C2 H4 N O2&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;23&quot; Name=&quot;GSH Conjugation (on Bromine)&quot; LeavingGroup=&quot;Br&quot; ArrivingGroup=&quot;C10 H16 N3 O6 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;25&quot; Name=&quot;GSH Conjugation (on Chlorine)&quot; LeavingGroup=&quot;Cl&quot; ArrivingGroup=&quot;C10 H16 N3 O6 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;24&quot; Name=&quot;GSH Conjugation (on Fluorine)&quot; LeavingGroup=&quot;F&quot; ArrivingGroup=&quot;C10 H16 N3 O6 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;21&quot; Name=&quot;GSH Conjugation 1&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;C10 H15 N3 O6 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;22&quot; Name=&quot;GSH Conjugation 2&quot; LeavingGroup=&quot;&quot; ArrivingGroup=&quot;C10 H17 N3 O6 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;17&quot; Name=&quot;Methylation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C H3&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;28&quot; Name=&quot;Ornitine Conjugation&quot; LeavingGroup=&quot;H O&quot; ArrivingGroup=&quot;C5 H11 N2 O2&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;31&quot; Name=&quot;Palmitoyl Conjugation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C16 H31 O&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;32&quot; Name=&quot;Stearyl Conjugation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;C18 H35 O&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;18&quot; Name=&quot;Sulfation&quot; LeavingGroup=&quot;H&quot; ArrivingGroup=&quot;H O3 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+  &lt;Transformation ID=&quot;30&quot; Name=&quot;Taurine Conjugation&quot; LeavingGroup=&quot;H O&quot; ArrivingGroup=&quot;C2 H6 N O3 S&quot; Phase=&quot;Phase2&quot; MaxOccurrence=&quot;1&quot; /&gt;
+&lt;/Transformations&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="TransformationsOther" FriendlyName="Others" Category="2. Transformations" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/TransformationsOther" IsValueSet="False" IsHidden="False" IsConfig="False" DisplayValue=""></ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxNumberOfPhase2steps" FriendlyName="Max. # Phase II" Category="2. Transformations" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="1">1</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MaxNumberOfAllSteps" FriendlyName="Max. # All Steps" Category="2. Transformations" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="3">3</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FilterRequireTransformation" FriendlyName="Require Transformation" Category="3. Applied View Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/FilterRequireTransformation" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FilterRequireMSn" FriendlyName="Require MSn" Category="3. Applied View Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/FilterRequireMSn" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FilterMinMSnScore" FriendlyName="Min. MSn Score" Category="3. Applied View Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/FilterMinMSnScore" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="50">50</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FilterMinMSnCoverage" FriendlyName="Min. MSn Coverage" Category="3. Applied View Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/FilterMinMSnCoverage" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="70">70</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FilterMinMSnFragments" FriendlyName="Min. Fragments" Category="3. Applied View Filters" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="MolecularNetworksParameterDetails/FilterMinMSnFragments" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="3">3</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoringRequireTransformation" FriendlyName="Require Transformation" Category="4. Applied Thresholds" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoringRequireMSn" FriendlyName="Require MSn" Category="4. Applied Thresholds" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoringMinMSnScore" FriendlyName="Min. MSn Score" Category="4. Applied Thresholds" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="20">20</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoringMinMSnCoverage" FriendlyName="Min. MSn Coverage" Category="4. Applied Thresholds" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="20">20</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="StoringMinMSnFragments" FriendlyName="Min. Fragments" Category="4. Applied Thresholds" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0">0</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="1301.78149414063" Y="660.559631347656" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="51" ProcessingNodeName="MzVaultSearchNode" FriendlyName="Search mzVault" Description="Provides mzVault search results for detected compounds." MainVersion="1" MinorVersion="1" Guid="ef0d2aa1-29ee-40c5-8196-df5c2423fe4f" Category="7. Compound Identification" ParentProcessingNodeNumber="31" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/CompoundAnnotationProposals">
+							<DataTypeAttributes>
+								<DataTypeAttribute>http://thermo.magellan.com/owl/DataTypes/IdentificationProposal</DataTypeAttribute>
+							</DataTypeAttributes>
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Incoming" Multiplicity="Multiple" ConnectionRequirement="RequiredAtDesignTime" Mode="AutomaticToAllPossibleParents" DisplayName="Incoming Compounds" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="OnlyToGeneratorsOfRequestedData">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/ConsolidatedCompounds">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Multiple" ConnectionRequirement="Optional" Mode="Manual" DisplayName="" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="http://thermo.magellan.com/owl/DataTypes/MzVaultSearchResult">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<NodeGroupConstraints>
+				<NodeGroupConstraint Name="GC EI workflow" Constraint="NotTogetherWithGroup" />
+			</NodeGroupConstraints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="FilePath" FriendlyName="mzVault Library" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="MoNA-export-LC-MS-MS_Negative_Mode.db">&lt;Items&gt;
+  &lt;Item SHA512=&quot;F0-62-26-FC-27-9F-FE-B3-73-87-DE-75-9D-87-BC-17-CC-A6-C8-D2-1A-FD-C5-A6-8B-16-89-DD-81-25-8B-B6&quot; Type=&quot;DatabaseFile&quot; FileName=&quot;MoNA-export-LC-MS-MS_Negative_Mode.db&quot; /&gt;
+&lt;/Items&gt;</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="CompoundClasses" FriendlyName="Compound Classes" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="All">All</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchIonActivationType" FriendlyName="Match Ion Activation Type" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchIonActivationEnergy" FriendlyName="Match Ion Activation Energy" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="Any">Any</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="IonActivationEnergyTolerance" FriendlyName="Ion Activation Energy Tolerance" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="20">20</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchIonizationMethod" FriendlyName="Match Ionization Method" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ApplyIntensityThreshold" FriendlyName="Apply Intensity Threshold" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RemovePrecursorIon" FriendlyName="Remove Precursor Ion" Category="1. Search Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PrecursorMassTolerance" FriendlyName="Precursor Mass Tolerance" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="PrecursorMassTolerance" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10 ppm">10 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="FTFragmentMassTolerance" FriendlyName="FT Fragment Mass Tolerance" Category="1. Search Settings" IsAdvanced="True" IntendedPurpose="FragmentMassTolerance" PurposeDetails="MassToleranceParameterDetails/HighResolutionMassTolerance" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10 ppm">10 ppm</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="ITFragmentMassTolerance" FriendlyName="IT Fragment Mass Tolerance" Category="1. Search Settings" IsAdvanced="True" IntendedPurpose="FragmentMassTolerance" PurposeDetails="MassToleranceParameterDetails/LowResolutionMassTolerance" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="0.4 Da">0.4 Da</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MatchAnalyzerType" FriendlyName="Match Analyzer Type" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="SearchAlgorithm" FriendlyName="Search Algorithm" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="HighChem HighRes">HighChem HighRes</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="MzVaultMatchFactorThreshold" FriendlyName="Match Factor Threshold" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="50">50</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="NumberOfResults" FriendlyName="Max. # Results" Category="1. Search Settings" IsAdvanced="True" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10">10</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="UseRetentionTimeTolerance" FriendlyName="Use Retention Time" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="False">False</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RetentionTimeTolerance" FriendlyName="RT Tolerance [min]" Category="1. Search Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="2">2</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="938" Y="440" />
+		</WorkflowNode>
+		<WorkflowNode ProcessingNodeNumber="17" ProcessingNodeName="DifferentialAnalysisNode" FriendlyName="Differential Analysis" Description="Provides simple differential statistics for detected compounds." MainVersion="1" MinorVersion="3" Guid="3985f355-0c58-4fa5-bdb8-d3a689b7467d" Category="10. Post-Processing" ParentProcessingNodeNumber="-1" Comment="" UsageConstraint="OnlyOncePerWorkflow" Publisher="Thermo Scientific" NodeState="Created">
+			<ProcessingNodeInterfaces>
+				<ProcessingNodeInterface Kind="Functional" Name="IProcessingNode" />
+				<ProcessingNodeInterface Kind="Functional" Name="IPostProcessing" />
+			</ProcessingNodeInterfaces>
+			<ConnectionPoints>
+				<ConnectionPoint Direction="Outgoing" Multiplicity="Single" ConnectionRequirement="Optional" Mode="Manual" DisplayName="Post-Processing" ConnectionDataHandlingType="FileBased" ParentNodeConstraint="None">
+					<DataContracts>
+						<DataContract DataType="Statistics">
+							<DataTypeAttributes />
+						</DataContract>
+					</DataContracts>
+				</ConnectionPoint>
+			</ConnectionPoints>
+			<ProcessingNodeParameters>
+				<ProcessingNodeParameter Name="LogTransformValues" FriendlyName="Log10 Transform Values" Category="1. General Settings" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="RecalculatePeakRating" FriendlyName="Update Peak Rating" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="True">True</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="AreaContribution" FriendlyName="Area Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="3">3</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="CvContribution" FriendlyName="CV Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="10">10</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfFwhmContribution" FriendlyName="FWHM to Base Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfJaggednessContribution" FriendlyName="Jaggedness Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfModalityContribution" FriendlyName="Modality Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+				<ProcessingNodeParameter Name="PqfZigZagIndexContribution" FriendlyName="Zig-Zag Index Contribution" Category="2. Peak Rating Contributions" IsAdvanced="False" IntendedPurpose="Unknown" PurposeDetails="" IsValueSet="True" IsHidden="False" IsConfig="False" DisplayValue="5">5</ProcessingNodeParameter>
+			</ProcessingNodeParameters>
+			<ProcessingNodePosition X="123.5" Y="55" />
+		</WorkflowNode>
+	</WorkflowTree>
+</Workflow>
