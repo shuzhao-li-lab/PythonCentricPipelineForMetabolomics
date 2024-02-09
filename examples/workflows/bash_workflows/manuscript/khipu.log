@@ -1,0 +1,88 @@
+INFO:root:Warning no match in isotope_pattern: 3.010162353515625
+INFO:root:Unknown isotope match ~ (139.05831909179688, 'F303')
+INFO:root:Empty network - 	['F2644']	[]	[]	[]
+INFO:root:Empty network - 	['F1623']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 0.00096893310546875
+INFO:root:Unknown isotope match ~ (133.09898376464844, 'F1789')
+INFO:root:Warning no match in isotope_pattern: 0.00096893310546875
+INFO:root:Unknown isotope match ~ (133.09898376464844, 'F1790')
+INFO:root:Warning no match in isotope_pattern: 3.0110626220703125
+INFO:root:Unknown isotope match ~ (229.19121551513672, 'F2596')
+INFO:root:Warning no match in isotope_pattern: 3.0112266540527344
+INFO:root:Unknown isotope match ~ (272.22216033935547, 'F3322')
+INFO:root:Empty network - 	['F3320']	[]	[]	[]
+INFO:root:Empty network - 	['F4033']	[]	[]	[]
+INFO:root:Empty network - 	['F4016']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 3.009185791015625
+INFO:root:Unknown isotope match ~ (402.22825622558594, 'F4153')
+INFO:root:Warning no match in isotope_pattern: 3.009185791015625
+INFO:root:Unknown isotope match ~ (402.22825622558594, 'F4154')
+INFO:root:Warning no match in isotope_pattern: 3.0084152221679688
+INFO:root:Unknown isotope match ~ (418.2224426269531, 'F4463')
+INFO:root:Warning no match in isotope_pattern: 4.0118560791015625
+INFO:root:Unknown isotope match ~ (419.2258834838867, 'F4466')
+INFO:root:Empty network - 	['F4340']	[]	[]	[]
+INFO:root:Empty network - 	['F741']	[]	[]	[]
+INFO:root:Empty network - 	['F1113']	[]	[]	[]
+INFO:root:Empty network - 	['F2666']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 3.0112457275390625
+INFO:root:Unknown isotope match ~ (300.2535095214844, 'F3058')
+INFO:root:Warning no match in isotope_pattern: 3.009693145751953
+INFO:root:Unknown isotope match ~ (374.1971015930176, 'F3874')
+INFO:root:Warning no match in isotope_pattern: 3.009693145751953
+INFO:root:Unknown isotope match ~ (374.1971015930176, 'F3875')
+INFO:root:Empty network - 	['F1623']	[]	[]	[]
+INFO:root:Empty network - 	['F2644']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 0.0009999999999763531
+INFO:root:Unknown isotope match ~ (133.099, 'F1789')
+INFO:root:Warning no match in isotope_pattern: 0.0009999999999763531
+INFO:root:Unknown isotope match ~ (133.099, 'F1790')
+INFO:root:Empty network - 	['F2089']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 4.014399999999966
+INFO:root:Unknown isotope match ~ (309.2831, 'F3624')
+INFO:root:Warning no match in isotope_pattern: 4.0142999999999915
+INFO:root:Unknown isotope match ~ (323.2987, 'F4004')
+INFO:root:Empty network - 	['F4225']	[]	[]	[]
+INFO:root:Empty network - 	['F2644']	[]	[]	[]
+INFO:root:Empty network - 	['F1623']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 4.014200000000017
+INFO:root:Unknown isotope match ~ (173.1365, 'F1624')
+INFO:root:Warning no match in isotope_pattern: 0.0009999999999763531
+INFO:root:Unknown isotope match ~ (133.099, 'F1789')
+INFO:root:Warning no match in isotope_pattern: 0.0009999999999763531
+INFO:root:Unknown isotope match ~ (133.099, 'F1790')
+INFO:root:Warning no match in isotope_pattern: 4.014399999999966
+INFO:root:Unknown isotope match ~ (309.2831, 'F3624')
+INFO:root:Empty network - 	['F4301']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 4.0142999999999915
+INFO:root:Unknown isotope match ~ (323.2987, 'F4004')
+INFO:root:Empty network - 	['F4225']	[]	[]	[]
+INFO:root:Warning no match in isotope_pattern: 4.011900000000026
+INFO:root:Unknown isotope match ~ (419.2259, 'F4466')
+INFO:root:Empty network - 	['F3812']	[]	[]	[]
+INFO:root:Empty network - 	['F741']	[]	[]	[]
+INFO:bokeh.server.server:Starting Bokeh server version 3.3.2 (running on Tornado 6.4)
+INFO:bokeh.server.tornado:User authentication hooks NOT provided (default user enabled)
+INFO:tornado.access:200 GET / (::1) 1455.62ms
+INFO:tornado.access:200 GET /static/js/bokeh-gl.min.js?v=4e0336f86fcb6dada342f8e6422c888290dbde6d19c7c34e010fc3c0d87f9d0942e13cb0f2ffc78ac589f41e623dc4f14fcec2bfefa935a92683eb62b31d7856 (::1) 3.30ms
+INFO:tornado.access:200 GET /static/js/bokeh.min.js?v=34a99574497c635a73371dbe4023914976d2d9ceebcd07f10f5b3c05e1905c363597591a50087e787c91e7fb63ede3256af217d51c6420935f3b14e615d4d53a (::1) 6.38ms
+INFO:tornado.access:200 GET /static/js/bokeh-tables.min.js?v=cf4d356e4048bf099520db0fe30c6466e01d18c3d6e45607f424e480742085fc0b7dbc612785a40cd485b9f5609e476fe94cc4b2d0337ecef07475a46bf1ab1a (::1) 1.47ms
+INFO:tornado.access:200 GET /static/extensions/panel/panel.min.js?v=d8d73c570e870230d60ad3c1a73315c61e3e61d0149defcd662bbecf91e26ad3 (::1) 41.91ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/theme/default.css (::1) 5.98ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/fastbasetemplate/fast.css (::1) 9.01ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/fastlisttemplate/fast_list_template.css (::1) 10.68ms
+INFO:tornado.access:200 GET /static/js/bokeh-widgets.min.js?v=16d20410b89198f4b4eaf585fb0c9f18997afdbcc1040a894bb1a7786044d4d364c4c996f1e7b652b77660e98bf0b27550d79425389d405a50c4fb0f4c3477b2 (::1) 7.83ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/fastbasetemplate/fast_template.js (::1) 6.37ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/@microsoft/fast-components@2.30.6/dist/fast-components.js (::1) 117.77ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/fast/js/fast_design.js (::1) 4.51ms
+INFO:tornado.access:200 GET /static/extensions/panel/images/favicon.ico (::1) 2.09ms
+INFO:tornado.access:101 GET /ws (::1) 1.05ms
+INFO:bokeh.server.views.ws:WebSocket connection opened
+INFO:bokeh.server.views.ws:ServerConnection created
+INFO:tornado.access:200 GET /static/extensions/panel/css/loading.css?v=1.3.4 (::1) 8.58ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/theme/fast.css?v=1.3.4 (::1) 8.40ms
+INFO:tornado.access:200 GET /static/extensions/panel/css/loadingspinner.css?v=1.3.4 (::1) 7.19ms
+INFO:tornado.access:200 GET /static/extensions/panel/css/listpanel.css?v=1.3.4 (::1) 13.01ms
+INFO:tornado.access:200 GET /static/extensions/panel/css/markdown.css?v=1.3.4 (::1) 7.54ms
+INFO:tornado.access:200 GET /static/extensions/panel/bundled/theme/default.css?v=1.3.4 (::1) 0.58ms
+INFO:bokeh.server.views.ws:WebSocket connection closed: code=1001, reason=None
