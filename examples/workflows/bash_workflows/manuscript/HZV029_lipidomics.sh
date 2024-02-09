@@ -5,7 +5,7 @@ source ../pcpfm_venv/bin/activate
 
 #rm -rf $experiment
 
-pcpfm assemble -o $working_dir -j HZV029_Lipidomics -s ~/Datasets/ForPCPFM/MerckLipidomics_Batch1/HILICneg_RPpos/HILICneg_RPpos.csv --filter /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/filters/hilicneg.json --name_field "File Name"
+pcpfm assemble -o $working_dir -j HZV029_Lipidomics -s ./sequence_files/HZV029_Lipidomics.csv --filter /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/filters/hilicneg.json --name_field "File Name"
 pcpfm convert -i $experiment
 pcpfm asari -i $experiment
 
