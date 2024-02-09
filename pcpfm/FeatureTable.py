@@ -116,9 +116,11 @@ class FeatureTable:
         Construct an interval tree to search for features using a query
         mz and a specific mz tolerance in ppm.
 
-        :param mz_tol: float or int, this is the mass resolution in ppm
+        Args:
+            mz_tol (float or int): float or int, this is the mass resolution in ppm
 
-        :return: interval tree for given mz_tol
+        Returns:
+            intervaltree: interval tree for given mz_tol
         """
         if mz_tol not in self.__mz_trees:
             self.__mz_trees[mz_tol] = intervaltree.IntervalTree()
@@ -132,9 +134,11 @@ class FeatureTable:
         Construct an interval tree to search for features using a query
         rtime and a specific rtime tolerance in absolute units (sec).
 
-        :param rt_tol: float or int, this is the rtime tolerance in sec
+        Args:
+            rt_tol (float or int): this is the rtime tolerance in sec
 
-        :return: interval tree for given rt_tol
+        Returns:
+            intervaltree: interval tree for given rt_tol
         """
         if rt_tol not in self.__rt_trees:
             self.__rt_trees[rt_tol] = intervaltree.IntervalTree()
@@ -153,8 +157,9 @@ class FeatureTable:
         that may not be in the feature table. We can use this list tofilter out the 
         samples in the experiment not in the feature table.
 
-        :return: sample_columns
-        :rtype: list
+        Returns:
+            list: list of sample columns
+
         """
         sample_columns = []
         for x in self.feature_table.columns:
@@ -176,8 +181,8 @@ class FeatureTable:
         This is used when filtering the feature tables but typically the list of sample
         columns is used instead.
 
-        :return: non_sample_columns
-        :rtype: list
+        Returns:
+            list: list of columns that are not samples
         """
         return [x for x in self.feature_table.columns if x not in self.sample_columns]
 
@@ -193,8 +198,8 @@ class FeatureTable:
         transform a feature table, check this first to ensure that it is has not 
         already been log transformed.
 
-        :return: is_log_transformed
-        :rtype: boolean
+        Returns:
+            bool: true if table is log_transformed
         """
         return self.moniker in self.experiment.log_transformed_feature_tables
 
@@ -203,7 +208,8 @@ class FeatureTable:
         """
         Returns the number of features in the feature table
 
-        :return: integer, number of features in feature table
+        Returns:
+            int: number of features in feature table
         """
         return self.feature_table.shape[0] - 1
 
@@ -212,7 +218,8 @@ class FeatureTable:
         """
         Returns the number of samples in the feature table
 
-        :return: integer, number of samples in feature table
+        Returns:
+            int: number of samples in feature table
         """
         return len(self.sample_columns)
 
@@ -226,7 +233,7 @@ class FeatureTable:
         the object.
 
         :param moniker: the string with which the FeatureTable is registered
-        :type moniker: string
+        :type moniker: str
         :param experiment: the experiment object with the FeatureTable
         :type experiment: object
         :return: the feature table for the moniker
@@ -312,9 +319,9 @@ class FeatureTable:
         figures and is saved to the appropriate location in the experiment directory.
 
         :param name: desired name for the figure
-        :type name: string
+        :type name: str
         :return: path to save figure
-        :rtype: string
+        :rtype: str
         """
         fig_path = os.path.join(
             os.path.abspath(self.experiment.qaqc_figs), self.moniker + "/"
@@ -353,18 +360,18 @@ class FeatureTable:
         all figures related to FeatureTables. The figure paramaters such as color, markers, 
         etc are stored as a datamember in the FeatureTable object. 
 
-        :param figure_type: _description_
-        :type figure_type: _type_
-        :param data: _description_
-        :type data: _type_
+        :param figure_type: which figure type to make
+        :type figure_type: str
+        :param data: the data to plot
+        :type data: can be dict or list (need to better document)
         :param title: the title for the figure, defaults to ''
         :type title: str, optional
         :param x_label: string to apply to the x-axis, defaults to None
         :type x_label: str, optional
         :param y_label: string to apply to the y-axis, defaults to None
         :type y_label: str, optional
-        :param params: _description_, defaults to None
-        :type params: _type_, optional
+        :param fig_params: if provided override the object's fig_param, defaults to None
+        :type fig_params: dict, optional
         :param skip_annot: if true do not apply cosmetics to the figure, defaults to False
         :type skip_annot: bool, optional
         """
@@ -630,11 +637,12 @@ class FeatureTable:
         against the median of ALL correlations in the experiment. A high or low Z-score indicates 
         that the sample was poorly correlated with other smaples in the experiment.
 
-        :param self: a feature table object
-        :param figure_params: a dictionary specifying how to make figures
-        :param correlation_type: can be 'pearson', 'spearman', 'kendall'
+        Args:
+            self: a feature table object
+            correlation_type (str): can be 'pearson', 'spearman', 'kendall'
 
-        :return: QAQC_result dict
+        Returns:
+            dict: QAQC_result dict
         """
         correlation_result = self.correlation_heatmap(correlation_type=correlation_type, full_results=True)
         all_correlations = []
@@ -683,11 +691,8 @@ class FeatureTable:
         those values when the missing values are removed or when they
         are log2 transformed.
 
-        :param self: a feature table object
-        :param figure_params: a dictionary specifying how to make figures
-        :param correlation_type: can be 'pearson', 'spearman', 'kendall'
-
-        :return: QAQC_result dict
+        Returns:
+            dict: QAQC_result dict
         """
         selected_ftable = self.feature_table[self.sample_columns].copy()
         intensity_sums = np.sum(selected_ftable, axis=0)
@@ -841,9 +846,11 @@ class FeatureTable:
         Perform PCA on provided feature table, optionally log transform
         it first.
 
-        :param figure_params: dictionary with figure params
+        Args:
+            log_transform (bool, optional): if true log2 transform the table
 
-        :return: QAQC_result dict
+        Returns:
+            dict: QAQC_result dict
         """
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
         scaler = StandardScaler()
@@ -880,10 +887,11 @@ class FeatureTable:
         """
         Perform TSNE on provided feature table
 
-        :param figure_params: dictionary for the figure generation
-        :param perplexity: perplexity value for TSNE
+        Args:
+            perplexity (int): perplexity value for TSNE
 
-        :result: QAQC result dict
+        Results
+            dict: QAQC result dict
         """
         try:
             tnse_embedded_vector_matrix = TSNE(
@@ -974,7 +982,7 @@ class FeatureTable:
                 Defaults to False.
 
         Returns:
-            result: dictionary storing the result of this QCQA operation
+            dict: dictionary storing the result of this QCQA operation
         """
         masked_ftables = self.feature_table[self.sample_columns] <= intensity_cutoff
         missing_feature_counts = dict(
@@ -1017,7 +1025,7 @@ class FeatureTable:
                 Defaults to False.
 
         Returns:
-            result: dictionary storing the result of this QCQA operation
+            dict: dictionary storing the result of this QCQA operation
         """
         masked_ftables = self.feature_table[self.sample_columns] > intensity_cutoff
         feature_counts = dict(
@@ -1098,7 +1106,7 @@ class FeatureTable:
                 Defaults to False.
 
         Returns:
-            result: dictionary storing the result of this QCQA operation
+            dict: dictionary storing the result of this QCQA operation
         """
         missing_feature_counts_result = self.missing_feature_distribution(
             intensity_cutoff=intensity_cutoff
@@ -1307,19 +1315,17 @@ class FeatureTable:
 
         _extended_summary_
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
-        :param by_batch: _description_, defaults to None
-        :type by_batch: _type_, optional
-        :param blank_intensity_ratio: _description_, defaults to 3
+        :param by_batch: if true, blank mask by the batch field, defaults to None
+        :type by_batch: str, optional
+        :param blank_intensity_ratio: sample feautre intensity / blank intensity must exceed this value to be kept, defaults to 3
         :type blank_intensity_ratio: int, optional
-        :param logic_mode: _description_, defaults to "or"
+        :param logic_mode: determines if a feature is dropped if it fails the test in one batch or all batches, defaults to "or"
         :type logic_mode: str, optional
-        :param blank_type: _description_, defaults to "Blank"
+        :param blank_type: the value of type_field that specifies the blanks, defaults to "Blank"
         :type blank_type: str, optional
-        :param sample_type: _description_, defaults to "Unknown"
+        :param sample_type: the value of type_field that specifies the study samples, defaults to "Unknown"
         :type sample_type: str, optional
-        :param type_field: _description_, defaults to "Sample Type"
+        :param type_field: the field to look for the sample type in, defaults to "Sample Type"
         :type type_field: str, optional
         """
 
@@ -1391,12 +1397,10 @@ class FeatureTable:
         a multiplier of the minimum value for that feature observed across all samples, excluding
         zeros.
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
-        :param ratio: _description_, defaults to 0.5
+        :param ratio: multiply min value by this value, defaults to 0.5
         :type ratio: float, optional
-        :param by_batch: _description_, defaults to None
-        :type by_batch: _type_, optional
+        :param by_batch: if try, impute per batch, defaults to None
+        :type by_batch: str, optional
         """
 
         def __calc_impute_value(row, sample_names):
@@ -1535,10 +1539,6 @@ class FeatureTable:
         This method batch corrects the feature intensities. The 
         batches are determined dynamically using the by_batch field. 
 
-        _extended_summary_
-
-        :param new_moniker: the moniker to save the new table to
-        :type new_moniker: str
         :param by_batch: the field on which to batch sampels
         :type by_batch: str
         """
@@ -1557,13 +1557,12 @@ class FeatureTable:
             sys.exit()
 
     def log_transform(self, new_moniker, log_mode="log2"):
-        """log_transform _summary_
-
-        _extended_summary_
+        """
+        log transform the features in the table.
 
         :param new_moniker: _description_
         :type new_moniker: _type_
-        :param log_mode: _description_, defaults to "log2"
+        :param log_mode: can be log10 or log2, which type of log to use, defaults to "log2"
         :type log_mode: str, optional
         """
 
@@ -1585,8 +1584,6 @@ class FeatureTable:
         This method will drop features that are uncommon in the feature table.
 
         Drop_percentile is the threshold for inclusion.
-
-        _extended_summary_
 
         :param by_batch: if provided, perform the operation on each batch separately. with 
         batches defined by this field., defaults to None
@@ -1759,12 +1756,7 @@ class FeatureTable:
         """
         This is the wrapper for all the qcqa functions.
 
-        Args:
-            tag (str, optional): Sample type must match this field. Defaults to None.
-            sort (bool, optional): if true, sort the sample names. Defaults to False.
-            interactive (bool, optional): if True, plots are interactive. Defaults to False.
-
-            These args control if the named step is performed or not in the curation:
+        If these fields are present in the params, it will determine which methods are performed:
 
             pca (bool, optional): Defaults to False.
             tsne (bool, optional): Defaults to False.
@@ -1778,6 +1770,9 @@ class FeatureTable:
             intensity_analysis (bool, optional): Defaults to False.
             feature_distribution (bool, optional): Defaults to False.
             feature_outlier_detection (bool, optional): Defaults to False.
+        
+        Args:
+            params (dict): the params from the main process.
 
         Returns:
             list: with all qcqa results for the performed QCQA steps

@@ -34,9 +34,11 @@ class EmpCpds:
         the empCpds object is a wrapper around dict_empcpds that will associate the dict_empcpds
         with a moniker and experiment object.
 
-        :param dict_empcpds: dictionary of empCpds
-        :param experiment: experiment object for these empdpds
-        :param moniker: the moniker for this empCpd
+        Args:
+
+        dict_empcpds (dict): dictionary of empCpds, from khipu
+        experiment (object): experiment object for these empdpds
+        moniker (str): the moniker for this empCpd
         """
         self.dict_empcpds = dict_empcpds
         self.experiment = experiment
@@ -165,7 +167,8 @@ class EmpCpds:
         """
         This method iterates through all khipus and updates the relevant annotation fields. 
 
-        :param update_ms2: if True, update the MS2 annotations, default is False.
+        Args:
+            update_ms2 (bool): if True, update the MS2 annotations, default is False.
         """
         if update_ms2:
             self.__update_ms2()
@@ -214,10 +217,12 @@ class EmpCpds:
         This method will return an existing m/z based interval tree for
         these empcpds for a given mz_tol.
 
-        :param mz_tol: the mz_tol in ppm
-        :param abs: if true, assume the mz tolerance provide is in daltons
+        Args:
+            mz_tol (float): the mz_tol assumed to be in ppm
+            abs (bool): if true, assume the mz tolerance provide is in daltons
 
-        :return: interval tree for mz at the provided mz_tol
+        Returns:
+            intervaltree: interval tree for mz at the provided mz_tol
         """
         if ("feature", str(mz_tol), str(abs_error)) not in self.__mz_trees:
             mz_tree = IntervalTree()
@@ -244,9 +249,11 @@ class EmpCpds:
         This method will return an existing rt based interval tree for
         these empcpds for a given rt_tolerance
 
-        :param mz_tol: the rt_tolerance in sec(s)
+        Args:
+            mz_tol (float): the rt_tolerance in sec(s)
 
-        :return: interval tree for rtime at the provided rt tolerance
+        Returns:
+            intervaltree: interval tree for rtime at the provided rt tolerance
         """
         if ("feature", rt_tolerance) not in self.__rt_trees:
             rt_tree = IntervalTree()
@@ -314,7 +321,7 @@ class EmpCpds:
         """
         This method returns the number of khipus in empCpd
 
-        :return: number of empcpds
+        int: number of empcpds
         """
         return len(self.dict_empcpds)
 
@@ -324,7 +331,7 @@ class EmpCpds:
         This method returns the number of features contained within
         the empcpds.
 
-        :return: number of features in empcpds.
+        int: number of features in empcpds.
 
         """
         return len(self.feature_id_to_khipu_id)
@@ -339,6 +346,8 @@ class EmpCpds:
         All search fields are optional but if none are provided then all the features will be considered matching.
         The mz tolerance should be in ppm while the rtime tolerance should be provided in rtime units.
 
+        Args:
+            
         :param query_mz: the mz to search for, defaults to None
         :type query_mz: float, optional
         :param query_rt: the rtime to search for, defaults to None
@@ -472,22 +481,24 @@ class EmpCpds:
         for that table using a set of isotopes, adducts, charges,
         and save it as either the table moniker or a new moniker.
 
-        :param isotopes: isotopes for which to search
-        :param adducts: adducts to use, if None use defaults based on
-            ionization.
-        :param extended_adducts: extended_adducts to use, if None, the
-            default extended_adducts are used.
-        :param feature_table_moniker: the feature table to use
-        :param empCpd_moniker: the moniker to save the empcpds to
-        :param add_singletons: if true, add singletons to the khipus
-        :param rt_search_window: the rt window to use for empcpd
-            construction, default is 2.
-        :param mz_tol: the mz tolerance in ppm to use for
-            empcpd construction, default is 5.
-        :param charges: the charges, in absolute units, to consider
-            for empcpd construction.
+        Args:
+            isotopes (list, optional): isotopes for which to search
+            adducts (list, optional): adducts to use, if None use defaults based on
+                ionization.
+            extended_adducts (list, optional): extended_adducts to use, if None, the
+                default extended_adducts are used.
+            feature_table_moniker (str, optional): the feature table to use
+            empCpd_moniker (str, optional): the moniker to save the empcpds to
+            :param add_singletons (bool, optional): if true, add singletons to the khipus
+            rt_search_window (int, optional): the rt window to use for empcpd
+                construction, default is 2.
+            mz_tol: the mz tolerance in ppm to use for
+                empcpd construction, default is 5.
+            charges: the charges, in absolute units, to consider
+                for empcpd construction.
 
-        :return: empcpd dict
+        Returns:
+            empCpd: empcpd object
         """
         charges = [1,2,3] if charges is None else charges
         ext_adducts = extended_adducts if ext_adducts is None else ext_adducts
@@ -642,15 +653,16 @@ class EmpCpds:
         min_peaks=1,
         score_cutoff=0.50,
     ):
-        """_summary_
+        """
+        Perform l1 annotation on the empcpds. Using CD authentic standard library. 
 
         Args:
-            standards_csv (_type_): _description_
-            mz_tol (int, optional): _description_. Defaults to 5.
-            rt_tolerance (int, optional): _description_. Defaults to 30.
-            similarity_method (str, optional): _description_. Defaults to "CosineHungarian".
-            min_peaks (int, optional): _description_. Defaults to 2.
-            score_cutoff (float, optional): _description_. Defaults to 0.50.
+            standards_csv (str): path to CD csv export
+            mz_tol (int, optional): mz tolerance to match precursors. Defaults to 5.
+            rt_tolerance (int, optional): rt tolerance to match precursors. Defaults to 30.
+            similarity_method (str, optional): which matchms similarity method to use. Defaults to "CosineHungarian".
+            min_peaks (int, optional): minimum number of peaks that must be shared for annotation. Defaults to 2.
+            score_cutoff (float, optional): scores above this value are consider matches. Defaults to 0.50.
         """
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
