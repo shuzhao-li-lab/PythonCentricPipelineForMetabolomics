@@ -1,7 +1,7 @@
 {
     "Method": {
         "includes": [
-            "HILIC_pos"
+            "HILICpos"
         ]
     }
 }

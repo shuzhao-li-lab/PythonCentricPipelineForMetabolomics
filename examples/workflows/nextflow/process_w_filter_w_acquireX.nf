@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
-params.jobs = "./example_input_minimal.csv"
-params.pcpfm_workflow = "/Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/workflows/nextflow/minimal_processing.sh"
+params.jobs = "/Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/workflows/nextflow/compatible_workflows/example_filter_acquirex_jobs.csv"
+params.pcpfm_workflow = "/Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/workflows/nextflow/compatible_workflows/basic_process_w_filter_w_acquireX.sh"
 
 process minimial_pcpfm {
 	publishDir "./"
