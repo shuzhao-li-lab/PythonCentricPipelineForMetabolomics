@@ -1,0 +1,1 @@
+Figure 3 requires the HZV029 plasma workflows. If you want to recreate the CompoundDiscoverer results, you will need the AcquireX datasets and the provided CD workflows. 

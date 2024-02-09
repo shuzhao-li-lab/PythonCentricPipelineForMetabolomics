@@ -1,0 +1,7 @@
+Dataset,Tool,Start,Stop
+HILIC_pos, pcpfm, 2:40:23, 2:42:59
+HILIC_pos, MetaboAnalystR, 19:30:47, 20:37:02
+RP_neg, pcpfm, 2:44:55, 2:47:29
+RP_neg, MetaboAnalystR, 20:37:02, 22:32:27
+Checkmate Subset, pcpfm, 2:48:48, 2:56:04
+Checkmate Subset, MetaboAnalystR, 22:54:09, 25:57:38
