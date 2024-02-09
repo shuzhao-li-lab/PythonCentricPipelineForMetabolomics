@@ -12,7 +12,7 @@ source ../pcpfm_venv/bin/activate
 rm -rf $experiment
 
 pcpfm assemble -o $working_dir -j Bowen_media -s ./sequence_files/bowen_media_wo_QC.csv --name_field "File Name"
-pcpfm asari -i $experiment --extra_asari="--autoheight True"
+pcpfm asari -i $experiment
 pcpfm blank_masking --table_moniker preferred --new_moniker pref_blank_masked --blank_value Blank --sample_value Unknown --query_field "Sample Type" --blank_intensity_ratio 3 -i $experiment 
 pcpfm drop_samples --table_moniker pref_blank_masked --new_moniker masked_pref_unknowns --drop_value Unknown --drop_field "Sample Type" --drop_others true -i $experiment 
 pcpfm drop_outliers --table_moniker masked_pref_unknowns --new_moniker qaqc_filtered_masked_pref_unknowns -i $experiment
