@@ -1,5 +1,5 @@
 {
-    "FeatureCountZScores": {
+    "feature_count_z_scores": {
         "Action": "Drop",
         "Conditions": {
             "GreaterThan": 2,
