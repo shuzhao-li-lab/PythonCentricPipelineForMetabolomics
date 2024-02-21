@@ -21,94 +21,30 @@
         },
         {
             "section": "figure",
-            "table": "preferred",
+            "table": "*", 
             "name": "pca"
         },
         {
             "section": "figure",
-            "table": "preferred",
+            "table": "*",
             "name": "pearson_correlation"
         },
         {
             "section": "figure",
-            "table": "preferred",
-            "name": "spearman_corrlation"
+            "table": "*",
+            "name": "log_tics"
         },
         {
             "section": "figure",
-            "table": "preferred",
-            "name": "log_tics.png"
-        },
-        {
-            "section": "figure",
-            "table": "preferred",
+            "table": "*",
             "name": "feature_count_z_scores"
         },
-        {
-            "section": "figure",
-            "table": "preferred",
-            "name": "_Feature_Counts.png"
-        },
-
-        {
-            "section": "figure",
-            "table": "full",
-            "name": "pca"
-        },
-        {
-            "section": "figure",
-            "table": "full",
-            "name": "pearson_correlation"
-        },
-        {
-            "section": "figure",
-            "table": "full",
-            "name": "spearman_corrlation"
-        },
-        {
-            "section": "figure",
-            "table": "full",
-            "name": "log_tics.png"
-        },
-        {
-            "section": "figure",
-            "table": "full",
-            "name": "feature_count_z_scores"
-        },
-
-        {
-            "section": "figure",
-            "table": "for_analysis",
-            "name": "pca"
-        },
-        {
-            "section": "figure",
-            "table": "for_analysis",
-            "name": "pearson_correlation"
-        },
-        {
-            "section": "figure",
-            "table": "for_analysis",
-            "name": "spearman_corrlation"
-        },
-        {
-            "section": "figure",
-            "table": "for_analysis",
-            "name": "log_tics.png"
-        },
-        {
-            "section": "figure",
-            "table": "for_analysis",
-            "name": "feature_count_z_scores"
-        },
-
         {
             "section": "version_summary"
         },
         {
             "section": "command_history"
         },
-
         {
             "section": "save",
             "report_name": "report.pdf"

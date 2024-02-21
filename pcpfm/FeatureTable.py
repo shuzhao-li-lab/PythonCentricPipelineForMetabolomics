@@ -489,7 +489,7 @@ class FeatureTable:
                     plt.bar(list(range(len(data[1]))), data[1])
                 plt.title(title)
                 plt.xticks(rotation=90)
-                plt.xlabel(y_label)
+                plt.xlabel(title)
                 plt.ylabel(x_label)
                 if fig_params["color_legend"]:
                     plt.tight_layout(rect=[0, 0, 0.75, 1])

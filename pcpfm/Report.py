@@ -66,7 +66,7 @@ class Report():
         self.report = ReportPDF(report_title)
         self.report.add_page()
         self.report.set_font(*self.default_font)
-        self.max_width = round(self.report.line_width * 1000,0)
+        self.max_width = round(self.report.line_width * 900,0)
         self.style = self.__preprocess_style(self.parameters["report_config"])
         self.__create_report()
 
