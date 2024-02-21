@@ -308,7 +308,7 @@ class FeatureTable:
         self.experiment.feature_tables[new_moniker] = output_path
         self.experiment.save()
         if os.path.exists(self.experiment.qaqc_figs + "/" + new_moniker):
-            os.removedirs(self.experiment.qaqc_figs + "/" + new_moniker)
+            utils.file_operations["delete"](self.experiment.qaqc_figs + "/" + new_moniker)
 
     def save_fig_path(self, name):
         """
