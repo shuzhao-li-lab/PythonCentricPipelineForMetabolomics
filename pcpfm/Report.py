@@ -15,6 +15,7 @@ from pip._vendor import pkg_resources
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 from . import FeatureTable
+from . import utils
 
 class ReportPDF(FPDF):
     """
@@ -406,6 +407,7 @@ class Report():
         report_path = os.path.join(output_subdir, section_desc["report_name"])
         if not report_path.endswith(".pdf"):
             report_path += ".pdf"
+        print("saving: ", report_path)
         self.report.output(report_path)
 
     def figure(self, section_desc):
@@ -423,7 +425,6 @@ class Report():
         provided.
 
         """
-
         figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/" + "_" + section_desc["name"] + ".png"
         if os.path.exists(figure_path):
             self.report.add_page()
@@ -442,6 +443,7 @@ class Report():
                 self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
                 self.report.ln(10)
                 self.report.image(figure_path, w=self.max_width)
+                utils.file_operations["delete"](figure_path)
 
 # this updates the docstring for report
 qaqc_names = list(FeatureTable.FeatureTable.qaqc_result_to_key.keys())
