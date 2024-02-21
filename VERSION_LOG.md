@@ -3,3 +3,6 @@ v1.0.2 -> v1.0.3
 
 v1.0.3 -> v1.0.4
   - improved report generation, improved default report template, improved graph labelling, fix overlap
+
+v1.0.4 -> v1.0.5
+   - fixed the qaqc filter... again :(, verified this works on a fresh install

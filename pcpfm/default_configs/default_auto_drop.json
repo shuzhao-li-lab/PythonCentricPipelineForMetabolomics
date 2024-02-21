@@ -2,8 +2,8 @@
     "feature_count_z_scores": {
         "Action": "Drop",
         "Conditions": {
-            "GreaterThan": 2,
-            "LessThan": -2
+            ">": 2.5,
+            "<": -2.5
         }
     }
 }
