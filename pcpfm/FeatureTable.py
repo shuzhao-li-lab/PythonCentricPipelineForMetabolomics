@@ -456,9 +456,10 @@ class FeatureTable:
                     )
             elif figure_type == "clustermap":
                 if colors:
-                    sns.clustermap(data, col_colors=colors)
+                    sns.clustermap(data, col_colors=colors, columns=self.sample_columns)
                 else:
                     sns.clustermap(data)
+                plt.xticks
                 plt.suptitle(title)
                 if fig_params["color_legend"]:
                     plt.tight_layout(rect=[0, 0, 0.75, 1])
@@ -1290,6 +1291,7 @@ class FeatureTable:
         if to_drop:
             print("Dropping: \n\t" + "\t\n".join(to_drop))
             self.feature_table.drop(columns=to_drop, inplace=True)
+        print("\n".join(to_drop))
 
     def blank_mask(
         self,
