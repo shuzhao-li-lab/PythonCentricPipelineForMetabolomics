@@ -642,7 +642,9 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         feature_table = experiment.retrieve_feature_table(params['table_moniker'], True)
         feature_table.log_transform(params['log_transform_mode'])
+        experiment.log_transformed_feature_tables.append(params["new_moniker"])
         feature_table.save(params["new_moniker"])
+
 
     @staticmethod
     def l4_annotate(params):
@@ -857,12 +859,12 @@ def main():
                 print("\t", method)
     else:
         function = getattr(Main, params['subcommand'])
-        try:
-            function(params)
-        except Exception as e:
-            print("Error executing: " + params['subcommand'])
-            print(function.__doc__)
-            print(e)
+        #try:
+        function(params)
+        #except Exception as e:
+        #    print("Error executing: " + params['subcommand'])
+        #    print(function.__doc__)
+        #    print(e)
 
 def CLI():
     '''

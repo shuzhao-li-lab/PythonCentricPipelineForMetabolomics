@@ -87,7 +87,7 @@ class Experiment(core.Experiment):
         self.feature_tables = feature_tables if feature_tables else {}
         self.empCpds = empCpds if empCpds else {}
         self.log_transformed_feature_tables = (
-            log_transformed_feature_tables if log_transformed_feature_tables else {}
+            list(set(log_transformed_feature_tables)) if log_transformed_feature_tables else []
         )
         self.cosmetics = cosmetics if cosmetics else {}
         self.used_cosmetics = used_cosmetics if used_cosmetics else {}

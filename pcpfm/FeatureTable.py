@@ -95,22 +95,6 @@ class FeatureTable:
         }
         self.figure_params = None
 
-    def clean_columns(self):
-        """
-        Some helper scripts will convert the file path and append the
-        directory name on the sample names using '___' as a separator.
-
-        This will convert these back to the anticipated names.
-        """
-        if "cleaned" in self.moniker:
-            return
-        rename_map = {}
-        for column in self.feature_table.columns:
-            if "___" in column:
-                rename_map[column] = column.split("___")[-1]
-        self.feature_table.rename(columns=rename_map, inplace=True)
-        self.save(self.moniker + "_cleaned")
-
     def get_mz_tree(self, mz_tol):
         """
         Construct an interval tree to search for features using a query
@@ -161,16 +145,7 @@ class FeatureTable:
             list: list of sample columns
 
         """
-        sample_columns = []
-        for x in self.feature_table.columns:
-            if x in self.experiment.sample_names:
-            #if x.split("___")[-1] in self.experiment.sample_names:
-                sample_columns.append(x)
-            else:
-                new_x = x + ".mzML"
-                if new_x in self.experiment.sample_names:
-                    sample_columns.append(x)
-        return sample_columns
+        return self.feature_table.columns[11:]
 
     @property
     def non_sample_columns(self):
@@ -239,13 +214,14 @@ class FeatureTable:
         :return: the feature table for the moniker
         :rtype: FeatureTable
         """
-        moniker = (
-            moniker + "_cleaned"
-            if moniker + "_cleaned" in experiment.feature_tables
-            else moniker
-        )
+
+        df = pd.read_csv(experiment.feature_tables[moniker], sep="\t")
+        mzml_to_name = {}
+        for acquisition in experiment.acquisitions:
+            mzml_to_name[os.path.basename(acquisition.mzml_filepath).rstrip('.mzML')] = acquisition.name
+        df.rename(mzml_to_name, inplace=True)
         return FeatureTable(
-            pd.read_csv(experiment.feature_tables[moniker], sep="\t"),
+            df,
             experiment,
             moniker,
         )
@@ -329,10 +305,7 @@ class FeatureTable:
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
         name = "".join(c for c in name if c.isalpha() or c.isdigit() or c==' ' or c=='_').rstrip()
-
-        fig_path = os.path.join(fig_path, "_" + name + ".png")
-        print(fig_path)
-        return fig_path
+        return os.path.join(fig_path, "_" + name + ".png")
 
     def gen_figure(
         self,
@@ -456,7 +429,7 @@ class FeatureTable:
                     )
             elif figure_type == "clustermap":
                 if colors:
-                    sns.clustermap(data, col_colors=colors, columns=self.sample_columns)
+                    sns.clustermap(data, col_colors=colors)
                 else:
                     sns.clustermap(data)
                 plt.xticks
@@ -1186,7 +1159,7 @@ class FeatureTable:
 
     def drop_sample_by_name(self, drop_name, drop_others=False):
         """
-        This method drops a sample from a feature table by its name.
+        This method drops a sample from a feature table by its name.x
 
         Optionally all other samples that do not match the name can be dropped as well.
 
@@ -1558,25 +1531,15 @@ class FeatureTable:
             print("Unable to batch correct if only one batch!")
             sys.exit()
 
-    def log_transform(self, new_moniker, log_mode="log2"):
+    def log_transform(self, log_mode="log2"):
         """
         log transform the features in the table.
 
-        :param new_moniker: _description_
-        :type new_moniker: _type_
         :param log_mode: can be log10 or log2, which type of log to use, defaults to "log2"
         :type log_mode: str, optional
         """
-
-
         for sample_name in self.sample_columns:
-            self.feature_table[sample_name] = utils.log_modes[log_mode](
-                self.feature_table[sample_name] + 1
-            )
-        self.make_nonnegative()
-        if not self.experiment.log_transformed_feature_tables:
-            self.experiment.log_transformed_feature_tables = []
-            self.experiment.log_transformed_feature_tables.append(new_moniker)
+            self.feature_table[sample_name] = utils.log_modes[log_mode](self.feature_table[sample_name] + 1)
 
     def drop_missing_features(
         self, by_batch=None, drop_percentile=0.8, logic_mode="or"
