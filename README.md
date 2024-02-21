@@ -17,6 +17,9 @@ We are working to add supports of GC and other data types.
 
 Note that to replicate the presented results you will need to run the `download extras` command. See below.
 
+# Recent Changes (since the manuscript is under review, this is just to keep track of and for people to see, what has been changed since submission)
+
+Fixed a bug in the default qaqc filter relating to the name of the feature_count_z_scores in the filter field. This made the drop_outliers command broken in the original release, this has been fixed. 
 
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
