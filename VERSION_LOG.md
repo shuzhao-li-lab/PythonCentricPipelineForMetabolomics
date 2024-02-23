@@ -11,3 +11,7 @@ v1.0.5 -> v1.0.6
   - sample_columns in the feature table object assumed the mzML were named the same as the samples but that is not correct for rerun samples. This is fixed by using the fact that the first 11 columns of the asari feature table are not sample intensities. 
   - log transformation is now recorded properly
   - log_transformed property now works correctly
+
+v1.0.6 -> v1.0.7
+  - better messages regarding dropped samples
+  - fix issue where checkmate analysis was not using the subset dataset for the pcpfm portion, this has improved the overlap between R and pcpfm considerably.
