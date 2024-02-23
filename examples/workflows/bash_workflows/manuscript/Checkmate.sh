@@ -11,5 +11,5 @@ experiment=~/Analyses/checkmate_orbi/
 # delete any previous analysis
 rm -rf $experiment
 
-pcpfm assemble -o $working_dir -j checkmate_orbi -s ./sequence_files/checkmate_orbi_full.csv --name_field "File Name"
+pcpfm assemble -o $working_dir -j checkmate_orbi -s ./subset_sequence_files/checkmate_orbi_subset_sequence.csv --name_field "File Name"
 pcpfm asari -i $experiment
