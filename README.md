@@ -100,13 +100,13 @@ However, some instruments do not allow all values for all fields in a sequence f
 This step is therefore to prepare metadata from the sequence file. 
 
 An example of input CSV file:
-```
-Sample Type,Name,Filepath
-Blank,SZ_01282024_01,my_experiment/SZ_01282024_01.raw
-QC,SZ_01282024_07,my_experiment/SZ_01282024_07.raw
-Unknown,SZ_01282024_13,my_experiment/SZ_01282024_13.raw
-...  
-```
+
+| Sample Type | Name           | Filepath                           |
+|-------------|----------------|------------------------------------|
+| Blank       | SZ_01282024_01 | my_experiment/SZ_01282024_01.raw  |
+| QC          | SZ_01282024_07 | my_experiment/SZ_01282024_07.raw  |
+| Unknown     | SZ_01282024_13 | my_experiment/SZ_01282024_13.raw  |
+| ...         | ...            | ...                                |
 
 Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
 
