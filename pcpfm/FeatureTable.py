@@ -218,10 +218,11 @@ class FeatureTable:
         df = pd.read_csv(experiment.feature_tables[moniker], sep="\t")
         mzml_to_name = {}
         for acquisition in experiment.acquisitions:
-            mzml_to_name[os.path.basename(acquisition.mzml_filepath).rstrip('.mzML')] = acquisition.name
-        df.rename(mzml_to_name, inplace=True)
+            if os.path.basename(acquisition.mzml_filepath).rstrip('.mzML') in df.columns:
+                mzml_to_name[os.path.basename(acquisition.mzml_filepath).rstrip('.mzML')] = acquisition.name
+        renamed = df.rename(columns=mzml_to_name)
         return FeatureTable(
-            df,
+            renamed,
             experiment,
             moniker,
         )
@@ -1187,6 +1188,9 @@ class FeatureTable:
         do_not_drop = [x for x in self.sample_columns if x not in to_drop]
         if drop_others:
             to_drop, do_not_drop = do_not_drop, to_drop
+        print("Dropping:")
+        for x in to_drop:
+            print("\t", x)
         self.feature_table.drop(columns=to_drop, inplace=True)
 
     def drop_samples_by_field(self, value, field, drop_others=False):
@@ -1249,8 +1253,10 @@ class FeatureTable:
                 else:
                     print("No method found for " + field)
             qaqc_results_for_field = self.experiment.qcqa_results[self.moniker].get(field, None)
+            print(qaqc_results_for_field)
             if qaqc_results_for_field:
                 for sample, value in qaqc_results_for_field["Result"].items():
+                    print(sample, value)
                     if not min_value < float(value) < max_value:
                         if qaqc_filter[field]["Action"] == "Keep":
                             pass
@@ -1261,8 +1267,10 @@ class FeatureTable:
         to_drop = [x for x in to_drop if x in self.sample_columns]
         if drop_others:
             to_drop = [x for x in self.sample_columns if x not in to_drop]
+        print("Dropping:")
         if to_drop:
-            print("Dropping: \n\t" + "\t\n".join(to_drop))
+            for x in to_drop:
+                print(x)
             self.feature_table.drop(columns=to_drop, inplace=True)
         print("\n".join(to_drop))
 
