@@ -12,7 +12,7 @@ source ../pcpfm_venv/bin/activate
 # delete any previous analysis
 rm -rf $experiment
 
-pcpfm assemble -o $working_dir -j HZV029_plasma_RP_neg_batch_corr -s /Users/mitchjo/Documents/pcpfm_submission/supplemental/RO1_w_reruns_clean.csv --filter /Users/mitchjo/Projects/PythonCentricPipelineForMetabolomics/pcpfm/filters/rpneg.json --name_field "File Name"
+pcpfm assemble -o $working_dir -j HZV029_plasma_RP_neg_batch_corr -s /Users/mitchjo/Documents/pcpfm_submission/supplemental/RO1_w_reruns_clean.csv --filter ../../../filters/rpneg.json --name_field "File Name"
 pcpfm asari -i $experiment
 pcpfm blank_masking --table_moniker preferred --new_moniker preferred_blank_masked --blank_value blank --sample_value unknown --query_field "Sample Type" --blank_intensity_ratio 3 -i $experiment 
 pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker masked_preferred_unknowns --drop_value unknown --drop_field "Sample Type" --drop_others true -i $experiment 

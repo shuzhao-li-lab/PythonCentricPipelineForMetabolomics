@@ -11,7 +11,7 @@ experiment=~/Analyses/HZV029_plasma_HILIC_pos/
 # delete any previous analysis
 rm -rf $experiment
 
-pcpfm assemble -o $working_dir -j HZV029_plasma_HILIC_pos -s ./sequence_files/HZV029_Plasma_w_reruns.csv  --filter /Users/mitchjo/pcpfm/PythonCentricPipelineForMetabolomics/examples/filters/hilicpos.json --name_field "File Name"
+pcpfm assemble -o $working_dir -j HZV029_plasma_HILIC_pos -s ./sequence_files/HZV029_Plasma_w_reruns.csv  --filter ../../../filters/hilicpos.json --name_field "File Name"
 pcpfm asari -i $experiment
 
 pcpfm blank_masking --table_moniker preferred --new_moniker preferred_blank_masked --blank_value blank --sample_value unknown --query_field "Sample Type" --blank_intensity_ratio 3 -i $experiment 
