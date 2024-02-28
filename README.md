@@ -19,8 +19,7 @@ Note that to replicate the presented results you will need to run the `download 
 
 # Recent Changes 
 
-Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. 
-
+Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. Notably there was an issue regarding sample names that do not match their mzML file names. This has been fixed as of 2/28/24.
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
@@ -101,13 +100,13 @@ However, some instruments do not allow all values for all fields in a sequence f
 This step is therefore to prepare metadata from the sequence file. 
 
 An example of input CSV file:
-```
-Sample Type,Name,Filepath
-Blank,SZ_01282024_01,my_experiment/SZ_01282024_01.raw
-QC,SZ_01282024_07,my_experiment/SZ_01282024_07.raw
-Unknown,SZ_01282024_13,my_experiment/SZ_01282024_13.raw
-...  
-```
+
+| Sample Type | Name           | Filepath                           |
+|-------------|----------------|------------------------------------|
+| Blank       | SZ_01282024_01 | my_experiment/SZ_01282024_01.raw  |
+| QC          | SZ_01282024_07 | my_experiment/SZ_01282024_07.raw  |
+| Unknown     | SZ_01282024_13 | my_experiment/SZ_01282024_13.raw  |
+| ...         | ...            | ...                                |
 
 Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
 
