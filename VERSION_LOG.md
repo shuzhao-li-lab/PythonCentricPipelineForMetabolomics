@@ -15,3 +15,9 @@ v1.0.5 -> v1.0.6
 v1.0.6 -> v1.0.7
   - better messages regarding dropped samples
   - fix issue where checkmate analysis was not using the subset dataset for the pcpfm portion, this has improved the overlap between R and pcpfm considerably.
+
+v1.0.7 -> v1.0.8
+  - added subtraction in notebook for venn diagram to prevent mistakes
+
+v1.0.8 -> v1.0.9
+  - edge case fixed with sample names
