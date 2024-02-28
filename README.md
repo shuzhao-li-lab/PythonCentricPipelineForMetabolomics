@@ -19,8 +19,7 @@ Note that to replicate the presented results you will need to run the `download 
 
 # Recent Changes 
 
-Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. 
-
+Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. Notably there was an issue regarding sample names that do not match their mzML file names. This has been fixed as of 2/28/24.
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
