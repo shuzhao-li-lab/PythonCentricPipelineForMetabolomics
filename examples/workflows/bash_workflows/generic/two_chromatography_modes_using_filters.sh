@@ -33,7 +33,7 @@ process() {
     pcpfm map_ms2 -i $experiment -em preferred -tm preferred_w_MS2
     pcpfm l4_annotate -i $experiment -em preferred_w_MS2 -nm HMDB_LMSD_annotated_preferred
     pcpfm l2_annotate -i $experiment -em HMDB_LMSD_annotated_preferred -nm MoNA_HMDB_LMSD_annotated_preferred_for_analysis
-    pcpfm generate_output -i $experiment -em MoNA_HMDB_LMSD_annotated_preferred_for_analysis -tm for_analysis 
+    pcpfm generate_output -i $experiment -em MoNA_HMDB_LMSD_annotated_preferred_for_analysis -tm log_transformed_for_analysis 
     pcpfm report -i $experiment
 }
 
