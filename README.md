@@ -89,6 +89,8 @@ Note that annotation sources including the HMDB, while free for public non-comme
 ### Preparing experiment metadata
 Goal: to organize metadata in a CSV file. 
 
+This step is optional, you can also provide a manually crafted sequence file instead. The examples in the manuscript use manually constructed examples.  
+
 An example command: 
 
 `pcpfm preprocess -s ./Sequence.csv --new_csv_path ./NewSequence.csv --name_field='Name' --path_field='Path' --preprocessing_config ./pcpfm/prerpocessing.json`
