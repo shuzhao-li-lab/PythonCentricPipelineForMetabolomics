@@ -109,7 +109,7 @@ for v in PARAMETERS['targets']:
 PARAMETERS['targets'] = new_target_files
 
 if PARAMETERS["conversion_command"][1] == '$BUILTIN_CONVERTER':
-    path = os.path.join(this_abs_dir, '/ThermoRawFileParser/ThermoRawFileParser.exe')
+    path = this_abs_dir + '/ThermoRawFileConverter/ThermoRawFileParser.exe'
     PARAMETERS["conversion_command"][1] = path
 
 for k, v in PARAMETERS.items():
