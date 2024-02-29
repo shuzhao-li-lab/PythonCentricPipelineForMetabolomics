@@ -29,7 +29,7 @@ This is a basic overview of the various steps in the pipeline and workflow:
 
 # Quick Start 
 
-See the workflows under examples/workflows/bash_workflows for examples of processing pipelines to get started. You will need an appropriately formattted sequence file / sample metadata file along with mzML files. You can work with .raw files but support is limited. Creating properly formatted metadata sheets is easy by hand for small studies but the preprocessing step can be helpful for larger studies (manual is still recommended for full flexibility).
+See the workflows under `examples/workflows/bash_workflows` for examples of processing pipelines to get started. You will need an appropriately formattted sequence file / sample metadata file along with mzML files. You can work with .raw files but support is limited. Creating properly formatted metadata sheets is easy by hand for small studies but the preprocessing step can be helpful for larger studies (manual is still recommended for full flexibility).
 
 
 # PythonCentricPipelineForMetabolomics (PCPFM)
