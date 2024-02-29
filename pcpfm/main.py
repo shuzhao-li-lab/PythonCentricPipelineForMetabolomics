@@ -108,6 +108,7 @@ class Main():
         parser.add_argument('--targets')
         parser.add_argument('--annot_rt_tolerance')
         parser.add_argument('--annot_mz_tolerance')
+        
 
         args = parser.parse_args()
         if args.parameters:
@@ -859,12 +860,13 @@ def main():
                 print("\t", method)
     else:
         function = getattr(Main, params['subcommand'])
-        #try:
-        function(params)
-        #except Exception as e:
-        #    print("Error executing: " + params['subcommand'])
-        #    print(function.__doc__)
-        #    print(e)
+        try:
+            function(params)
+            print("Succesfully executed: ", params["subcommand"])
+        except Exception as e:
+            print("Error executing: " + params['subcommand'])
+            print(function.__doc__)
+            print(e)
 
 def CLI():
     '''
