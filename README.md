@@ -89,6 +89,8 @@ Note that annotation sources including the HMDB, while free for public non-comme
 ### Preparing experiment metadata
 Goal: to organize metadata in a CSV file. 
 
+This step is optional, you can also provide a manually crafted sequence file instead. The examples in the manuscript use manually constructed examples.  
+
 An example command: 
 
 `pcpfm preprocess -s ./Sequence.csv --new_csv_path ./NewSequence.csv --name_field='Name' --path_field='Path' --preprocessing_config ./pcpfm/prerpocessing.json`
@@ -110,7 +112,7 @@ An example of input CSV file:
 
 Other fields are supported and can be used during an analysis. As a basic recommmendation, you should include a field for sample type (e.g., "Type") with strings for each type of sample (i.e., standards are marked 'STD', blanks are 'BLANK', etc.) and a "Batch" field if your samples were collected in multiple batches and you want to do batch correction. All fields are read in and stored in the underlying data structures and any number of fields are supported. 
 
-Here a dictionary is used that contains various fields that need to be standardized under the heading "mappings". For each such field there can be multiple values, each a key in a sub directionary containing multiple key: value pairs indicating what substrings when observed in any of the specified csv fields should result in that field being populated with the specified value. 
+The preprocessing command can help with the creation of these csv files. For this command a dictioary structure is provided as JSON that contains top-level keys for the fields you want to add to the sequence file with sub-keys for the desired field values which in turn are the keys for a dictionary with a set of rules specifying when that value should be used. The rules currently allow for the searching for any number of substrings specified by a list of strings as a value for a "substrings" key and the fields to search specified by a list of strings for a "search" field. An "else" key can be provided with a string value which will be used if none of the substrings are found in any search field.
 
 For example, 
 ```
@@ -128,7 +130,9 @@ If multiple key: value pairs are true, the specified value is added only once; h
 
 Furthermore pre-processing will attempt to map the specified path to the file to a local path. If the path exists, no changes are made; however, if the path does not exist, a .mzML or .raw file in the same location as the sequence file with the specified Name field is checked for existence. If it exists a field called "InferredPath" is created that stores this path. 
 
-An example preprocessing configuration is provided under preprocessing_examples.
+An example preprocessing configuration is provided under default_configs/default_preprocessing.json.
+
+Note that unlike other commands, there is no reasonable default configuration for this step as it depends greatly on your data. 
 
 
 ### Assemble Experiment
