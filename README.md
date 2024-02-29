@@ -20,6 +20,18 @@ Note that to replicate the presented results you will need to run the `download 
 # Recent Changes 
 
 Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. Notably there was an issue regarding sample names that do not match their mzML file names. This has been fixed as of 2/28/24.
+
+# Workflow 
+
+This is a basic overview of the various steps in the pipeline and workflow: 
+
+<img width="871" alt="image" src="https://github.com/shuzhao-li-lab/PythonCentricPipelineForMetabolomics/assets/10132705/60b92ee0-e855-41df-be5d-509a0b5f5f2f">
+
+# Quick Start 
+
+See the workflows under `examples/workflows/bash_workflows` for examples of processing pipelines to get started. You will need an appropriately formattted sequence file / sample metadata file along with mzML files. You can work with .raw files but support is limited. Creating properly formatted metadata sheets is easy by hand for small studies but the preprocessing step can be helpful for larger studies (manual is still recommended for full flexibility).
+
+
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
 The PythonCentricPipelineForMetabolomics (PCPFM) aims to be an all-in-one pre-processing pipeline for LC-MS metabolomics datasets leveraging the data quality and performance improvements offered by our pre-processing software Asari. 
