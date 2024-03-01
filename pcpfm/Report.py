@@ -424,7 +424,13 @@ class Report():
         provided.
 
         """
-        figure_path = self.experiment.qaqc_figs + "/" + section_desc["table"] + "/" + "_" + section_desc["name"] + ".png"
+        feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
+        params_for_figure = dict(self.parameters)
+        params_for_figure['all'] = False
+        params_for_figure['save_plots'] = True
+        feature_table.generate_figure_params(params_for_figure)
+        figure_path = feature_table.save_fig_path(section_desc["name"])
+
         if os.path.exists(figure_path):
             self.report.add_page()
             self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
@@ -442,7 +448,8 @@ class Report():
                 self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
                 self.report.ln(10)
                 self.report.image(figure_path, w=self.max_width)
-                utils.file_operations["delete"](figure_path)
+                #utils.file_operations["delete"](figure_path)
+
         if "text" in section_desc and section_desc["text"]:
             self.__section_text(section_desc["text"])
 
