@@ -487,6 +487,12 @@ Once a feature table and an annotated empirical compound have been created, you 
 
 The resulting tables will be found in a "<experiment_directory>/results/" subdirectory. 
 
+`pcpfm report -i <experiment_directory>`
+
+Will generate a pdf report in the output directory. The report generation uses report_config json files, a reasonable default is provided but can be modified. This is a more advanced feature and will require reading the Report.py documentation to understand. More details will be added in the future. 
+
+You can augment the report and have the colors, markers, and text be determined by passing the optional fields `--color_by`, '--marker_by` and `--text_by`. The values that should be given for these flags is a json-formatted list of the metadata fields to be used. For instance to color by `genotype` you would pass `--color_by='["genotype"]'`
+
 
 --------------------------------------------------------------
 Please do not hesitate to contact us via the GitHub issues. 
