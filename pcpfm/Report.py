@@ -145,19 +145,17 @@ class Report():
         module to see what the function requires and only pass that data.
         """
         for section in self.style:
-            try:
-                method = getattr(self, section["section"])
-                if method:
-                    if "table" in section:
-                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
-                            section["table"] = section["table"] + "_cleaned"
-                            method(section)
-                        else:
-                            method(section)
+            method = getattr(self, section["section"])
+            if method:
+                if "table" in section:
+                    if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                        section["table"] = section["table"] + "_cleaned"
+                        method(section)
                     else:
                         method(section)
-            except:
-                print("Unable to processes section: \n", section)
+                else:
+                    method(section)
+
 
     def __reset_font(self):
         """
@@ -219,7 +217,7 @@ class Report():
         text = ' '.join(text.split(None))
         text = ' '.join(text.split("\n"))
         i = 0
-        for line in textwrap.wrap(text, width=100):
+        for line in textwrap.wrap(text, width=95):
             self.__section_line(line, options=options)
         self.report.ln(5)
         self.report.ln(5)
@@ -347,6 +345,7 @@ class Report():
         Requires: None
         """
         self.__section_head("Software Version Summary")
+        self.__section_line(":".join(['pcpfm', pkg_resources.get_distribution('pcpfm').version]))
         _package = pkg_resources.working_set.by_key['pcpfm']
         for req in _package.requires():
             version = pkg_resources.get_distribution(req.name).version
@@ -355,7 +354,7 @@ class Report():
         self.__section_line("OS: " + platform.system())
         self.__section_line("Python Version: " + platform.python_version())
         self.__section_line("Architecture: " + platform.machine())
-        self.__section_line("Uname: " + " ".join(platform.uname()))
+        self.__section_text("Uname: " + " ".join(platform.uname()))
 
     def computational_performance(self, section_desc):
         """
@@ -430,7 +429,7 @@ class Report():
             self.report.add_page()
             self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
             self.report.ln(10)
-            self.report.image(figure_path, w=self.max_width)
+            self.report.image(figure_path, w=self.max_width-10)
         else:
             feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
             params_for_figure = dict(self.parameters)
@@ -444,6 +443,8 @@ class Report():
                 self.report.ln(10)
                 self.report.image(figure_path, w=self.max_width)
                 utils.file_operations["delete"](figure_path)
+        if "text" in section_desc and section_desc["text"]:
+            self.__section_text(section_desc["text"])
 
 # this updates the docstring for report
 qaqc_names = list(FeatureTable.FeatureTable.qaqc_result_to_key.keys())

@@ -29,6 +29,7 @@ class FeatureTable:
     # this maps qaqc results to keys in the self.method_map. This is used for qaqc filtering
     qaqc_result_to_key = {
         "pca": "pca",
+        "log_pca": "log_pca",
         "tsne": "tsne",
         "pearson_correlation": "pearson",
         "kendall_correlation": "kendall",
@@ -74,6 +75,7 @@ class FeatureTable:
         self.method_map = {
             "pca": self.pca,
             "tsne": self.tsne,
+            "log_pca": partial(self.pca, log_transform=True),
             "pearson": partial(self.correlation_heatmap, correlation_type="pearson"),
             "kendall": partial(self.correlation_heatmap, correlation_type="kendall"),
             "spearman": partial(self.correlation_heatmap, correlation_type="spearman"),
@@ -816,7 +818,7 @@ class FeatureTable:
             }
         return result
 
-    def pca(self, log_transform=True):
+    def pca(self, log_transform=False):
         """
         Perform PCA on provided feature table, optionally log transform
         it first.
@@ -830,15 +832,18 @@ class FeatureTable:
         sample_ftable = self.feature_table[self.sample_columns].T.copy()
         scaler = StandardScaler()
         pca_embedder = PCA(n_components=2)
+        pca_log_transformed = False
         if log_transform and not self.log_transformed:
+            pca_log_transformed = True
             sample_ftable = np.log2(sample_ftable + 1)
         pca_embedding = pca_embedder.fit_transform(
             scaler.fit_transform((sample_ftable))
         )
+        title = "pca" if not pca_log_transformed else "log_pca"
         self.gen_figure(
             "scatter",
             pca_embedding,
-            "pca",
+            title,
             x_label="PC 1 "
             + str(round(pca_embedder.explained_variance_ratio_[0] * 100, 1))
             + "%",
@@ -847,7 +852,7 @@ class FeatureTable:
             + "%",
         )
         result = {
-            "Type": "pca",
+            "Type": "pca" if not pca_log_transformed else "log_pca",
             "Config": {"n_components": 2, "scaler": "StandardScaler"},
             "Result": {
                 "Sample_Coord_Dict": {
@@ -1253,10 +1258,8 @@ class FeatureTable:
                 else:
                     print("No method found for " + field)
             qaqc_results_for_field = self.experiment.qcqa_results[self.moniker].get(field, None)
-            print(qaqc_results_for_field)
             if qaqc_results_for_field:
                 for sample, value in qaqc_results_for_field["Result"].items():
-                    print(sample, value)
                     if not min_value < float(value) < max_value:
                         if qaqc_filter[field]["Action"] == "Keep":
                             pass
