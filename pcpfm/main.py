@@ -36,11 +36,16 @@ class Main():
 
         :return: parameters dictionary
         """
-
+        all_subcommands = "\n".join([m for m in dir(Main) if not m.startswith('__')])
+        with open(os.path.join(os.path.dirname(__file__), '__init__.py'), encoding='utf-8') as f:
+            for x in f.readlines():
+                if '__version__' in x:
+                    version = "v" + x.split("=")[-1].strip()[1:-1]
         params = default_parameters.PARAMETERS
-        parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing')
+        parser = argparse.ArgumentParser(description='pcpfm, LC-MS end-to-end processing', prog='pcpfm')
+        parser.add_argument('--version', action='version', version="pcpfm " + version)
         parser.add_argument('subcommand', metavar='subcommand', 
-                            help='one of the subcommands: _____')
+                            help='one of the subcommands: ' + all_subcommands)
         parser.add_argument('-p', '--parameters')
         parser.add_argument('-m', '--mode', default=None)
         parser.add_argument('--ppm', default=5, type=int)
@@ -108,7 +113,6 @@ class Main():
         parser.add_argument('--targets')
         parser.add_argument('--annot_rt_tolerance')
         parser.add_argument('--annot_mz_tolerance')
-        
 
         args = parser.parse_args()
         if args.parameters:
@@ -860,13 +864,13 @@ def main():
                 print("\t", method)
     else:
         function = getattr(Main, params['subcommand'])
-        try:
-            function(params)
-            print("Succesfully executed: ", params["subcommand"])
-        except Exception as e:
-            print("Error executing: " + params['subcommand'])
-            print(function.__doc__)
-            print(e)
+        #try:
+        function(params)
+        #    print("Succesfully executed: ", params["subcommand"])
+        #except Exception as e:
+        #    print("Error executing: " + params['subcommand'])
+        #    print(function.__doc__)
+        #    print(e)
 
 def CLI():
     '''
@@ -876,5 +880,5 @@ def CLI():
     '''
     main()
 
-if __name__ == '__main__':
+if __name__ == '__main__':        
     main()
