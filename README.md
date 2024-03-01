@@ -162,6 +162,8 @@ Since a sequence file may contain entries that you do not want to include in the
 
 Alternatively, by using `--skip_list <names.txt>` option and providing a txt file with sample names, any acquisitions with those names will be excluded from the analysis.
 
+Ionization mode should be the same across all samples and will be automatically inferred for empirical compound creation, feature extraction, etc. 
+
 ### Conversion to mzML
 Goal: to convert .raw files to centroid .mzML files.
 
@@ -180,7 +182,7 @@ An example command:
 
 `pcpfm asari -i ./my_experiment`
 
-This command will infer the correct ionization mode for the experiment; however, if additional parameters or different parameters are needed, they can be provided using `--asari_command "asari process -m $IONIZATION_MODE -i $CONVERTED_SUBDIR -o $ASARI_SUBDIR ...", just replace ... with your additional params. Alternatively, you can use the default asari_command and simply add --extra_asari with the parameters you want to add. 
+This command will infer the correct ionization mode for the experiment which will persist through out processing; however, if additional parameters or different parameters are needed, they can be provided using `--asari_command "asari process -m $IONIZATION_MODE -i $CONVERTED_SUBDIR -o $ASARI_SUBDIR ...", just replace ... with your additional params. Alternatively, you can use the default asari_command and simply add --extra_asari with the parameters you want to add. 
 
 Here it is important to introduce the concept of monikers and how they are used by the pipeline. For any given experiment, multiple feature tables and/or empirical compound lists may be created using different criteria (e.g., which isotope patterns are considered or adducts for empCpds or different filtering rules for feature tables). Each such table or empCpd list will be stored on disk in the appropriate subdirectory but they will be accessible by their moniker, a name given to them by the user or automatically created by the pipeline. 
 
@@ -484,6 +486,12 @@ Once a feature table and an annotated empirical compound have been created, you 
 `pcpfm generate_output -i <experiment_directory> -em <empCpd_moniker> -tm <table_moniker>`
 
 The resulting tables will be found in a "<experiment_directory>/results/" subdirectory. 
+
+`pcpfm report -i <experiment_directory>`
+
+Will generate a pdf report in the output directory. The report generation uses report_config json files, a reasonable default is provided but can be modified. This is a more advanced feature and will require reading the Report.py documentation to understand. More details will be added in the future. 
+
+You can augment the report and have the colors, markers, and text be determined by passing the optional fields `--color_by`, '--marker_by` and `--text_by`. The values that should be given for these flags is a json-formatted list of the metadata fields to be used. For instance to color by `genotype` you would pass `--color_by='["genotype"]'`
 
 
 --------------------------------------------------------------
