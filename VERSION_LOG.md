@@ -21,3 +21,14 @@ v1.0.7 -> v1.0.8
 
 v1.0.8 -> v1.0.9
   - edge case fixed with sample names
+  - fixed issue resolving ThermoRawFileConverter name
+
+v1.0.9 -> v1.0.10
+  - changed default conversion output from mzML to indexed mzML
+  - succesfull commands are now reported
+  - '--version' now outputs the version of the pipeline
+  - suppressed some print messages from debugging
+  - clarified that PCA is performed on log2 transformed tables in previous reports
+  - differentiated between PCA and PCA after log transformation, now two separate commands in report generation. 
+  - add text to default reports
+  - MANIFEST includes more things now, namely example JSON configs
