@@ -1,7 +1,4 @@
 include requirements.txt
 recursive-include pcpfm/annotation_sources *
 recursive-include pcpfm/default_configs *.json
-recursive-include pcpfm/filters *.json
-recursive-include pcpfm/examples *.sh
-recursive-include pcpfm/preprocessing_examples *.json
-recursive-include pcpfm/report_templates *.json
+recursive-include examples *
