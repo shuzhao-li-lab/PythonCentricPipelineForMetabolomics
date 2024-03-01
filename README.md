@@ -144,7 +144,7 @@ Furthermore pre-processing will attempt to map the specified path to the file to
 
 An example preprocessing configuration is provided under default_configs/default_preprocessing.json.
 
-Note that unlike other commands, there is no reasonable default configuration for this step as it depends greatly on your data. 
+Note that unlike other commands, there is no reasonable default configuration for this step as it depends greatly on your data. Furthermore, please note that any missing values will be cast to the appropriate placeholder using the logic in Panda's `read_csv` function. This can cause missing fields to become `np.nan` or an empty string. If you don't want this behavior, then don't pass empty fields. 
 
 
 ### Assemble Experiment
