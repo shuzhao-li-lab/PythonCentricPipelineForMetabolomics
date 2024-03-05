@@ -405,6 +405,8 @@ To annoatate the preferred empCpd object:
 
 There is no mz tolerance here for the search as the search uses the inferred formula from the EmpCpd which will be determined by the parameters used for construction.
 
+NOTE: Level 4 annotations are NOT currently generated for singletons since we cannot infer their adducts. 
+
 #### MS1 Annotations - Level 1b
 
 Goal: generate Level 1b annotations (rt and mz similarity to authentic standards) for the empirical compounds.
