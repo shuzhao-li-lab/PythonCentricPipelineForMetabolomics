@@ -149,8 +149,8 @@ class Acquisition(Sample):
                 fp_to_read = self.source_filepath
             if fp_to_read:
                 self.__has_ms2 = False
-                reader = pymzml.run.Reader(fp_to_read)
                 try:
+                    reader = pymzml.run.Reader(fp_to_read)
                     for _, spec in enumerate(reader):
                         if spec.ms_level == 2:
                             self.__has_ms2 = True

@@ -113,6 +113,7 @@ class Main():
         parser.add_argument('--targets')
         parser.add_argument('--annot_rt_tolerance')
         parser.add_argument('--annot_mz_tolerance')
+        parser.add_argument('--accept_licenses')
 
         args = parser.parse_args()
         if args.parameters:
@@ -191,7 +192,7 @@ class Main():
         '''
         print(warning)
         user_input = input()
-        if user_input == "yes":
+        if user_input == "yes" or params['accept_licenses'] in ["True", "TRUE", "Yes", "yes", "T", "Y", True]:
             def download_from_cloud_storage(src, dst):
                 gdown.download(src, output=dst)
                 with zipfile.ZipFile(dst, 'r') as zip_ref:

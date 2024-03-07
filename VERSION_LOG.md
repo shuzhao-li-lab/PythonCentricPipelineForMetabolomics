@@ -32,3 +32,6 @@ v1.0.9 -> v1.0.10
   - differentiated between PCA and PCA after log transformation, now two separate commands in report generation. 
   - add text to default reports
   - MANIFEST includes more things now, namely example JSON configs
+
+v1.0.10 -> v1.0.11
+  - can download extras using command line flag, useful for workshop.
