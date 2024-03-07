@@ -99,7 +99,8 @@ PARAMETERS = {
     "skip_list": None,
     "extra_asari": None,
     "seed": None,
-    "accept_licenses": False
+    "accept_licenses": False,
+    "scan_experiment": False
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))

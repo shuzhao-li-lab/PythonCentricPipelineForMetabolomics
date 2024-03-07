@@ -188,12 +188,18 @@ class Main():
         
         By downloading these extras you agree to the terms of their licenses. 
 
-        Please type 'yes' to acknowledge. 
-        
         '''
         print(warning)
-        user_input = input()
-        if user_input == "yes" or params['accept_licenses'] in ["True", "TRUE", "Yes", "yes", "T", "Y", True]:
+
+        accepted_license = False
+        if params['accept_licenses'] in ["True", "TRUE", "Yes", "yes", "T", "Y", True]:
+            accepted_license = True
+        else:
+            user_input = input()
+            if user_input == "yes":
+                accepted_license = True
+                
+        if accepted_license:
             def download_from_cloud_storage(src, dst):
                 gdown.download(src, output=dst)
                 with zipfile.ZipFile(dst, 'r') as zip_ref:

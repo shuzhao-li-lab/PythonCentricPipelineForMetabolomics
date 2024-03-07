@@ -435,8 +435,11 @@ class EmpCpds:
         # we should first map ms2 spectra to empCpds, then annnotate them.
         mzml_w_ms2 = []
         if ms2_files:
-            for ms2_file in search_for_mzml(ms2_files):
-                mzml_w_ms2.append(ms2_file)
+            if ms2_files.endswith(".mzML"):
+                mzml_w_ms2.append(ms2_files)
+            else:
+                for ms2_file in search_for_mzml(ms2_files):
+                    mzml_w_ms2.append(ms2_file)
 
         if scan_experiment:
             for acq in self.experiment.acquisitions:

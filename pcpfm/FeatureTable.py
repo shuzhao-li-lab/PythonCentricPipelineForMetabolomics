@@ -1179,16 +1179,16 @@ class FeatureTable:
             drop_name (_type_): the name to be dropped
             drop_others (bool, optional): drop other samples if true. Defaults to False.
         """
-        starting_columns = self.feature_table.columns
+        starting_columns = list(self.feature_table.columns)
         if drop_others:
             self.feature_table.drop(
                 columns=[x for x in self.sample_columns if x != drop_name], inplace=True
             )
         else:
             self.feature_table.drop(columns=drop_name, inplace=True)
-        print("Dropped:")
-        for x in self.feature_table.columns:
-            if x not in starting_columns:
+        print("Dropping:")
+        for x in starting_columns:
+            if x not in self.feature_table.columns:
                 print("\t", x)
             
             
