@@ -307,7 +307,10 @@ class FeatureTable:
         )
         if not os.path.exists(fig_path):
             os.makedirs(fig_path)
+
+        name += json.dumps(self.figure_params['color_by']) + json.dumps(self.figure_params['marker_by']) + json.dumps(self.figure_params['text_by'])
         name = "".join(c for c in name if c.isalpha() or c.isdigit() or c==' ' or c=='_').rstrip()
+
         return os.path.join(fig_path, "_" + name + ".png")
 
     def gen_figure(
@@ -484,6 +487,9 @@ class FeatureTable:
                 plt.suptitle(title)
                 plt.hist(data, bins=bins)
             if fig_params["save_figs"]:
+                
+
+
                 plt.savefig(self.save_fig_path(title.replace(" ", "_")))
             if fig_params["interactive"]:
                 plt.show()
@@ -1173,12 +1179,19 @@ class FeatureTable:
             drop_name (_type_): the name to be dropped
             drop_others (bool, optional): drop other samples if true. Defaults to False.
         """
+        starting_columns = self.feature_table.columns
         if drop_others:
             self.feature_table.drop(
                 columns=[x for x in self.sample_columns if x != drop_name], inplace=True
             )
         else:
             self.feature_table.drop(columns=drop_name, inplace=True)
+        print("Dropped:")
+        for x in self.feature_table.columns:
+            if x not in starting_columns:
+                print("\t", x)
+            
+            
 
     def drop_samples_by_filter(self, sample_filter, drop_others=False):
         """
@@ -1726,6 +1739,9 @@ class FeatureTable:
             "colors": colors,
             "color_legend": color_legend,
             "marker_legend": marker_legend,
+            "color_by": params["color_by"],
+            "marker_by": params["marker_by"],
+            "text_by": params["text_by"]
         }
 
     def QAQC(self, params):
