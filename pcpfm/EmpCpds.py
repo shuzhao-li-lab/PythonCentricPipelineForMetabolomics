@@ -633,7 +633,6 @@ class EmpCpds:
                     sim_result = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
                     score, n_matches = sim_result.tolist()
                     if score >= score_cutoff and n_matches >= min_peaks:
-                        print("HIT")
                         match += 1
                         exp_ms2.annotate(
                             db_ms2,
