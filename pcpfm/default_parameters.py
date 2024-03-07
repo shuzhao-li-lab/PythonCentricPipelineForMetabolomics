@@ -29,7 +29,7 @@ PARAMETERS = {
     "multicores": 4,
     "conversion_command": ['$(which mono)', 
                            '$BUILTIN_CONVERTER', 
-                           '-f=1', 
+                           '-f=2', 
                            '-i', 
                            '$RAW_PATH', 
                            '-b',
@@ -99,6 +99,7 @@ PARAMETERS = {
     "skip_list": None,
     "extra_asari": None,
     "seed": None,
+    "accept_licenses": False
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
