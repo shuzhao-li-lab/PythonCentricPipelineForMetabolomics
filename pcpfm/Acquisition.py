@@ -105,13 +105,16 @@ class Acquisition(Sample):
         :return: ionization mode, "pos" or "neg"
         """
         if self.__ionization_mode is None:
-            for spec in pymzml.run.Reader(self.mzml_filepath):
-                if spec["positive scan"]:
-                    self.__ionization_mode = "pos"
+            try:
+                for spec in pymzml.run.Reader(self.mzml_filepath):
+                    if spec["positive scan"]:
+                        self.__ionization_mode = "pos"
+                        self.mode = self.__ionization_mode
+                        return self.__ionization_mode
+                    self.__ionization_mode = "neg"
                     self.mode = self.__ionization_mode
                     return self.__ionization_mode
-                self.__ionization_mode = "neg"
-                self.mode = self.__ionization_mode
+            except:
                 return self.__ionization_mode
         return self.__ionization_mode
 
