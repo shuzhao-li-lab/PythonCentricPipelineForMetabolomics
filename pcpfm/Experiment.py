@@ -281,7 +281,8 @@ class Experiment(core.Experiment):
         if self.__ionization_mode is None:
             while len(ion_modes) < min(3, len(self.acquisitions)):
                 acquisition = random.sample(self.acquisitions, 1)[0]
-                ion_modes.append(acquisition.ionization_mode)
+                if acquisition.ionization_mode:
+                    ion_modes.append(acquisition.ionization_mode)
             if len(set(ion_modes)) == 1:
                 self.__ionization_mode = list(ion_modes)[0]
         return self.__ionization_mode
