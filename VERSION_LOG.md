@@ -35,3 +35,12 @@ v1.0.9 -> v1.0.10
 
 v1.0.10 -> v1.0.11
   - can download extras using command line flag, useful for workshop.
+  - non fatal corrupted mzML during MS2 determination
+  - now print dropped samples if drop_names is used
+  - added flag to scan for DDA in experiment, this was an oversight that occured during refactoring of MS2 methods
+
+v1.0.11 -> v1.0.12
+  - better drop messages
+  - better handling of corrupted mzML
+  - better handling of license agreement
+  - add link to tutorial

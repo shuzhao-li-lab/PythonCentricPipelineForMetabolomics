@@ -31,6 +31,9 @@ This is a basic overview of the various steps in the pipeline and workflow:
 
 See the workflows under `examples/workflows/bash_workflows` for examples of processing pipelines to get started. You will need an appropriately formattted sequence file / sample metadata file along with mzML files. You can work with .raw files but support is limited. Creating properly formatted metadata sheets is easy by hand for small studies but the preprocessing step can be helpful for larger studies (manual is still recommended for full flexibility).
 
+There are also examples of basic and advanced pipeline and asari usage located here: https://github.com/shuzhao-li-lab/asari_pcpfm_tutorials
+
+Along with additional details on running Asari.
 
 # PythonCentricPipelineForMetabolomics (PCPFM)
 
