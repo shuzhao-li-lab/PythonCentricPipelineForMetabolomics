@@ -480,7 +480,6 @@ class Experiment(core.Experiment):
                 "$RAW_PATH": acquisition.raw_filepath,
                 "$OUT_PATH": output_filepath,
             }
-            print(conversion_command)
             if isinstance(conversion_command, list):
                 jobs.append(
                     [field_map.get(element, element) for element in conversion_command]
@@ -567,6 +566,7 @@ class Experiment(core.Experiment):
                 experiment_directory, experiment_directory, sequence=csv_filepath
             )
             sequence_df = pd.read_csv(csv_filepath)
+            sequence_df = sequence_df.infer_objects(copy=True)
             for acq_info in sequence_df.apply(row_to_dict, axis=1, args=(sequence_df.columns,)):
                 acq_path = acq_info.get(path_field, None)
                 acq_name = acq_info.get(name_field, None)

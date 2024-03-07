@@ -50,11 +50,12 @@ def row_to_dict(row, columns):
     """
     _d = {}
     for c in columns:
-        c = c.strip() if isinstance(c, str) else c
-        v = row[c].strip() if isinstance(row[c], str) else row[c]
-        _d[c] = v
+        if row[c]:
+            _d[c] = row[c]
+        else:
+            if isinstance(row[c], str):
+                _d[c] = ''
     return _d
-
 
 def extract_CD_csv(
     cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
@@ -355,9 +356,18 @@ log_modes = {
     "log10": np.log10
     }
 
+def delete_dir_or_file(to_delete):
+    try:
+        shutil.rmtree(to_delete)
+    except:
+        try:
+            os.remove(to_delete)
+        except:
+            "Unable to delete: " + to_delete
+
 file_operations = {
     "link": os.link,
     "copy": shutil.copy,
     "move": shutil.move,
-    "delete": shutil.rmtree,
+    "delete": delete_dir_or_file
 }
