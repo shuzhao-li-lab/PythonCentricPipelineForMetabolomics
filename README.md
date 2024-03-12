@@ -17,6 +17,14 @@ We are working to add supports of GC and other data types.
 
 Note that to replicate the presented results you will need to run the `download extras` command. See below.
 
+# Citation / Publication
+
+A publication based on this work is currently under review. If you are interested in the pipeline and would like to learn more, please checkout:
+
+https://www.biorxiv.org/content/10.1101/2024.02.13.580048v1
+
+If you use the pipeline in a publication please cite the above preprint until the formal publication is available.
+
 # Recent Changes 
 
 Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. Notably there was an issue regarding sample names that do not match their mzML file names. This has been fixed as of 2/28/24.
