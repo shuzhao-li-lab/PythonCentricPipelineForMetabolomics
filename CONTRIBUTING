@@ -8,5 +8,6 @@ Currently there are no strict coding style guidelines but please consider the fo
 2. Readability > performance, unless strictly necessary keep code less optimized but easier to follow
 3. Consider edge cases and please add tests to your contributions. 
 4. Pylint is not to be trusted blindly; however, please ensure all *.py files have a rating > 9.0
+5. The issues on github are to be used for bug reports, feature requests, or to ask general questions that may be usable to a wider community. If you have an issue that is highly specific to your use case, please email me directly at the below address.
 
 If you have questions, please contact me at joshua.mitchell@jax.org.
