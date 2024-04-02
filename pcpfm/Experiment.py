@@ -295,7 +295,11 @@ class Experiment(core.Experiment):
             moniker (str): the table moniker to delete
 
         """
-        if moniker in self.feature_tables:
+        if moniker == "*":
+            for moniker in self.feature_tables:
+                if moniker not in {"preferred", "full"}:
+                    self.delete_feature_table(moniker)
+        elif moniker in self.feature_tables:
             file_operations["delete"](self.feature_tables[moniker])
             del self.feature_tables[moniker]
         else:
@@ -309,7 +313,11 @@ class Experiment(core.Experiment):
             moniker (str): the empcpd moniker to delete
 
         """
-        if moniker in self.empCpds:
+        if moniker == "*":
+            for moniker in self.empCpds:
+                if moniker not in {"asari"}:
+                    self.delete_empCpds(moniker)
+        elif moniker in self.empCpds:
             file_operations["delete"](self.empCpds[moniker])
             del self.empCpds[moniker]
         else:

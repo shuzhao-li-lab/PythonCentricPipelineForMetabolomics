@@ -22,22 +22,32 @@
         {
             "section": "figure",
             "table": "*", 
-            "name": "pca"
+            "name": "pca",
+            "text": "This is PCA performed on the specified feature table. It has standardized to a mean of zero and unit variance."
         },
         {
             "section": "figure",
             "table": "*",
-            "name": "pearson_correlation"
+            "name": "log_pca",
+            "text": "This is PCA performed on the log2 transformed feature table. This is very similar to PCA without log transform but may better handle outliers.  It has standardized to a mean of zero and unit variance."
         },
         {
             "section": "figure",
             "table": "*",
-            "name": "log_tics"
+            "name": "pearson_correlation",
+            "text": "The pearson correlation represents how similar samples in feature intensities but assumes linearity. Higher correlation typically implies more similarity in samples; however, if many features are missing and have zero values, this correlation will appear falsely high. More informative correlation will be capture after imputing missing values and log transforming."
         },
         {
             "section": "figure",
             "table": "*",
-            "name": "feature_count_z_scores"
+            "name": "log_tics",
+            "text": "The sum of all ions in the feature table then log10 transformed. This is useful for finding all sorts of anomalies"
+        },
+        {
+            "section": "figure",
+            "table": "*",
+            "name": "feature_count_z_scores",
+            "text": "A z-score calculated using the standard deviation and median number of features per sample in the feature table. This is useful for finding failed injections and other anomalies."
         },
         {
             "section": "version_summary"
