@@ -44,3 +44,16 @@ v1.0.11 -> v1.0.12
   - better handling of corrupted mzML
   - better handling of license agreement
   - add link to tutorial
+
+v1.0.12 -> v1.0.13
+  - this version is used for the manuscript revision
+  - better usage of metDataModel
+  - uses the dataclass version of metDataModel
+  - updates to the figure 5D notebook
+  - better handling of missing figures during report generation
+  - updates to the figure 4 notebook
+  - replace row_to_dict with pd.to_dict()
+  - add __main__ to enable calling as module easily
+  - added statements regarding the execution of CLI commands
+  - fixed bug with report timing
+  - reports will now trigger experiment save on success
