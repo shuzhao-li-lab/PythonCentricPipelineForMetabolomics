@@ -427,6 +427,7 @@ class Main():
                                                     params['khipu_rt_tolerance'],
                                                     params['ppm'],
                                                     params['khipu_charges'])
+        exit()
         experiment.save()
 
     @staticmethod
@@ -908,8 +909,9 @@ def main():
     """
     This is the main function for the pipeline
     """
-
     params = Main.process_params()
+
+    print("Attempting: ", params["subcommand"])
     if params['subcommand'] not in dir(Main):
         print(params['subcommand'] + " is not a valid subcommand")
         print("valid commands include:")
@@ -918,13 +920,13 @@ def main():
                 print("\t", method)
     else:
         function = getattr(Main, params['subcommand'])
-        #try:
-        function(params)
-        #    print("Succesfully executed: ", params["subcommand"])
-        #except Exception as e:
-        #    print("Error executing: " + params['subcommand'])
-        #    print(function.__doc__)
-        #    print(e)
+        try:
+            function(params)
+            print("Succesfully executed: ", params["subcommand"])
+        except Exception as e:
+            print("Error executing: " + params['subcommand'])
+            print(function.__doc__)
+            print(e)
 
 def CLI():
     '''

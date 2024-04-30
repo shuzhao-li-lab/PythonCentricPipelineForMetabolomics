@@ -1693,12 +1693,16 @@ class FeatureTable:
             "markers": {}
         }
         acq_name_map = {acq.name: acq for acq in self.experiment.acquisitions}
+        input_name_map = {os.path.basename(acq.input_file): acq for acq in self.experiment.acquisitions}
         for sample_name in self.sample_columns:
             if sample_name in acq_name_map:
                 acquisition = acq_name_map[sample_name]
-            else:
-                new_sample_name = sample_name + ".mzML"
-                acquisition = acq_name_map[new_sample_name]
+            elif sample_name + ".mzML" in acq_name_map:
+                acquisition = acq_name_map[sample_name + ".mzML"]
+            elif sample_name in input_name_map:
+                acquisition = input_name_map[sample_name]
+                
+            
 
             #acquisition = acq_name_map[sample_name.split("___")[-1]]
             for i, x in enumerate(colorby):

@@ -1,0 +1,75 @@
+{
+    "sections":
+    [
+        {
+            "section": "timestamp"
+        },
+        {
+            "section": "table_summary",
+            "text": "A feature denotes a region of a spectrum believed to represent a ion of a compound with a retention time and a mass-to-charge ratio. Multiple features often represent the same metabolite due to isotopologues, adduct, multiple charges etc. and thus, the number of features is only a rough proxy for the number of detected metabolites. Due to noise, artifacts, rare metabolites, etc. the number of features often increases with the number of samples."
+        },
+        {
+            "section": "empcpd_summary",
+            "text": "Empirical compounds are computational intermediates representing sets of features suspected to correspond to the same compound. Each empirical compound is a khipu, thus, the number of khipus is an estimateof the number of detected metabolites. Each khipu represents multiple features; however, unless singletons were added to the khipu during construction, the number of features grouped captured by empCpds is less thanthe number of features."
+        },
+        {
+            "section": "experiment_summary"
+        },
+        {
+            "section": "annotation_summary",
+            "text": "Annotations are mappings of features / empCpds to suspected chemical entities. Annotations can be higher or lower confidence depending on the origin in which they are generated. In general, MS1 annotated features are lower confidence than MS2 annotated features."
+        },
+        {
+            "section": "figure",
+            "table": "*", 
+            "name": "pca",
+            "text": "This is PCA performed on the specified feature table. It has standardized to a mean of zero and unit variance."
+        },
+        {
+            "section": "figure",
+            "table": "*",
+            "name": "log_pca",
+            "text": "This is PCA performed on the log2 transformed feature table. This is very similar to PCA without log transform but may better handle outliers.  It has standardized to a mean of zero and unit variance."
+        },
+        {
+            "section": "figure",
+            "table": "preferred",
+            "name": "pearson_correlation",
+            "text": "The pearson correlation represents how similar samples in feature intensities but assumes linearity. Higher correlation typically implies more similarity in samples; however, if many features are missing and have zero values, this correlation will appear falsely high. More informative correlation will be capture after imputing missing values and log transforming."
+        },
+        {
+            "section": "figure",
+            "table": "qaqc_filtered_masked_pref_unknowns",
+            "name": "pearson_correlation",
+            "text": "The pearson correlation represents how similar samples in feature intensities but assumes linearity. Higher correlation typically implies more similarity in samples; however, if many features are missing and have zero values, this correlation will appear falsely high. More informative correlation will be capture after imputing missing values and log transforming."
+        },
+        {
+            "section": "figure",
+            "table": "for_analysis",
+            "name": "pearson_correlation",
+            "text": "The pearson correlation represents how similar samples in feature intensities but assumes linearity. Higher correlation typically implies more similarity in samples; however, if many features are missing and have zero values, this correlation will appear falsely high. More informative correlation will be capture after imputing missing values and log transforming."
+        },
+        {
+            "section": "figure",
+            "table": "*",
+            "name": "log_tics",
+            "text": "The sum of all ions in the feature table then log10 transformed. This is useful for finding all sorts of anomalies"
+        },
+        {
+            "section": "figure",
+            "table": "*",
+            "name": "feature_count_z_scores",
+            "text": "A z-score calculated using the standard deviation and median number of features per sample in the feature table. This is useful for finding failed injections and other anomalies."
+        },
+        {
+            "section": "version_summary"
+        },
+        {
+            "section": "command_history"
+        },
+        {
+            "section": "save",
+            "report_name": "report.pdf"
+        }
+    ]
+}

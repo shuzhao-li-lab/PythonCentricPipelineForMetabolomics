@@ -155,6 +155,7 @@ class Report():
                         method(section)
                 else:
                     method(section)
+        self.experiment.save()
 
 
     def __reset_font(self):
@@ -430,28 +431,28 @@ class Report():
         params_for_figure['save_plots'] = True
         feature_table.generate_figure_params(params_for_figure)
         figure_path = feature_table.save_fig_path(section_desc["name"])
-
-        if os.path.exists(figure_path):
-            self.report.add_page()
-            self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
-            self.report.ln(10)
-            self.report.image(figure_path, w=self.max_width-10)
-        else:
-            feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
-            params_for_figure = dict(self.parameters)
-            params_for_figure['all'] = False
-            params_for_figure['save_plots'] = True
-            if section_desc["name"] in feature_table.qaqc_result_to_key:
-                params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
-                feature_table.QAQC(params_for_figure)
+        try:
+            if os.path.exists(figure_path):
                 self.report.add_page()
                 self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
                 self.report.ln(10)
-                self.report.image(figure_path, w=self.max_width)
-                #utils.file_operations["delete"](figure_path)
-
-        if "text" in section_desc and section_desc["text"]:
-            self.__section_text(section_desc["text"])
+                self.report.image(figure_path, w=self.max_width-10)
+            else:
+                feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
+                params_for_figure = dict(self.parameters)
+                params_for_figure['all'] = False
+                params_for_figure['save_plots'] = True
+                if section_desc["name"] in feature_table.qaqc_result_to_key:
+                    params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
+                    feature_table.QAQC(params_for_figure)
+                    self.report.add_page()
+                    self.__section_line("Table: " + section_desc["table"] + "  " + "Figure: " + section_desc["name"])
+                    self.report.ln(10)
+                    self.report.image(figure_path, w=self.max_width)
+            if "text" in section_desc and section_desc["text"]:
+                self.__section_text(section_desc["text"])
+        except:
+            pass
 
 # this updates the docstring for report
 qaqc_names = list(FeatureTable.FeatureTable.qaqc_result_to_key.keys())

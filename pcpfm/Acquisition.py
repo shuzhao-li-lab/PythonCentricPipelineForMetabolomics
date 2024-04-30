@@ -33,15 +33,23 @@ class Acquisition(Sample):
         has_ms2=None,
         experiment=None
     ):
-        registry = {
-            "input_file": source_filepath,
-            "name": name,
-            "sample_id": name,
-            "list_retention_time": None
-        }
-        super().__init__(registry, experiment=experiment, mode=None)
-        self.name = name
-        self.source_filepath = source_filepath
+        
+        super().__init__(
+            experiment = '',
+            registry = {
+                "input_file": source_filepath,
+                "name": name,
+                "sample_id": name,
+                "list_retention_time": None
+            },
+            mode = ionization_mode,
+            sample_type = '',
+            input_file = source_filepath,
+            name = name,
+            id = name,
+        )
+        self.experiment = experiment
+
         self.metadata_tags = metadata_tags if metadata_tags is not None else {}
         self.raw_filepath = raw_filepath
         self.mzml_filepath = mzml_filepath
@@ -50,8 +58,10 @@ class Acquisition(Sample):
         self.__ionization_mode = ionization_mode
         self.__has_ms2 = has_ms2
 
+    @property
+    def source_filepath(self):
+        return self.input_file
     
-
     @staticmethod
     def load_acquisition(acquisition_data, experiment):
         """
@@ -65,7 +75,7 @@ class Acquisition(Sample):
         """
         return Acquisition(
             acquisition_data["name"],
-            source_filepath=acquisition_data["source_filepath"],
+            source_filepath=acquisition_data["registry"]["input_file"],
             metadata_tags=acquisition_data["metadata_tags"],
             raw_filepath=acquisition_data["raw_filepath"],
             mzml_filepath=acquisition_data["mzml_filepath"],
@@ -125,7 +135,7 @@ class Acquisition(Sample):
 
         :return: a JSON-friendly dictionary for serialization during experiment saving and loading
         """
-        return recursive_encoder(self.__dict__)
+        return recursive_encoder({k: v for k, v in self.__dict__.items() if k != 'experiment'})
 
     @property
     def has_ms2(self):
