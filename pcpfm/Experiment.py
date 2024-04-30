@@ -18,7 +18,7 @@ import pandas as pd
 import matplotlib.colors as mcolors
 import asari
 from metDataModel import core
-from .utils import recursive_encoder, file_operations, row_to_dict, flatten_nested_dicts
+from .utils import recursive_encoder, file_operations, flatten_nested_dicts
 from . import Acquisition
 from . import EmpCpds
 from . import FeatureTable
@@ -76,12 +76,41 @@ class Experiment(core.Experiment):
         qaqc_figs=None,
         asari_subdirectory=None,
         output_subdirectory=None,
+        ordered_samples=None,
+        parent_study=None
     ):
-        super().__init__(experiment_name)
-        self.experiment_name = self.id
+        super().__init__(id=experiment_name,
+                         parent_study= parent_study if parent_study else '',
+                         species=species if species else '',
+                         tissue=tissue if tissue else '',
+                         provenance=provenance if provenance else {
+                                'generated_time': '',
+                                'generated_by': '',
+                                'input_filename': '',
+                                'preprocess_software': '',
+                                'preprocess_parameters': {}
+                            },
+                         chromatography= {
+                                'type': '',
+                                'total_time': '',
+                                'method_file': '',
+                                'column_model': '',
+                                'column_length': ''
+                            },
+                         instrumentation= {
+                                'type': '',
+                                'spectrometer': '',
+                                'method_file': '',
+                                'ionization': ''
+                            },
+                         ObservationAnnotation= {
+                                'sample_list': [],
+                                'file_sample_mapper': {}
+                            },
+                        #ordered_samples = ordered_samples if ordered_samples else [x.acq_name for x in acquisitions] if acquisitions else []
+                         )
+
         self.experiment_directory = os.path.abspath(experiment_directory)
-        if acquisitions:
-            self.ordered_samples = set(acquisitions)
         self.acquisitions = acquisitions if acquisitions else []
         self.qcqa_results = qcqa_results if qcqa_results else {}
         self.feature_tables = feature_tables if feature_tables else {}
@@ -96,10 +125,9 @@ class Experiment(core.Experiment):
         self.command_history = command_history if command_history else []
         self.sequence = sequence
         self.List_of_empCpds = self.final_empCpds = final_empCpds
-        self.parent_study = self.study = study
-        self.provenance = provenance if provenance else {}
 
         # subdirectories
+        # todo - someday, lets make this more clean
         self.converted_subdirectory = converted_subdirectory
         self.raw_subdirectory = raw_subdirectory
         self.acquisition_data = acquisition_data
@@ -121,11 +149,19 @@ class Experiment(core.Experiment):
         self.__acq_names = None
         self.__ms2_acquisitions = None
 
+    @property
+    def experiment_name(self):
+        return self.id
+    
+    @property
+    def study(self):
+        return self.parent_study
+
     def order_samples(self):
         """
         This updates the ordered_samples param, part of metdatamodel implementation.
         """
-        self.ordered_samples = tuple(self.acquisitions)
+        self.ordered_samples = [x.name for x in self.acquisitions]
 
     @staticmethod
     def create_experiment(experiment_name, experiment_directory, sequence=None):
@@ -171,17 +207,15 @@ class Experiment(core.Experiment):
 
     def save(self):
         """
-        This saves the experiment object as a JSON object inside the
+        This saves the experiment object as a JSON object in side the
         experiment directory.
         """
-        save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
-        self.command_history.append(str(time.time()) + ":" + ";".join(sys.argv))
         try:
-            with open(
-                os.path.join(save_path), "w", encoding="utf-8"
-            ) as save_filehandle:
+            save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
+            with open(os.path.join(save_path), "w", encoding="utf-8") as save_filehandle:
+                self.command_history.append(str(time.time()) + ":" + ";".join(sys.argv))
                 json.dump(recursive_encoder(self.__dict__), save_filehandle, indent=4)
-            file_operations["move"](save_path, save_path.replace(".tmp", ""))
+                file_operations["move"](save_path, save_path.replace(".tmp", ""))
         except Exception as e:
             print("Unable to save experiment!\n" + e)
             raise e
@@ -216,7 +250,7 @@ class Experiment(core.Experiment):
                 MS2_methods=decoded_JSON["MS2_methods"],
                 MS1_only_methods=decoded_JSON["MS1_only_methods"],
                 command_history=decoded_JSON["command_history"],
-                study=decoded_JSON["study"],
+                study=None,
                 sequence=decoded_JSON["sequence"],
                 final_empCpds=decoded_JSON["final_empCpds"],
                 species=decoded_JSON["species"],
@@ -232,7 +266,8 @@ class Experiment(core.Experiment):
                 ms2_directory=decoded_JSON["ms2_directory"],
                 qaqc_figs=decoded_JSON["qaqc_figs"],
                 asari_subdirectory=decoded_JSON["asari_subdirectory"],
-                output_subdirectory=decoded_JSON['output_subdirectory']
+                output_subdirectory=decoded_JSON['output_subdirectory'],
+                parent_study=decoded_JSON['parent_study']
             )
         for x in decoded_JSON["acquisitions"]:
             experiment.acquisitions.append(
@@ -419,7 +454,7 @@ class Experiment(core.Experiment):
                 )
         else:
             print("File Not Found: ", acquisition.name, acquisition.source_filepath)
-        self.ordered_samples = tuple(self.acquisitions)
+        self.order_samples()
         if self.number_samples is None:
             self.number_samples = 0
         self.number_samples += 1
@@ -576,7 +611,7 @@ class Experiment(core.Experiment):
             )
             sequence_df = pd.read_csv(csv_filepath)
             sequence_df = sequence_df.infer_objects(copy=True)
-            for acq_info in sequence_df.apply(row_to_dict, axis=1, args=(sequence_df.columns,)):
+            for acq_info in sequence_df.to_dict(orient="records"):
                 acq_path = acq_info.get(path_field, None)
                 acq_name = acq_info.get(name_field, None)
                 if acq_path is None and acq_name:
@@ -637,6 +672,7 @@ class Experiment(core.Experiment):
             dict: the mapping of fields to cosmetic types.
         """
 
+        # todo - this should be in JSON
         cosmetic_rules = {
             "colors": {
                 "banned": [

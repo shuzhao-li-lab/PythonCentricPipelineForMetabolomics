@@ -5,7 +5,7 @@ source ../pcpfm_venv/bin/activate
 
 #rm -rf $experiment
 
-pcpfm assemble -o $working_dir -j HZV029_TwoPhase_HILICneg -s ./sequence_files/HZV029_Lipidomics.csv --filter ../../../filters/hilicneg.json --name_field "File Name"
+pcpfm assemble -o $working_dir -j HZV029_TwoPhase_HILICneg -s ./sequence_files/HZV029_TwoPhase.csv --filter ../../../filters/hilicneg.json --name_field "File Name"
 pcpfm convert -i $experiment
 pcpfm asari -i $experiment
 

@@ -21,7 +21,6 @@ from .utils import (
     get_similarity_method,
     lazy_extract_ms2_spectra,
     search_for_mzml,
-    row_to_dict,
     extract_CD_csv,
 )
 
@@ -464,7 +463,6 @@ class EmpCpds:
                     matched_ms2_objects += 1
                     khipu["MS2_Spectra"].append(ms2_object.embedding())
                     used_khipu.add(kp_id)
-        print(matched_ms2_objects)
 
     @staticmethod
     def construct_from_feature_table(
@@ -512,6 +510,7 @@ class EmpCpds:
         }
         if adducts is None:
             adducts = default_adducts[experiment.ionization_mode]
+
         peaklist = read_table_to_peaks(
             experiment.feature_tables[feature_table_moniker],
             has_header=True,
@@ -520,18 +519,10 @@ class EmpCpds:
             feature_id=0,
             full_extract=True,
         )
+        print(peaklist)
         for p in peaklist:
             p["id"] = p["id_number"]
             p["representative_intensity"] = None
-        to_delete = set()
-        #for p in peaklist:
-        #    for field in list(p.keys()):
-        #        if "___" in field:
-        #            new_field = field.split("___")[-1]
-        #            p[new_field] = p[field]
-        #            to_delete.add(field)
-        #for field in to_delete:
-        #    del p[field]
 
         ECCON = epdsConstructor(peaklist, experiment.ionization_mode)
         dict_empcpds = ECCON.peaks_to_epdDict(
@@ -643,7 +634,6 @@ class EmpCpds:
                             n_matches,
                             annotation_level="Level_2"
                         )
-        print(match)
         self.update_annotations(update_ms2=True)
 
     def l1a_annotate(
@@ -660,7 +650,8 @@ class EmpCpds:
 
         Args:
             standards_csv (str): path to CD csv export
-            mz_tol (int, optional): mz tolerance to match precursors. Defaults to 5.
+            mz_tol (int, optional): mz tolerance to match precursors. Defaults to 5. 
+            Note that this value will be multiplied by 2
             rt_tolerance (int, optional): rt tolerance to match precursors. Defaults to 30.
             similarity_method (str, optional): which matchms similarity method to use. Defaults to "CosineHungarian".
             min_peaks (int, optional): minimum number of peaks that must be shared for annotation. Defaults to 2.
@@ -699,10 +690,7 @@ class EmpCpds:
             rt_tolerance (int, optional): rt tolerance in seconds. Defaults to 10.
         """
         for csv in standards_csv:
-            standards = pd.read_csv(csv)
-            for standard in standards.apply(
-                row_to_dict, axis=1, args=(standards.columns,)
-            ):
+            for standard in pd.read_csv(csv).to_dict(orient='records'):
                 mz, rtime, cname = [
                     standard[k] for k in ["Confirm Precursor", "RT", "CompoundName"]
                 ]

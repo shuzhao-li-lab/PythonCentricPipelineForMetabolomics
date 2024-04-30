@@ -37,26 +37,6 @@ def flatten_nested_dicts(nested_dicts):
     return _d
 
 
-def row_to_dict(row, columns):
-    """
-    This method converts a pandas row to a dictionary with key value pairs for each column
-
-    Args:
-        row (pandas row): the row to be converted to dict
-        columns (list): columns to include as keys
-
-    Returns:
-        dict: row as a dict
-    """
-    _d = {}
-    for c in columns:
-        if row[c]:
-            _d[c] = row[c]
-        else:
-            if isinstance(row[c], str):
-                _d[c] = ''
-    return _d
-
 def extract_CD_csv(
     cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
 ):
@@ -81,18 +61,17 @@ def extract_CD_csv(
     """
     standards_spectra = []
     for cd_csv in cd_csvs:
-        standards = pd.read_csv(cd_csv)
-        for standard in standards.apply(row_to_dict, axis=1, args=(standards.columns,)):
+        for standard in pd.read_csv(cd_csv).to_dict(orient="records"):
             mzs, intensities = [], []
             for i in range(10):
                 mzs.append(
                     standard["Confirm Extracted." + str(i)]
-                    if i
+                    if i and "Confirm Extracted." + str(i) in standard
                     else standard["Confirm Extracted"]
                 )
                 intensities.append(
                     standard["Target Ratio." + str(i)]
-                    if i
+                    if i and "Target Ratio." + str(i) in standard
                     else standard["Target Ratio"]
                 )
             mzs = [mz for mz in mzs if (mz and not np.isnan(mz))]
@@ -323,15 +302,14 @@ def recursive_encoder(to_encode):
     """
     if isinstance(to_encode, (str, int, float, type(None))):
         return to_encode
-    if isinstance(to_encode, (list, set)):
+    elif isinstance(to_encode, (list, set)):
         return [recursive_encoder(x) for x in to_encode]
-    if isinstance(to_encode, dict):
+    elif isinstance(to_encode, dict):
         return {k: recursive_encoder(v) for k, v in to_encode.items()}
-    if hasattr(to_encode, "json_repr"):
+    elif hasattr(to_encode, "json_repr"):
         return to_encode.json_repr
-    if hasattr(to_encode, "serialize"):
+    elif hasattr(to_encode, "serialize"):
         return recursive_encoder(to_encode.serialize())
-    return None
 
 
 # the following define mappings between strings and functions used in
