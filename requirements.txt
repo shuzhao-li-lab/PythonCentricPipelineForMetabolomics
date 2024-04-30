@@ -2,12 +2,12 @@ pycombat
 combat
 fpdf
 intervaltree
-jms_metabolite_services
+jms_metabolite_services>=0.5.8
 khipu_metabolomics
 mass2chem>=0.4.9
 matchms
 matplotlib
-metDataModel>=0.6.0
+metDataModel>=0.6.1
 numpy
 pandas
 pymzml
