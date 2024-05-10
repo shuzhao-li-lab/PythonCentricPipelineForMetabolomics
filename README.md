@@ -268,6 +268,8 @@ Options can be provided including:
 --blank_intensity_ratio: the ratio that feature intensity must exceed when blanks and samples are compared (zeros excluded)
 ```
 
+The default blank_intensity_ratio is 3
+
 #### Drop Undesired Samples
 
 Goal: remove samples not needed for downstream analysis namely QC samples, blanks, etc. 
@@ -332,6 +334,8 @@ Options can be provided including:
 --feature_retention_percentile: features present in fewer than this percent of samples are dropped
 ```
 
+The default value for the feature_retention_percentile is 50% (0.50)
+
 #### Impute Missing Values
 
 Goal: to impute missing values by a minimium number.
@@ -348,6 +352,8 @@ Options can be provided including:
 ```
 --interpolation_ratio: multiply the minimum value by this amount to get the imputation value
 ```
+
+The default imputation ratio is .5.
 
 #### Batch Correction and Multi Batch Experiments
 
