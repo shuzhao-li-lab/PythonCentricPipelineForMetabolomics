@@ -115,6 +115,7 @@ class Main():
         parser.add_argument('--annot_mz_tolerance')
         parser.add_argument('--accept_licenses')
         parser.add_argument('--scan_experiment', default=False)
+        parser.add_argument('--force', default=False)
 
         args = parser.parse_args()
         if args.parameters:
@@ -859,51 +860,53 @@ class Main():
         experiment = Experiment.Experiment.load(params['input'])
         experiment.generate_output(params['empCpd_moniker'], params['table_moniker'])
 
-@staticmethod
-def reset(params):
-    """
-    This command resets the experiment object back to when asari was
-    ran. This removes all user-generated monikered entities, including
-    feature tables and empirical compounds. This removes any qcqa results
-    that were generated along with any qaqc figures. 
+    @staticmethod
+    def reset(params):
+        """
+        This command resets the experiment object back to when asari was
+        ran. This removes all user-generated monikered entities, including
+        feature tables and empirical compounds. This removes any qcqa results
+        that were generated along with any qaqc figures. 
 
-    This is useful if you want to restart an analysis but you do not want
-    to rerun asari, reconvert the acquisitions, or recreate the experiment. 
+        This is useful if you want to restart an analysis but you do not want
+        to rerun asari, reconvert the acquisitions, or recreate the experiment. 
 
-    This action is irreversible
+        This action is irreversible
 
-        - This requires passing -i with the experiment's path.
-        - If passed, --force, will skip the user confirmation 
-    """
+            - This requires passing -i with the experiment's path.
+            - If passed, --force, will skip the user confirmation 
+        """
 
-    warning = """
-    THIS WILL DELETE ALL USER-GENERATED MONIKERED ENTITIES
-    
-    THIS INCLUDES: 
-        emp_cpds
-        feature_tables
+        warning = """
+        THIS WILL DELETE ALL USER-GENERATED MONIKERED ENTITIES
+        
+        THIS INCLUDES: 
+            emp_cpds
+            feature_tables
 
-    AND ANY QAQC RESULTS / FIGURES GENERATED FOR THESE ENTITES
+        AND ANY QAQC RESULTS / FIGURES GENERATED FOR THESE ENTITES
 
-    INPUT 'yes' TO PROCEED. ALTERNATIVELY PROVIDE '--force' TO
-    IGNORE THIS WARNING (FOR HANDS-OFF USAGE)
+        INPUT 'yes' TO PROCEED. ALTERNATIVELY PROVIDE '--force' TO
+        IGNORE THIS WARNING (FOR HANDS-OFF USAGE). ANY OTHER INPUT
+        WILL CANCEL THE RESET.
 
-    """
+        """
 
-    if not params['force']:
-        print(warning)
-        consent = input()
-        if consent not in {'yes', 'YES', 'y', 'Y'}:
-            return
-    experiment = Experiment.Experiment.load(params['input'])
-    experiment.delete_feature_table('*')
-    experiment.delete_empCpds('*')
-    experiment.qaqc_figs = None
-    experiment.qcqa_results = None
-    experiment.log_transformed_feature_tables = None
-    experiment.cosmetics = None
-    experiment.used_cosmetics = None
-    experiment.save()
+        if not params['force']:
+            print(warning)
+            consent = input()
+            if consent not in {'yes', 'YES', 'y', 'Y'}:
+                print("Cancelling reset!")
+                return
+        experiment = Experiment.Experiment.load(params['input'])
+        experiment.delete_feature_table('*')
+        experiment.delete_empCpds('*')
+        experiment.qaqc_figs = None
+        experiment.qcqa_results = None
+        experiment.log_transformed_feature_tables = None
+        experiment.cosmetics = None
+        experiment.used_cosmetics = None
+        experiment.save()
 
 def main():
     """

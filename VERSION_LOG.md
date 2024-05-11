@@ -57,3 +57,13 @@ v1.0.12 -> v1.0.13
   - added statements regarding the execution of CLI commands
   - fixed bug with report timing
   - reports will now trigger experiment save on success
+
+v1.0.13 -> v1.0.14
+  - fix issue with requirements about JMS and metDataModel
+  - add VERSION_LOG change from v1.0.13
+  
+v1.0.14 -> v1.0.15
+  - fix issue with isocor requirement, this should be in khipu
+  - fix bugs with reset function
+  - fix incorrect default argument description in README
+  - add description of reset to README

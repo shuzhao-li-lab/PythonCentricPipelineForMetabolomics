@@ -331,10 +331,10 @@ class Experiment(core.Experiment):
 
         """
         if moniker == "*":
-            for moniker in self.feature_tables:
+            for moniker in list(self.feature_tables.keys()):
                 if moniker not in {"preferred", "full"}:
                     self.delete_feature_table(moniker)
-        elif moniker in self.feature_tables:
+        elif moniker in list(self.feature_tables.keys()):
             file_operations["delete"](self.feature_tables[moniker])
             del self.feature_tables[moniker]
         else:
@@ -349,10 +349,10 @@ class Experiment(core.Experiment):
 
         """
         if moniker == "*":
-            for moniker in self.empCpds:
+            for moniker in list(self.empCpds.keys()):
                 if moniker not in {"asari"}:
                     self.delete_empCpds(moniker)
-        elif moniker in self.empCpds:
+        elif moniker in list(self.empCpds.keys()):
             file_operations["delete"](self.empCpds[moniker])
             del self.empCpds[moniker]
         else:
