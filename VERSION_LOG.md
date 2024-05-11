@@ -67,3 +67,6 @@ v1.0.14 -> v1.0.15
   - fix bugs with reset function
   - fix incorrect default argument description in README
   - add description of reset to README
+
+v1.0.15 -> v1.0.16
+  - add support for copy or link file modes

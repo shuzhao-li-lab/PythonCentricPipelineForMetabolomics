@@ -116,6 +116,7 @@ class Main():
         parser.add_argument('--accept_licenses')
         parser.add_argument('--scan_experiment', default=False)
         parser.add_argument('--force', default=False)
+        parser.add_argument('--file_mode', default="link")
 
         args = parser.parse_args()
         if args.parameters:
@@ -293,7 +294,8 @@ class Main():
             sample_filter=params['filter'],
             name_field=params['name_field'],
             path_field=params['path_field'],
-            sample_skip_list_fp=params['skip_list']
+            sample_skip_list_fp=params['skip_list'],
+            file_mode=params['file_mode']
         )
         experiment.save()
 

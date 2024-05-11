@@ -580,6 +580,7 @@ class Experiment(core.Experiment):
         name_field="File Name",
         path_field="Filepath",
         sample_skip_list_fp=None,
+        file_mode="link"
     ):
         """
         For a given sequence file, create the experiment object, and add all acquisitions
@@ -630,7 +631,7 @@ class Experiment(core.Experiment):
                     acquisition.experiment = experiment
                     if acquisition.filter(sample_filter):
                         if acquisition.name not in sample_skip_list:
-                            experiment.add_acquisition(acquisition)
+                            experiment.add_acquisition(acquisition, mode=file_mode)
                 else:
                     print("Skipping: ", acq_name, " no acquisition data found")
             if experiment.acquisitions:
