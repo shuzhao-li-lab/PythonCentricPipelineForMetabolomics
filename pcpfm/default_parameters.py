@@ -101,7 +101,8 @@ PARAMETERS = {
     "seed": None,
     "accept_licenses": False,
     "scan_experiment": False,
-    "force": False
+    "force": False,
+    "file_mode": "link"
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
