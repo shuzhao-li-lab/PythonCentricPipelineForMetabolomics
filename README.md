@@ -512,6 +512,19 @@ Will generate a pdf report in the output directory. The report generation uses r
 
 You can augment the report and have the colors, markers, and text be determined by passing the optional fields `--color_by`, '--marker_by` and `--text_by`. The values that should be given for these flags is a json-formatted list of the metadata fields to be used. For instance to color by `genotype` you would pass `--color_by='["genotype"]'`
 
+### Reset (aka Reverting an Analysis)
+
+The reset command destroys all user generated tables and empCpds but keeps the outputs from Asari intact. 
+
+This is useful for removing any intermediates generated while prototyping an analysis. In normal usage, 
+this has no real benefits so for an established workflow. It does preserve the output directory and its 
+contents. 
+
+`pcpfm reset -i <experiment_directory>`
+
+Will prompt you to input 'yes' to confirm the reset. Otherswise add `--force` to skip the user verification.
+
+
 
 --------------------------------------------------------------
 Please do not hesitate to contact us via the GitHub issues. 

@@ -17,3 +17,4 @@ seaborn
 setuptools
 asari-metabolomics
 gdown
+isocor
