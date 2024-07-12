@@ -12,18 +12,18 @@ The Python-Centric Pipeline for Metabolomics is designed to take raw LC-MS metab
 - perform MS2 annotation (matchms) using a custom database (default MoNA)
 - output data in standardized formats (.txt, JSON), ready for downstream analysis
 
-Asari (https://www.nature.com/articles/s41467-023-39889-1) supports a visual dashboard to explore and inspect individual features.
+Asari supports a visual dashboard to explore and inspect individual features.
 We are working to add supports of GC and other data types.
 
 Note that to replicate the presented results you will need to run the `download extras` command. See below.
 
-# Citation / Publication
+# Citations
 
-A publication based on this work is currently under review. If you are interested in the pipeline and would like to learn more, please checkout:
+Please cite these publications if you use PCPFM and Asari:
 
-https://www.biorxiv.org/content/10.1101/2024.02.13.580048v1
+- Mitchell, J.M., Chi, Y., Thapa, M., Pang, Z., Xia, J. and Li, S., 2024. Common data models to streamline metabolomics processing and annotation, and implementation in a Python pipeline. PLOS Computational Biology, 20(6), p.e1011912. (https://doi.org/10.1371/journal.pcbi.1011912)
 
-If you use the pipeline in a publication please cite the above preprint until the formal publication is available.
+- Li, S., Siddiqa, A., Thapa, M., Chi, Y. and Zheng, S., 2023. Trackable and scalable LC-MS metabolomics data processing using asari. Nature Communications, 14(1), p.4113. (https://www.nature.com/articles/s41467-023-39889-1)
 
 # Recent Changes 
 
@@ -528,5 +528,3 @@ Will prompt you to input 'yes' to confirm the reset. Otherswise add `--force` to
 
 --------------------------------------------------------------
 Please do not hesitate to contact us via the GitHub issues. 
-
-Citation to come.
