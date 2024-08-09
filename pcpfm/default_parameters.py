@@ -100,7 +100,7 @@ PARAMETERS = {
     "extra_asari": None,
     "seed": None,
     "accept_licenses": False,
-    "scan_experiment": False,
+    "scan_experiment": True,
     "force": False,
     "file_mode": "link"
 }
