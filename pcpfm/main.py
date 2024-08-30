@@ -12,6 +12,8 @@ import argparse
 import csv
 import zipfile
 import gdown
+import requests
+import tarfile
 from . import Experiment
 from . import EmpCpds
 from . import default_parameters
@@ -194,29 +196,64 @@ class Main():
         print(warning)
 
         accepted_license = False
-        if params['accept_licenses'] in ["True", "TRUE", "Yes", "yes", "T", "Y", True]:
+        if params['accept_licenses'] in ["True", "TRUE", "Yes", "yes", "T", "Y", "YES", True]:
             accepted_license = True
         else:
-            user_input = input()
-            if user_input == "yes":
+            user_input = input("Do you accept their license terms (type yes or no)? ")
+            if user_input in ["True", "TRUE", "Yes", "yes", "T", "Y", "YES", True]:
                 accepted_license = True
 
         if accepted_license:
-            def download_from_cloud_storage(src, dst):
-                gdown.download(src, output=dst)
-                with zipfile.ZipFile(dst, 'r') as zip_ref:
-                    zip_ref.extractall(os.path.basename(dst))
-                    zip_ref.extractall(os.path.dirname(dst))
-                os.remove(dst)
+            def download_from_cloud_storage(src, dst, extract_dir=None, delete_after_extract=True, use_gdown=False):
+                """
+                Downloads a file from either Google Drive or a direct URL, extracts it, and optionally deletes the archive.
+
+                Parameters:
+                - src (str): URL or path to the source file in the cloud.
+                - dst (str): Local path where the file should be downloaded.
+                - extract_dir (str): Directory where the contents should be extracted. 
+                                    Defaults to the same directory as dst.
+                - delete_after_extract (bool): Whether to delete the archive file after extraction. 
+                                            Defaults to True.
+                - use_gdown (bool): If True, use gdown to download from Google Drive; 
+                                    otherwise, download from a direct URL.
+                """
+                # Download the file
+                if use_gdown:
+                    gdown.download(src, output=dst, quiet=False)
+                else:
+                    response = requests.get(src, stream=True)
+                    with open(dst, 'wb') as file:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            file.write(chunk)
+                
+                # Determine the extraction directory
+                if extract_dir is None:
+                    extract_dir = os.path.dirname(dst)
+
+                # Extract the file based on its extension
+                if dst.endswith('.zip'):
+                    with zipfile.ZipFile(dst, 'r') as zip_ref:
+                        zip_ref.extractall(extract_dir)
+                elif dst.endswith(('.tar.gz', '.tgz', '.tar')):
+                    with tarfile.open(dst, 'r:*') as tar_ref:
+                        tar_ref.extractall(extract_dir, filter='data')
+                else:
+                    raise ValueError(f"Unsupported file format: {dst}")
+
+                # Optionally delete the archive file after extraction
+                if delete_after_extract:
+                    os.remove(dst)
+
 
             this_dir = os.path.abspath(os.path.dirname(__file__))
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter", "ThermoRawFileConverter.zip")
+            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileParser", "ThermoRawFileParser.zip")
             anno_src_path = os.path.join(this_dir, "annotation_sources", "annotation_sources.zip")
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileConverter.zip")
+            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileParser.zip")
             anno_src_path = os.path.join(this_dir, "annotation_sources.zip")
 
-            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/ThermoRawFileConverter-20240119T131510Z-001.zip', thermo_parser_path)
-            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path)
+            download_from_cloud_storage('https://github.com/compomics/ThermoRawFileParser/releases/download/v1.4.4/ThermoRawFileParser1.4.4.zip', thermo_parser_path)
+            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path, use_gdown=True)
 
     @staticmethod
     def preprocess(params):
