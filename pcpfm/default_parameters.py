@@ -113,7 +113,13 @@ for v in PARAMETERS['targets']:
 PARAMETERS['targets'] = new_target_files
 
 if PARAMETERS["conversion_command"][1] == '$BUILTIN_CONVERTER':
-    path = this_abs_dir + '/ThermoRawFileConverter/ThermoRawFileParser.exe'
+    path = this_abs_dir + '/ThermoRawFileParser.exe'
+    
+    # leave for now for testing
+    #print(os.path.exists(path))
+    #os.system("mono " + path + " --version")
+    #exit()
+
     PARAMETERS["conversion_command"][1] = path
 
 for k, v in PARAMETERS.items():

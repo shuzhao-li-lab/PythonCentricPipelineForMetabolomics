@@ -80,4 +80,7 @@ v1.0.16 -> v1.0.17
   - fix version bug with ThermoRawFileConverter.exe, was previously 1.1.8, now is 1.4.2.
   - implemented various hardening
   - cleaner annotation results
-  
+
+v1.0.17 -> v1.0.18
+  - moving away from googleapi for converter
+  - better download confirmation prompt
