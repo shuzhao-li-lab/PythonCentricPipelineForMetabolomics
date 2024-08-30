@@ -606,7 +606,13 @@ class Experiment(core.Experiment):
                     sample_skip_list = {x.strip() for x in skip_list_fh.readlines()}
 
         if not os.path.exists(os.path.join(experiment_directory, "experiment.json")):
-            sample_filter = {} if sample_filter is None else sample_filter
+            if isinstance(sample_filter, dict):
+                pass
+            elif isinstance(sample_filter, str):
+                sample_filter = json.loads(sample_filter)
+                assert isinstance(sample_filter, dict)
+            elif sample_filter is None:
+                sample_filter = {}
             experiment = Experiment.create_experiment(
                 experiment_directory, experiment_directory, sequence=csv_filepath
             )

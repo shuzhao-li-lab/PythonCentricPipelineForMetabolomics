@@ -170,10 +170,10 @@ class Acquisition(Sample):
                             break
                 except:
                     pass
-        if ms_method and self.__has_ms2:
-            self.experiment.MS2_methods.add(ms_method)
-        elif ms_method and not self.__has_ms2:
-            self.experiment.MS1_only_methods.add(ms_method)
+            if ms_method and self.__has_ms2:
+                self.experiment.MS2_methods.add(ms_method)
+            elif ms_method and not self.__has_ms2:
+                self.experiment.MS1_only_methods.add(ms_method)
         return self.__has_ms2
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):

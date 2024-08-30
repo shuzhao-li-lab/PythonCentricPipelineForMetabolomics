@@ -70,3 +70,14 @@ v1.0.14 -> v1.0.15
 
 v1.0.15 -> v1.0.16
   - add support for copy or link file modes
+
+v1.0.16 -> v1.0.17
+  - fix bug with level names in annotation table for MS2.
+  - fix bug with method caching for ms2 detection
+  - fix bug with jsonstring filters
+  - harmonized annot_source with primary_db 
+  - annot_source now renamed as source, properly refers to the file which had the ms2 spectrum. 
+  - fix version bug with ThermoRawFileConverter.exe, was previously 1.1.8, now is 1.4.2.
+  - implemented various hardening
+  - cleaner annotation results
+  

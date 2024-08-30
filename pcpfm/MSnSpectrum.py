@@ -129,7 +129,8 @@ class MS2Spectrum(core.Spectrum):
                 "reference_id": other_ms2.compound_name,
                 "list_mz": [x[0] for x in other_ms2.matchms_spectrum.peaks],
                 "list_intensity": [x[1] for x in other_ms2.matchms_spectrum.peaks],
-                "annot_source": other_ms2.source,
+                "primary_db": other_ms2.source,
+                "source": self.source,
                 "annotation_level": annotation_level,
             }
         )
