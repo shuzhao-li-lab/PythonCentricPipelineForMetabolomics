@@ -138,7 +138,7 @@ class EmpCpds:
                 #MS2 annots
                 for ms2_spectrum in khipu.get("MS2_Spectra", []):
                     for annotation in ms2_spectrum["annotations"]:
-                        annotation_level = annotation["annotation_level"][0]
+                        annotation_level = annotation["annotation_level"]
                         ms2_annotation = {"feature": feature, "level": annotation_level}
                         ms2_annotation.update(annotation)
                         annotation_table.append(ms2_annotation)
@@ -519,7 +519,6 @@ class EmpCpds:
             feature_id=0,
             full_extract=True,
         )
-        print(peaklist)
         for p in peaklist:
             p["id"] = p["id_number"]
             p["representative_intensity"] = None
