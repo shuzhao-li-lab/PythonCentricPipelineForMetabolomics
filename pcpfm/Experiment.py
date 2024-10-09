@@ -608,7 +608,7 @@ class Experiment(core.Experiment):
         if not os.path.exists(os.path.join(experiment_directory, "experiment.json")):
             if isinstance(sample_filter, dict):
                 pass
-            elif isinstance(sample_filter, str):
+            elif isinstance(sample_filter, str) and sample_filter:
                 sample_filter = json.loads(sample_filter)
                 assert isinstance(sample_filter, dict)
             elif sample_filter is None:
