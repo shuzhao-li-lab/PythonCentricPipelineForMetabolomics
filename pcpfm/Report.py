@@ -146,15 +146,18 @@ class Report():
         """
         for section in self.style:
             method = getattr(self, section["section"])
-            if method:
-                if "table" in section:
-                    if section["table"] + "_cleaned" in self.experiment.feature_tables:
-                        section["table"] = section["table"] + "_cleaned"
-                        method(section)
+            try:
+                if method:
+                    if "table" in section:
+                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                            section["table"] = section["table"] + "_cleaned"
+                            method(section)
+                        else:
+                            method(section)
                     else:
                         method(section)
-                else:
-                    method(section)
+            except:
+                pass
         self.experiment.save()
 
 

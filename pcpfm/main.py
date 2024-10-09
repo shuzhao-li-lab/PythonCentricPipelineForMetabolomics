@@ -966,9 +966,12 @@ def main():
             function(params)
             print("Succesfully executed: ", params["subcommand"])
         except Exception as e:
+            import traceback
             print("Error executing: " + params['subcommand'])
             print(function.__doc__)
-            print(e)
+            print("Exception: ", e)
+            print("Traceback:")
+            print(traceback.format_exc())
 
 def CLI():
     '''

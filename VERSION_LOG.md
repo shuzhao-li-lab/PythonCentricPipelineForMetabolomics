@@ -84,3 +84,7 @@ v1.0.16 -> v1.0.17
 v1.0.17 -> v1.0.18
   - moving away from googleapi for converter
   - better download confirmation prompt
+
+v1.0.18 -> v1.0.19
+  - fix issue with parsing filter on assemble command. (thanks Felipe Mansoldo)
+  - errors in main now prints traceback
