@@ -88,3 +88,6 @@ v1.0.17 -> v1.0.18
 v1.0.18 -> v1.0.19
   - fix issue with parsing filter on assemble command. (thanks Felipe Mansoldo)
   - errors in main now prints traceback
+
+v1.0.19 -> v1.1.0
+  - hardening MS2 mapping

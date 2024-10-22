@@ -174,7 +174,7 @@ class EmpCpds:
         # update other fields in the empCpds:
         for _, khipu in self.dict_empcpds.items():
             khipu["identity"] = set()
-            khipu["Database_referred"] = set()
+            khipu["Database_referred"] = set() 
 
             # MS1 only, only Level_1b counts for identity
             if "Level_1b" in khipu:
@@ -198,7 +198,10 @@ class EmpCpds:
                                     round(annotation["msms_score"], 3),
                                 )
                             )
-                            khipu["Database_referred"].add(annotation["annot_source"])
+                            try:
+                                khipu["Database_referred"].add(annotation["annot_source"])
+                            except:
+                                khipu["Database_referred"].add("MS2")
                         if annotation["annotation_level"] == "Level_1a":
                             khipu["identity"].add(
                                 (
@@ -207,7 +210,10 @@ class EmpCpds:
                                     "matches standard",
                                 )
                             )
-                            khipu["Database_referred"].add(annotation["annot_source"])
+                            try:
+                                khipu["Database_referred"].add(annotation["annot_source"])
+                            except:
+                                khipu["Database_referred"].add("MS2")
             khipu["identity"] = list(khipu["identity"])
             khipu["Database_referred"] = list(khipu["Database_referred"])
 
