@@ -90,4 +90,7 @@ v1.0.18 -> v1.0.19
   - errors in main now prints traceback
 
 v1.0.19 -> v1.1.0
-  - hardening MS2 mapping
+  - hardening MS2 processing and output (thanks Xiangping Lei)
+
+v1.1.0 -> v1.1.1
+  - added comprehensive output option. (thanks Minghao Gong)
