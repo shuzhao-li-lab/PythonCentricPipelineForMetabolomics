@@ -111,7 +111,7 @@ class EmpCpds:
             self._khipu_id_to_feature_id = khipu_id_to_feature_id
         return self._khipu_id_to_feature_id
 
-    def create_annotation_table(self):
+    def create_annotation_table(self, comprehensive_output=False):
         """
         This flattens the empcpd annotations into a dataframe summarizing the annotation on a 
         per-feature level.
@@ -121,24 +121,41 @@ class EmpCpds:
         Returns:
             dataframe: annotation table
         """
+
+        #ion_relation_lookup = {}
+        #for kp_id, kp in self.dict_empcpds.items():
+        #    for ms1_peak in kp['MS1_pseudo_Spectra']:
+                
+        feature_lookup = {}
+        for kp_id, kp in self.dict_empcpds.items():
+            for ms1_peak in kp["MS1_pseudo_Spectra"]:
+                feature_lookup[ms1_peak['id']] = ms1_peak
+
         annotation_table = []
         for kp_id, khipu in self.dict_empcpds.items():
             for feature in self.khipu_id_to_feature_id[kp_id]:
+                if comprehensive_output:
+                    annotation_entry = feature_lookup[feature]
+                else:
+                    annotation_entry = {}
                 #MS1 annots
                 l1b_annots = khipu.get("Level_1b", [])
                 for l1b_annot in l1b_annots:
-                    l1b_annot_entry = {"feature": feature, "level": "1b"}
+                    l1b_annot_entry = {k: v for k, v in annotation_entry.items()}
+                    l1b_annot_entry.update({"feature": feature, "level": "1b"})
                     l1b_annot_entry.update({"name": l1b_annot[0], "source": l1b_annot[1]})
                     annotation_table.append(l1b_annot_entry)
                 l4_annots = khipu.get("Level_4", [])
                 for l4_annot in l4_annots:
-                    l4_annot_entry = {"feature": feature, "level": "4"}
+                    l4_annot_entry = {k: v for k, v in annotation_entry.items()}
+                    l4_annot_entry.update({"feature": feature, "level": "4"})
                     l4_annot_entry.update(l4_annot)
                     annotation_table.append(l4_annot_entry)
                 #MS2 annots
                 for ms2_spectrum in khipu.get("MS2_Spectra", []):
                     for annotation in ms2_spectrum["annotations"]:
                         annotation_level = annotation["annotation_level"]
+                        ms2_annotation = {k: v for k, v in annotation_entry.items()}
                         ms2_annotation = {"feature": feature, "level": annotation_level}
                         ms2_annotation.update(annotation)
                         annotation_table.append(ms2_annotation)
@@ -198,9 +215,9 @@ class EmpCpds:
                                     round(annotation["msms_score"], 3),
                                 )
                             )
-                            try:
-                                khipu["Database_referred"].add(annotation["annot_source"])
-                            except:
+                            if "primary_db" in annotation:
+                                khipu["Database_referred"].add(annotation["primary_db"])
+                            else:
                                 khipu["Database_referred"].add("MS2")
                         if annotation["annotation_level"] == "Level_1a":
                             khipu["identity"].add(
@@ -210,9 +227,9 @@ class EmpCpds:
                                     "matches standard",
                                 )
                             )
-                            try:
-                                khipu["Database_referred"].add(annotation["annot_source"])
-                            except:
+                            if "primary_db" in annotation:
+                                khipu["Database_referred"].add(annotation["primary_db"])
+                            else:
                                 khipu["Database_referred"].add("MS2")
             khipu["identity"] = list(khipu["identity"])
             khipu["Database_referred"] = list(khipu["Database_referred"])

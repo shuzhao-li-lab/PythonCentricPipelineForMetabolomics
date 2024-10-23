@@ -471,7 +471,7 @@ class Experiment(core.Experiment):
         self.tissue.add(acquisition.metadata_tags.get('species', 'Unknown'))
         self.tissue = list(self.tissue)
 
-    def generate_output(self, empCpd_moniker, table_moniker):
+    def generate_output(self, empCpd_moniker, table_moniker, comprehensive_output=False):
         """
         This generates and stores the the feature table, sample annotation table, and the 
         feature annotation table to the output directory. It also copies the JSON for the 
@@ -491,7 +491,7 @@ class Experiment(core.Experiment):
 
         annotation_table_path = os.path.join(self.output_subdirectory, "annotation_table.tsv")
         empCpds = self.retrieve_empCpds(empCpd_moniker, True)
-        annotation_table = empCpds.create_annotation_table()
+        annotation_table = empCpds.create_annotation_table(comprehensive_output)
         annotation_table.to_csv(annotation_table_path, sep="\t", index=False)
 
         file_operations["copy"](self.retrieve_empCpds(empCpd_moniker, False), self.output_subdirectory)

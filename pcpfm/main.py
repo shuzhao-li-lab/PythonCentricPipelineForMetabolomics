@@ -119,6 +119,7 @@ class Main():
         parser.add_argument('--scan_experiment', default=False)
         parser.add_argument('--force', default=False)
         parser.add_argument('--file_mode', default="link")
+        parser.add_argument('--comprehensive_output', default=False)
 
         args = parser.parse_args()
         if args.parameters:
@@ -897,7 +898,7 @@ class Main():
                     parsing the command line arguments plus the defaults. 
         """
         experiment = Experiment.Experiment.load(params['input'])
-        experiment.generate_output(params['empCpd_moniker'], params['table_moniker'])
+        experiment.generate_output(params['empCpd_moniker'], params['table_moniker'], params['comprehensive_output'])
 
     @staticmethod
     def reset(params):
