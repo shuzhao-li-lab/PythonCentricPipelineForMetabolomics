@@ -75,7 +75,7 @@ PARAMETERS = {
     "drop_others": None,
     "qaqc_filter": None,
     "drop_value": None,
-    "add_singletons": False,
+    "add_singletons": True,
     "TIC_normalization_percentile": 0.90,
     "normalize_value": "median",
     "feature_retention_percentile": 0.50,
