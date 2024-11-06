@@ -27,6 +27,7 @@ class MS2Spectrum(core.Spectrum):
         collision_energy=None,
         compound_name=None,
         annotations=None,
+        identifiers=None
     ):
         """_summary_
 
@@ -69,6 +70,7 @@ class MS2Spectrum(core.Spectrum):
         self.annotations = [] if annotations is None else annotations
         self.compound_name = compound_name
         self.source = source
+        self.identifiers = {} if identifiers is None else identifiers
 
     @property
     def prec_mz(self):
@@ -132,6 +134,7 @@ class MS2Spectrum(core.Spectrum):
                 "primary_db": other_ms2.source,
                 "source": self.source,
                 "annotation_level": annotation_level,
+                "identifiers": other_ms2.identifiers
             }
         )
 
