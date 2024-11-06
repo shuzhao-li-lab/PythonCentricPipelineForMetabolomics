@@ -197,6 +197,8 @@ def process_ms2_spectrum(
     :return: dictionary summarize MS2 spectrum.
     """
 
+    identifiers = {k: v for k,v in spectrum.metadata.items()}
+
     if not skip_meta:
         spectrum = matchms.filtering.add_precursor_mz(spectrum)
         if not skip_filters:
@@ -232,6 +234,7 @@ def process_ms2_spectrum(
             instrument="Unknown",
             collision_energy="Unknown",
             compound_name=reference_id,
+            identifiers=identifiers
         )
     else:
         spec_id = []
@@ -263,6 +266,7 @@ def process_ms2_spectrum(
             instrument="Unknown",
             collision_energy="Unknown",
             compound_name=reference_id,
+            identifiers=identifiers
         )
 
     return spectrum
