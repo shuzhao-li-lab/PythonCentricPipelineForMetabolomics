@@ -568,6 +568,7 @@ class EmpCpds:
                         "neutral_formula_mass": "",
                         "neutral_formula": "",
                         "MS1_pseudo_Spectra": [peak],
+                        "MS2_spectra": []
                     }
         empcpd = EmpCpds(dict_empcpds, experiment, moniker)
         empcpd.save()
