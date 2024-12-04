@@ -98,3 +98,6 @@ v1.1.0 -> v1.1.1
 v1.1.1 -> v1.1.2
   - added additional metadata fields to MS2 annotations
   - add_singletons now defaults to True
+
+v1.1.2 -> v1.1.3
+  - fixed issue where interval trees for negative values could be wrong due to using relative error instead of absolute relative error
