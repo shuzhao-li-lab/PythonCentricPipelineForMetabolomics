@@ -111,7 +111,7 @@ class FeatureTable:
         if mz_tol not in self.__mz_trees:
             self.__mz_trees[mz_tol] = intervaltree.IntervalTree()
             for f_id, mz in self.feature_table[['id_number', 'mz']].values.tolist():
-                mz_err = mz / 1e6 * mz_tol
+                mz_err = abs(mz / 1e6 * mz_tol)
                 self.__mz_trees[mz_tol].addi(mz - mz_err, mz + mz_err, f_id)
         return self.__mz_trees[mz_tol]
 
@@ -129,7 +129,7 @@ class FeatureTable:
         if rt_tol not in self.__rt_trees:
             self.__rt_trees[rt_tol] = intervaltree.IntervalTree()
             for f_id, rtime in self.feature_table[['id_number', 'rtime']].values.tolist():
-                self.__rt_trees[rt_tol].addi(rtime - rt_tol, rtime + rt_tol, f_id)
+                self.__rt_trees[rt_tol].addi(rtime - abs(rt_tol), rtime + abs(rt_tol), f_id)
         return self.__rt_trees[rt_tol]
 
     @property

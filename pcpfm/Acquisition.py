@@ -220,8 +220,8 @@ class Acquisition(Sample):
         mz_trees[0].addi(-np.inf, np.inf)
         rt_trees[0].addi(-np.inf, np.inf)
         for i, (x, y) in enumerate(zip(mz, rt)):
-            mz_trees[i + 1].addi(x - x / 1e6 * ppm, x + x / 1e6 * ppm)
-            rt_trees[i + 1].addi(y - rt_tol, y + rt_tol)
+            mz_trees[i + 1].addi(x - abs(x / 1e6 * ppm), x + abs(x / 1e6 * ppm))
+            rt_trees[i + 1].addi(y - abs(rt_tol), y + abs(rt_tol))
         bins = [[] for _ in mz_trees]
         rtimes = []
         for spec in pymzml.run.Reader(self.mzml_filepath):

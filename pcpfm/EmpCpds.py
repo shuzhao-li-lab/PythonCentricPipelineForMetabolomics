@@ -252,12 +252,12 @@ class EmpCpds:
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     if abs_error:
                         mz_tree.addi(
-                            peak["mz"] - mz_tol,
-                            peak["mz"] + mz_tol,
+                            peak["mz"] - abs(mz_tol),
+                            peak["mz"] + abs(mz_tol),
                             peak["id_number"],
                         )
                     else:
-                        mz_error = peak["mz"] / 1e6 * mz_tol
+                        mz_error = abs(peak["mz"] / 1e6 * mz_tol)
                         mz_tree.addi(
                             peak["mz"] - mz_error,
                             peak["mz"] + mz_error,
@@ -282,8 +282,8 @@ class EmpCpds:
             for _, khipu in self.dict_empcpds.items():
                 for peak in khipu["MS1_pseudo_Spectra"]:
                     rt_tree.addi(
-                        peak["rtime"] - rt_tolerance,
-                        peak["rtime"] + rt_tolerance,
+                        peak["rtime"] - abs(rt_tolerance),
+                        peak["rtime"] + abs(rt_tolerance),
                         peak["id_number"],
                     )
             self.__rt_trees[("feature", rt_tolerance)] = rt_tree
@@ -305,7 +305,7 @@ class EmpCpds:
             for spectra in self.ms2_spectra.values():
                 for spectrum in spectra:
                     precursor_mz = spectrum.prec_mz
-                    mz_error = precursor_mz / 1e6 * mz_tol
+                    mz_error = abs(precursor_mz / 1e6 * mz_tol)
                     mz_tree.addi(
                         precursor_mz - mz_error,
                         precursor_mz + mz_error,
@@ -331,8 +331,8 @@ class EmpCpds:
                 for spectrum in spectra:
                     precursor_rt = spectrum.rtime
                     rt_tree.addi(
-                        precursor_rt - rt_tolerance,
-                        precursor_rt + rt_tolerance,
+                        precursor_rt - abs(rt_tolerance),
+                        precursor_rt + abs(rt_tolerance),
                         spectrum.precursor_ion_id,
                     )
             self.__mz_trees[("precursor", rt_tolerance)] = rt_tree
