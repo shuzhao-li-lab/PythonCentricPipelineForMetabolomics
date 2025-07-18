@@ -14,10 +14,58 @@ import zipfile
 import gdown
 import requests
 import tarfile
+import shutil 
+
 from . import Experiment
 from . import EmpCpds
 from . import default_parameters
 from . import Report
+
+def download_from_cloud_storage(src, dst, extract_dir=None, delete_after_extract=True, use_gdown=False):
+    """
+    Downloads a file from either Google Drive or a direct URL, extracts it, and optionally deletes the archive.
+
+    Parameters:
+    - src (str): URL or path to the source file in the cloud.
+    - dst (str): Local path where the file should be downloaded.
+    - extract_dir (str): Directory where the contents should be extracted. 
+                        Defaults to the same directory as dst.
+    - delete_after_extract (bool): Whether to delete the archive file after extraction. 
+                                Defaults to True.
+    - use_gdown (bool): If True, use gdown to download from Google Drive; 
+                        otherwise, download from a direct URL.
+    """
+    # Download the file
+    if use_gdown:
+        gdown.download(src, output=dst, quiet=False)
+    else:
+        response = requests.get(src, stream=True)
+        with open(dst, 'wb') as file:
+            for chunk in response.iter_content(chunk_size=8192):
+                file.write(chunk)
+    
+    # Determine the extraction directory
+    if extract_dir is None:
+        extract_dir = os.path.dirname(dst)
+
+    # Extract the file based on its extension
+    __EXTRACTED = False
+    if dst.endswith('.zip'):
+        with zipfile.ZipFile(dst, 'r') as zip_ref:
+            zip_ref.extractall(extract_dir)
+            __EXTRACTED = True
+            print(f"{dst} downloaded and extracted")
+    elif dst.endswith(('.tar.gz', '.tgz', '.tar')):
+        with tarfile.open(dst, 'r:*') as tar_ref:
+            tar_ref.extractall(extract_dir, filter='data')
+            __EXTRACTED = True
+            print(f"{dst} downloaded and extracted")
+    else:
+        print(f"{dst} downloaded without extraction")
+
+    # Optionally delete the archive file after extraction
+    if delete_after_extract and __EXTRACTED:
+        os.remove(dst)
 
 class Main():
     """
@@ -205,56 +253,13 @@ class Main():
                 accepted_license = True
 
         if accepted_license:
-            def download_from_cloud_storage(src, dst, extract_dir=None, delete_after_extract=True, use_gdown=False):
-                """
-                Downloads a file from either Google Drive or a direct URL, extracts it, and optionally deletes the archive.
-
-                Parameters:
-                - src (str): URL or path to the source file in the cloud.
-                - dst (str): Local path where the file should be downloaded.
-                - extract_dir (str): Directory where the contents should be extracted. 
-                                    Defaults to the same directory as dst.
-                - delete_after_extract (bool): Whether to delete the archive file after extraction. 
-                                            Defaults to True.
-                - use_gdown (bool): If True, use gdown to download from Google Drive; 
-                                    otherwise, download from a direct URL.
-                """
-                # Download the file
-                if use_gdown:
-                    gdown.download(src, output=dst, quiet=False)
-                else:
-                    response = requests.get(src, stream=True)
-                    with open(dst, 'wb') as file:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            file.write(chunk)
-                
-                # Determine the extraction directory
-                if extract_dir is None:
-                    extract_dir = os.path.dirname(dst)
-
-                # Extract the file based on its extension
-                if dst.endswith('.zip'):
-                    with zipfile.ZipFile(dst, 'r') as zip_ref:
-                        zip_ref.extractall(extract_dir)
-                elif dst.endswith(('.tar.gz', '.tgz', '.tar')):
-                    with tarfile.open(dst, 'r:*') as tar_ref:
-                        tar_ref.extractall(extract_dir, filter='data')
-                else:
-                    raise ValueError(f"Unsupported file format: {dst}")
-
-                # Optionally delete the archive file after extraction
-                if delete_after_extract:
-                    os.remove(dst)
-
-
             this_dir = os.path.abspath(os.path.dirname(__file__))
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileParser", "ThermoRawFileParser.zip")
-            anno_src_path = os.path.join(this_dir, "annotation_sources", "annotation_sources.zip")
-            thermo_parser_path = os.path.join(this_dir, "ThermoRawFileParser.zip")
-            anno_src_path = os.path.join(this_dir, "annotation_sources.zip")
-
-            download_from_cloud_storage('https://github.com/compomics/ThermoRawFileParser/releases/download/v1.4.4/ThermoRawFileParser1.4.4.zip', thermo_parser_path)
-            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', anno_src_path, use_gdown=True)
+            download_from_cloud_storage('https://github.com/compomics/ThermoRawFileParser/releases/download/v1.4.4/ThermoRawFileParser1.4.4.zip', 
+                                        os.path.join(this_dir, "annotation_sources/ThermoRawFileParser.zip"))
+            download_from_cloud_storage('https://storage.googleapis.com/pcpfm-data/annotation_sources-20240119T131612Z-001.zip', 
+                                        os.path.join(this_dir, "annotation_sources/ThermoRawFileParser.zip"), use_gdown=True)
+            download_from_cloud_storage('https://mona.fiehnlab.ucdavis.edu/rest/downloads/retrieve/a09f9652-c7bc-48b2-9dd9-0dc4343bb360', 
+                                        os.path.join(this_dir, "annotation_sources/GC_MoNA_EIMS.msp"))
 
     @staticmethod
     def preprocess(params):
@@ -381,12 +386,34 @@ class Main():
 
     @staticmethod
     def asari_gc(params):
+        """
+        Perform asari on the experiment's acquisitions. They must be have
+        been converted or provided in .mzML format first. 
+
+        The command by default assumes a ppm of 5 and the ionization mode 
+        of the experiment will be automatically inferred. If extra 
+        arguments are desired for asari, they can be provided using
+        --extra_asari on the command line. 
+
+        This requires passing -i with the experiment's path.
+
+        :param params: This is the master configuration file generated by 
+                    parsing the command line arguments plus the defaults. 
+        """
         print("Using GC workflow, equivalent to --workflow GC --compress True")
         experiment = Experiment.Experiment.load(params['input'])
+
+        payload = {
+            '--workflow': 'GC',
+            '--compress': 'True',
+            '--retention_index_standards': params.get('retention_index_standards', None),
+            '--GC_Database': params.get('msp_files_gc', None),
+        }
         asari_command = params['asari_command']
-        params['extra_asari'] += '--worfklow GC'
         if params['extra_asari']:
             asari_command.extend(params['extra_asari'].split(" "))
+        for key, value in payload.items():
+            asari_command.extend([key, value])
         experiment.asari(asari_command)
         experiment.save()
 
@@ -479,7 +506,6 @@ class Main():
                                                     params['khipu_rt_tolerance'],
                                                     params['ppm'],
                                                     params['khipu_charges'])
-        exit()
         experiment.save()
 
     @staticmethod

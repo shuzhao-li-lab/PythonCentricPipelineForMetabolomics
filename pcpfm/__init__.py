@@ -1,1 +1,10 @@
-__version__ = "1.1.3"
+__version__ = "1.1.4"
+
+from . import main
+from . import Acquisition
+from . import EmpCpds
+from . import Experiment
+from . import FeatureTable
+from . import MSnSpectrum
+from . import Report
+from . import utils
