@@ -168,6 +168,8 @@ class Main():
         parser.add_argument('--force', default=False)
         parser.add_argument('--file_mode', default="link")
         parser.add_argument('--comprehensive_output', default=False)
+        parser.add_argument('--msp_files_gc')
+        parser.add_argument('--retention_index_standards')
 
         args = parser.parse_args()
         if args.parameters:
