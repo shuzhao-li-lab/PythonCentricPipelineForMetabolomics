@@ -36,7 +36,7 @@ PARAMETERS = {
                            '$OUT_PATH', 
                            ' >/dev/null'],
     "asari_command": [
-        'asari',
+        '/Users/mitchjo/Library/Python/3.11/bin/asari',
         'process',
         '-m',
         '$IONIZATION_MODE', 
@@ -89,6 +89,7 @@ PARAMETERS = {
     "MS2_annotation_name": "MS2_annotations",
     "msp_files_pos": "annotation_sources/MoNA-export-LC-MS-MS_Positive_Mode.msp",
     "msp_files_neg": "annotation_sources/MoNA-export-LC-MS-MS_Negative_Mode.msp",
+    "msp_files_gc": "annotation_sources/GC_MoNA_EIMS.msp",
     "ms2_dir": None,
     "ms2_similarity_metric": "CosineGreedy",
     "ms2_min_peaks": 1,
@@ -115,12 +116,6 @@ PARAMETERS['targets'] = new_target_files
 
 if PARAMETERS["conversion_command"][1] == '$BUILTIN_CONVERTER':
     path = this_abs_dir + '/ThermoRawFileParser.exe'
-    
-    # leave for now for testing
-    #print(os.path.exists(path))
-    #os.system("mono " + path + " --version")
-    #exit()
-
     PARAMETERS["conversion_command"][1] = path
 
 for k, v in PARAMETERS.items():
