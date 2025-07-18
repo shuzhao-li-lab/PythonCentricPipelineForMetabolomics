@@ -357,7 +357,7 @@ class Main():
         experiment.save()
 
     @staticmethod
-    def asari(params):
+    def asari(params, gc=False):
         """
         Perform asari on the experiment's acquisitions. They must be have
         been converted or provided in .mzML format first. 
@@ -374,6 +374,17 @@ class Main():
         """
         experiment = Experiment.Experiment.load(params['input'])
         asari_command = params['asari_command']
+        if params['extra_asari']:
+            asari_command.extend(params['extra_asari'].split(" "))
+        experiment.asari(asari_command)
+        experiment.save()
+
+    @staticmethod
+    def asari_gc(params):
+        print("Using GC workflow, equivalent to --workflow GC --compress True")
+        experiment = Experiment.Experiment.load(params['input'])
+        asari_command = params['asari_command']
+        params['extra_asari'] += '--worfklow GC'
         if params['extra_asari']:
             asari_command.extend(params['extra_asari'].split(" "))
         experiment.asari(asari_command)
