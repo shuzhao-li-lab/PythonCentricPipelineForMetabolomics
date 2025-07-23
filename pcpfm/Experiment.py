@@ -481,6 +481,7 @@ class Experiment(core.Experiment):
             empCpd_moniker (str): moniker of empcpd to use
             table_moniker (str): moniker of table to use
         """
+
         feature_table_path = os.path.join(self.output_subdirectory, "feature_table.tsv")
         feature_table = self.retrieve_feature_table(table_moniker, True)
         feature_table.feature_table.to_csv(feature_table_path, sep="\t", index=False)
@@ -805,35 +806,49 @@ class Experiment(core.Experiment):
                 "$CONVERTED_SUBDIR": self.converted_subdirectory,
                 "$ASARI_SUBDIR": self.asari_subdirectory,
             }
+
+            # find existing asari runs
+            existing_dirs = []
+            for _dir, _, _ in os.walk(self.asari_subdirectory):
+                if os.path.isdir(_dir):
+                    existing_dirs.append(_dir)
+
             job = asari_cmd if isinstance(asari_cmd, list) else asari_cmd.split(" ")
             job = [mapping.get(f, f) for f in asari_cmd]
             completed_process = subprocess.run(job, check=False)
+
+            # find new asari run
+            sub_dir = None
+            for _dir, _, _ in os.walk(self.asari_subdirectory):
+                if _dir not in existing_dirs and os.path.isdir(_dir):
+                    sub_dir = _dir
+                    break
+            self.asari_subdirectory = os.path.join(self.asari_subdirectory, sub_dir)
+
             if completed_process.returncode == 0:
-                for x in os.listdir(self.experiment_directory):
-                    if x.startswith("asari") and "project" in x:
-                        self.feature_tables.update(
-                            {
-                                "full": os.path.join(
-                                    self.experiment_directory,
-                                    x,
-                                    "export/full_Feature_table.tsv",
-                                ),
-                                "preferred": os.path.join(
-                                    self.experiment_directory,
-                                    x,
-                                    "preferred_Feature_table.tsv",
-                                ),
-                            }
+                self.feature_tables.update(
+                    {
+                        "full": os.path.join(
+                            self.experiment_directory,
+                            self.asari_subdirectory,
+                            "export/full_Feature_table.tsv",
+                        ),
+                        "preferred": os.path.join(
+                            self.experiment_directory,
+                            self.asari_subdirectory,
+                            "preferred_Feature_table.tsv",
+                        ),
+                    }
+                )
+                self.empCpds.update(
+                    {
+                        "asari": os.path.join(
+                            self.experiment_directory,
+                            self.asari_subdirectory,
+                            "Annotated_empiricalCompounds.json",
                         )
-                        self.empCpds.update(
-                            {
-                                "asari": os.path.join(
-                                    self.experiment_directory,
-                                    x,
-                                    "Annotated_empiricalCompounds.json",
-                                )
-                            }
-                        )
+                    }
+                )
                 self.provenance["preprocess_software"] = "Asari"
                 if "preprocess_parameters" not in self.provenance:
                     self.provenance["preprocess_parameters"] = {}
