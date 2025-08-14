@@ -44,6 +44,10 @@ PARAMETERS = {
         '$CONVERTED_SUBDIR',
         '-o',
         '$ASARI_SUBDIR',
+        '--compress',
+        'True',
+        '--anno',
+        'False'
     ],
     "filter": '',
     "save_plots": True,
