@@ -664,102 +664,84 @@ class Experiment(core.Experiment):
 
     def generate_cosmetic_map(self, field=None, provided_cos_type="color", seed=None):
         """
-        This generates the mapping of acquisition properties to colors,
-        markers, text, etc. used in figure generation. This allows for
-        consistency across runs as the mapping is stored in the object.
-
-        Args:
-
-
-        field (str, optional): field for which to generate the mapping
-        cos_type (str, optional): 'color', 'marker', or 'text'
-        seed (int, optional): used for shuffling, by setting this value, the
-            same exact mapping can be generated each time.
-
-        Returns:
-            dict: the mapping of fields to cosmetic types.
+        Standalone drop-in replacement.
+        Uses Paul Tol's "muted" palette for colors and a curated set for markers.
+        No external helpers or globals.
+        
+        Expects `self.acquisitions` to be iterable with `metadata_tags[field]`.
+        Caches results in `self.cosmetics` / `self.used_cosmetics` like original.
         """
+        import random
 
-        # todo - this should be in JSON
-        cosmetic_rules = {
-            "colors": {
-                "banned": [
-                    "snow",
-                    "beige",
-                    "honeydew",
-                    "azure",
-                    "aliceblue",
-                    "lightcyan",
-                    "lightyellow",
-                    "white",
-                    "oldlace",
-                    "antiquewhite",
-                    "ivory",
-                    "whitesmoke",
-                    "mistyrose",
-                    "seashell",
-                    "linen",
-                    "antiquewhite",
-                    "lightgoldenrodyellow",
-                    "cornsilk",
-                    "lemonchiffon",
-                    "honeydew",
-                    "mintcream",
-                    "ghostwhite",
-                    "lavenderblush",
-                ],
-                "allowed": mcolors.CSS4_COLORS,
-            },
-            "markers": {
-                "banned": [],
-                "allowed": [
-                    ".",
-                    "o",
-                    "v",
-                    "^",
-                    ">",
-                    "<",
-                    "1",
-                    "2",
-                    "3",
-                    "4",
-                    "8",
-                    "s",
-                    "P",
-                ],
-            },
-            "text": {"banned": [], "allowed": []},
-        }
-        if seed:
+        # --- local constants ---
+        TOL_MUTED = [
+            "#332288",  # navy
+            "#88CCEE",  # sky blue
+            "#44AA99",  # teal
+            "#117733",  # green
+            "#999933",  # olive
+            "#DDCC77",  # sand
+            "#CC6677",  # rose
+            "#882255",  # wine
+            "#AA4499",  # purple
+        ]
+        TOL_MARKERS = ["o", "s", "^", "v", ">", "<", "D", "P", "X", "h", "8", "*"]
+
+        if seed is not None:
             random.seed(seed)
+
+        # init caches if missing
+        if not hasattr(self, "cosmetics"):
+            self.cosmetics = {}
+        if not hasattr(self, "used_cosmetics"):
+            self.used_cosmetics = {}
+
+        # quick cache hit
         if provided_cos_type in self.cosmetics and field in self.cosmetics[provided_cos_type]:
             return self.cosmetics[provided_cos_type][field]
 
-        allowed_cosmetics = {}
-        for cos_type, mask in cosmetic_rules.items():
-            allowed_cosmetics[cos_type] = []
-            for item in mask["allowed"]:
-                if item not in self.used_cosmetics:
-                    if item not in mask["banned"]:
-                        allowed_cosmetics[cos_type].append(item)
+        # choose pool
+        if provided_cos_type == "color" or provided_cos_type == "colors":
+            pool = TOL_MUTED[:]
+        elif provided_cos_type == "marker" or provided_cos_type == "markers":
+            pool = TOL_MARKERS[:]
+        elif provided_cos_type == "text" or provided_cos_type == "texts":
+            pool = [chr(c) for c in range(65, 91)]  # A-Z
+        else:
+            raise ValueError(f"Unknown cosmetic type: {provided_cos_type}")
 
-        if provided_cos_type in allowed_cosmetics:
-            random.shuffle(allowed_cosmetics[provided_cos_type])
-            cosmetic_map = {}
-            for i, needs_cosmetic in enumerate(
-                {a.metadata_tags[field] for a in self.acquisitions}
-            ):
-                cosmetic_map[needs_cosmetic] = allowed_cosmetics[provided_cos_type][i]
-            if provided_cos_type not in self.used_cosmetics:
-                self.used_cosmetics[provided_cos_type] = []
-            self.used_cosmetics[provided_cos_type].extend(list(cosmetic_map.values()))
-            if provided_cos_type not in self.cosmetics:
-                self.cosmetics[provided_cos_type] = {}
-            self.cosmetics[provided_cos_type][field] = cosmetic_map
+        # filter out used
+        used = set(self.used_cosmetics.get(provided_cos_type, []))
+        available = [p for p in pool if p not in used]
+
+        # get unique labels that need cosmetics
+        try:
+            uniques = sorted({a.metadata_tags[field] for a in self.acquisitions})
+        except AttributeError:
+            uniques = sorted({getattr(a, field) for a in self.acquisitions})
+
+        n = len(uniques)
+        if n == 0:
+            return {}
+
+        # if not enough, cycle
+        if len(available) < n:
+            times = (n // len(pool)) + 1
+            available = available + (pool * times)
+
+        #random.shuffle(available)
+        mapping = {u: available[i] for i, u in enumerate(uniques)}
+
+        # update caches
+        self.used_cosmetics.setdefault(provided_cos_type, []).extend(mapping.values())
+        self.cosmetics.setdefault(provided_cos_type, {})[field] = mapping
+
+        # persist if object exposes save()
+        if hasattr(self, "save") and callable(self.save):
             self.save()
-            return cosmetic_map
-        print("No mapping for cosmetic type: ", provided_cos_type)
-        sys.exit()
+
+        return mapping
+
 
     def batches(self, batch_field):
         """

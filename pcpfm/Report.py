@@ -19,33 +19,24 @@ from . import utils
 
 class ReportPDF(FPDF):
     """
-    This class is simply a wrapper around FPDF from fpdf library so
-    that we can have a consistent header and footer for all pages
-
-    :param header_text: text to be included on the header of each page
+    Wrapper around FPDF with consistent header and footer.
     """
     def __init__(self, header_text):
         self.header_text = header_text
         super().__init__()
 
     def header(self):
-        """
-        This function is called on every page of the report. It 
-        generates the header for the page. 
-        """
-        self.set_font('Arial', 'B', 15)
-        self.cell(80)
-        self.cell(30, 10, self.header_text, 0, 0, 'C')
-        self.ln(10)
+        print(self.page_no())
+        if self.page_no() > 1:
+            self.set_font('Arial', 'B', 15)
+            #self.cell(0, 10, self.header_text, ln=True, align='C')
+            self.ln(5)
 
     def footer(self):
-        """
-        This function is called on every page of the report. It 
-        generates the footer. Currently this does nothing but it 
-        is required. 
-        """
-        self.set_y(15)
+        self.set_y(-15)
         self.set_font('Arial', 'I', 8)
+        if self.page_no() > 1:
+            self.cell(0, 10, f'Page {self.page_no() - 1} - {self.header_text}', 0, 0, 'C')
 
 class Report():
     """
@@ -65,11 +56,67 @@ class Report():
         self.default_font = ['Arial', '', 12]
         report_title = 'PCPFM Report - ' + self.experiment.experiment_directory.split("/")[-1]
         self.report = ReportPDF(report_title)
-        self.report.add_page()
+        #self.report.add_page()
         self.report.set_font(*self.default_font)
         self.max_width = round(self.report.line_width * 900,0)
         self.style = self.__preprocess_style(self.parameters["report_config"])
         self.__create_report()
+
+    def table_of_contents(self, section_desc):
+        """
+        Adds a Table of Contents page. Assumes each section = 1 page.
+        Automatically lists all sections before 'save', skipping 'cover_page' and TOC itself.
+        """
+        self.report.add_page()
+        self.__section_head("Table of Contents")
+        
+        page_num = 2  # cover = 1, TOC = 2
+        toc_lines = []
+        for section in self.__preprocess_style(self.parameters["report_config"]):
+            name = section["section"]
+            if name in {"cover_page", "table_of_contents", "save"}:
+                continue
+            if section['section'] == 'figure':
+                label = section['name']
+            else:
+                label = name.replace("_", " ").title()
+            if "table" in section and section["table"] != "*":
+                label += f" ({section['table']})"
+            if (label, page_num) not in toc_lines:
+                toc_lines.append((label, page_num))
+                page_num += 1
+
+        # Set uniform layout
+        for label, page in toc_lines:
+            label_str = f"{label}"
+            label_width = self.report.get_string_width(label_str)
+            dots = "." * int((180 - label_width - 10) / self.report.get_string_width("."))
+            self.report.cell(0, 10, f"{label_str} {dots} {page}", ln=True)
+
+    def __section_table(self, rows, col_widths=None, header=True, font_size=12):
+        """
+        Draws a well-aligned table in the PDF.
+        
+        Args:
+            rows (list of lists): Each sublist is a row of strings/numbers.
+            col_widths (list of floats): Optional fixed column widths in mm.
+            header (bool): Whether the first row is a header.
+            font_size (int): Font size for table content.
+        """
+        self.report.set_font(self.default_font[0], 'B' if header else '', font_size)
+        
+        # Auto-compute column widths if not provided
+        if not col_widths:
+            max_cols = max(len(r) for r in rows)
+            total_width = self.report.w - self.report.l_margin - self.report.r_margin
+            col_widths = [total_width / max_cols] * max_cols
+
+        for i, row in enumerate(rows):
+            if i == 1 and header:
+                self.report.set_font(self.default_font[0], '', font_size)
+            for j, cell in enumerate(row):
+                self.report.cell(col_widths[j], 10, str(cell), border=1)
+            self.report.ln()
 
     def __preprocess_style(self, style):
         """
@@ -146,18 +193,17 @@ class Report():
         """
         for section in self.style:
             method = getattr(self, section["section"])
-            try:
-                if method:
-                    if "table" in section:
-                        if section["table"] + "_cleaned" in self.experiment.feature_tables:
-                            section["table"] = section["table"] + "_cleaned"
-                            method(section)
-                        else:
-                            method(section)
+
+            if method:
+                if "table" in section:
+                    if section["table"] + "_cleaned" in self.experiment.feature_tables:
+                        section["table"] = section["table"] + "_cleaned"
+                        method(section)
                     else:
                         method(section)
-            except:
-                pass
+                else:
+                    method(section)
+
         self.experiment.save()
 
 
@@ -240,63 +286,91 @@ class Report():
             except:
                 print(section_desc)
 
+    def study_summary(self, section_desc):
+        pass
+
     def experiment_summary(self, section_desc):
         """
-        This will list the empcpds and feature tables in the experiment.
+        Summarize key aspects of the experiment concisely.
+        """
+        self.report.add_page()
+        self.__section_head("Experiment Overview")
+        
+        exp = self.experiment
 
-        Requires: None
-        """ 
-        self.__section_head("Experiment Summary")
-        if 'text' in section_desc:
-            self.__section_text(section_desc['text'])
-        self.__section_line("empCpd list", options=["bold"])
-        for empcpd_moniker in self.experiment.empCpds.keys():
-            self.__section_line(empcpd_moniker)
-        self.__section_line(' ')
-        self.__section_line("Feature Table list", options=["bold"])
-        for feature_table_moniker in self.experiment.feature_tables.keys():
-            self.__section_line(feature_table_moniker)
+        total_samples = len(exp.acquisitions)
+        
+        type_counts = {}
+        for acq in exp.acquisitions:
+            stype = getattr(acq, "sample_type", "Unknown")
+            if stype == "Unknown":
+                stype = "Study Sample"
+            type_counts[stype] = type_counts.get(stype, 0) + 1
+        type_summary = ", ".join([f"{count} {stype}" for stype, count in type_counts.items()])
 
+        #num_metadata_tags = len(getattr(exp.metadata, "columns", {}))
+        num_feature_tables = len(exp.feature_tables)
+
+        summary_text = (
+            f"A total of {total_samples} samples were analyzed.\n"
+            f"Samples by type: {type_summary}.\n"
+            #f"{num_metadata_tags} metadata tags were provided.\n"
+            f"The experiment has {num_feature_tables} feature tables: ."
+        )
+
+        self.__section_text(summary_text)
 
     def annotation_summary(self, section_desc):
         """
-        This summarizes the annotations for each empcpd in the experiment.
-
-        This counts the number of annotations per empcpd at each level.
-
-        Args:
-            Requires: None
-        """     
+        Summarizes annotations for each empCpd in a structured table.
+        """
+        self.report.add_page()
         self.__section_head("Annotation Summary")
         if 'text' in section_desc:
             self.__section_text(section_desc['text'])
-        self.__section_line("Name, #EmpCpds, #l4 Annotated, #l2 Annotated, #l1b Annotated, #l1a Annotated", options=["bold"])
+
+        rows = [["Name", "#EmpCpds", "#L4 Annotated", "#L2 Annotated", "#L1b Annotated", "#L1a Annotated"]]
+
         for empcpd_moniker in self.experiment.empCpds.keys():
             empcpds = self.experiment.retrieve_empCpds(empcpd_moniker, True)
-            num_l4_annotated = 0
-            num_l2_annotated = 0
-            num_l1b_annotated = 0
-            num_l1a_annotated = 0
+            num_l4, num_l2, num_l1b, num_l1a = 0, 0, 0, 0
+
             for kp in empcpds.dict_empcpds.values():
-                num_l1b_annotated += int(bool(kp.get("Level_1b", [])))
-                num_l4_annotated += int(bool(kp.get("Level_4")))
-                has_l2 = False
-                has_l1a = False
-                for ms2_spectrum in kp.get("MS2_Spectra", []):
-                    for annotation in ms2_spectrum.get("annotations", []):
-                        if annotation["annotation_level"] == "Level_2":
-                            has_l2 = True
-                        elif annotation["annotation_level"] == "Level_1a":
-                            has_l1a = True
-            num_l2_annotated += int(has_l2)
-            num_l1a_annotated += int(has_l1a)
-            line = ", ".join([str(x) for x in [empcpd_moniker, 
-                                               str(len(empcpds.dict_empcpds)), 
-                                               num_l4_annotated, 
-                                               num_l2_annotated, 
-                                               num_l1b_annotated, 
-                                               num_l1a_annotated]])
-            self.__section_line(line)
+                num_l1b += int(bool(kp.get("Level_1b", [])))
+                num_l4 += int(bool(kp.get("Level_4")))
+                annotations = [annotation["annotation_level"]
+                            for spectrum in kp.get("MS2_Spectra", [])
+                            for annotation in spectrum.get("annotations", [])]
+                num_l2 += int("Level_2" in annotations)
+                num_l1a += int("Level_1a" in annotations)
+
+            rows.append([
+                empcpd_moniker,
+                len(empcpds.dict_empcpds),
+                num_l4,
+                num_l2,
+                num_l1b,
+                num_l1a
+            ])
+
+        self.__section_table(rows)
+
+
+    def summary(self, section_desc):
+        self.report.add_page()
+        self.__section_head("Experiment Summary")
+        subsections = [
+            ("sample_desc_txt", "Sample Description"),
+            ("experiment_goal_txt", "Goal"),
+            ("assay_summary", "Assay Summary"), 
+            ("analysis_summary", "Analysis Summary"),
+            ("results_summary", "Results Summary")
+        ]
+        for (key, title) in subsections:
+            self.__section_line(f"{title}")
+            self.report.ln(5)
+            self.__section_text(section_desc.get(key, ''))
+
 
     def table_summary(self, section_desc):
         """
@@ -304,42 +378,76 @@ class Report():
 
         Requires: None
         """
-
+        self.report.add_page()
         self.__section_head("Feature Table Summary")
         if 'text' in section_desc:
             self.__section_text(section_desc['text'])
-        self.__section_line("Table Name, Num Samples, Num Features", options=["bold"])
-        tables = [x for x in self.experiment.feature_tables.keys() if "cleaned" not in x]
+        tables = [x for x in self.experiment.feature_tables.keys() if "__internal" not in x]
+        rows = [["Table Name", "Num Samples", "Num Features"]]
         for table in tables:
             ft = self.experiment.retrieve_feature_table(table, True)
-            line = ", ".join([str(x) for x in [table, ft.num_samples, ft.num_features]])
-            self.__section_line(line)
+            rows.append([table, ft.num_samples, ft.num_features])
+        self.__section_table(rows)
 
     def empcpd_summary(self, section_desc):
         """
-        This summarizes the feature tables in the experiment. 
-
-        Requires: None
+        Summarizes the empCpds in the experiment.
         """
+        self.report.add_page()
         self.__section_head("empCpd Table Summary")
         if 'text' in section_desc:
             self.__section_text(section_desc['text'])
-        self.__section_line("EmpCpd Name, Num Khipus, Num Features", options=["bold"])
+
+        rows = [["EmpCpd Name", "Num Khipus", "Num Features"]]
         for empcpd in self.experiment.empCpds.keys():
-            empcpd_object = self.experiment.retrieve_empCpds(empcpd, True)
-            self.__section_line(", ".join([str(x) for x in [empcpd, empcpd_object.num_khipus, empcpd_object.num_features]]))
+            obj = self.experiment.retrieve_empCpds(empcpd, True)
+            rows.append([empcpd, obj.num_khipus, obj.num_features])
+        
+        self.__section_table(rows)
 
     def command_history(self, section_desc):
         """
-        This summarizes each command that has been executed in the 
-        analysis. 
-
-        Requires: None
+        Summarizes each command that has been executed in the analysis.
         """
-
+        self.report.add_page()
         self.__section_head("Command History")
-        for command in self.experiment.command_history:
-            self.__section_text(command)
+
+        rows = [["Timestamp", "Command"]]
+        for entry in self.experiment.command_history:
+            ts, cmd = entry.split(":", 1)
+            timestamp = datetime.datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d %H:%M:%S")
+            rows.append([timestamp, cmd])
+
+        self.__section_table(rows, col_widths=[50, self.report.w - self.report.l_margin - self.report.r_margin - 50])
+
+    def cover_page(self, section_desc):
+        """
+        Adds a cover page to the report.
+
+        Optional fields in section_desc:
+            - title (str): Main title of the report
+            - subtitle (str): Subtitle or project description
+            - author (str): Name of the author or lab
+            - date (str): Override date string (default: today)
+            - logo_path (str): Path to a logo image
+        """
+        self.report.add_page()
+        self.report.set_font('Arial', 'B', 24)
+        self.report.ln(100)
+        if "title" in section_desc:
+            self.report.cell(0, 40, section_desc["title"], ln=True, align='C')
+        if "subtitle" in section_desc:
+            self.report.set_font('Arial', '', 16)
+            self.report.cell(0, 10, section_desc["subtitle"], ln=True, align='C')
+        if "author" in section_desc:
+            self.report.ln(10)
+            self.report.set_font('Arial', '', 12)
+            self.report.cell(0, 10, "Prepared by: " + section_desc["author"], ln=True, align='C')
+        date_str = section_desc.get("date", datetime.datetime.today().strftime('%B %d, %Y    %H:%M:%S'))
+        self.report.ln(5)
+        self.report.cell(0, 10, "Date: " + date_str, ln=True, align='C')
+        if "logo_path" in section_desc and os.path.exists(section_desc["logo_path"]):
+            self.report.image(section_desc["logo_path"], x=80, w=50)
 
     def version_summary(self, section_desc):
         """
@@ -348,17 +456,26 @@ class Report():
 
         Requires: None
         """
-        self.__section_head("Software Version Summary")
-        self.__section_line(":".join(['pcpfm', pkg_resources.get_distribution('pcpfm').version]))
-        _package = pkg_resources.working_set.by_key['pcpfm']
-        for req in _package.requires():
-            version = pkg_resources.get_distribution(req.name).version
-            self.__section_line(":".join([req.name, version]))
-        self.__section_line('')
-        self.__section_line("OS: " + platform.system())
-        self.__section_line("Python Version: " + platform.python_version())
-        self.__section_line("Architecture: " + platform.machine())
-        self.__section_text("Uname: " + " ".join(platform.uname()))
+        self.report.add_page()
+        self.__section_head("Software Metadata Summary")
+        self.report.ln(5)
+        __PCPFM_version = pkg_resources.get_distribution('pcpfm').version
+
+        __version_text = f'PCPFM version {__PCPFM_version} was used for data processing\n'
+        __version_text += 'The following software libraries were employed for the analysis: '
+
+        submodules = []
+        for req in pkg_resources.working_set.by_key['pcpfm'].requires():
+            submodules.append(f'{req.name}v.{pkg_resources.get_distribution(req.name).version}')
+        __version_text += " ,".join(submodules)
+        self.__section_text(__version_text)
+        self.report.ln(5)
+
+        __machine_description = f'Report generated and analysis performed using a '
+        __machine_description += f"{platform.machine()} system running {platform.system()} as the operating system."
+        __uname_string = ",".join(platform.uname())
+        __machine_description += f"Python Version was {platform.python_revision()} and system uname was {__uname_string}"
+        self.__section_text(__machine_description)
 
     def computational_performance(self, section_desc):
         """
@@ -396,9 +513,10 @@ class Report():
 
         Requires: None
         """
-        timestamp_string = 'Report generated on ' + str(datetime.datetime.now())
-        self.__section_head("Timestamp")
-        self.__section_line(timestamp_string)
+        pass
+        #timestamp_string = 'Report generated on ' + str(datetime.datetime.now())
+        #self.__section_head("Timestamp")
+        #self.__section_line(timestamp_string)
 
     def save(self, section_desc):
         """
@@ -412,6 +530,18 @@ class Report():
             report_path += ".pdf"
         print("saving: ", report_path)
         self.report.output(report_path)
+
+    def figure_live(self, section_desc):
+        feature_table = self.experiment.retrieve_feature_table(section_desc["table"], True)
+        params_for_figure = dict(self.parameters)
+        params_for_figure['all'] = False
+        params_for_figure['save_plots'] = True
+        feature_table.generate_figure_params(params_for_figure)
+        figure_path = feature_table.save_fig_path(section_desc["name"])
+        if section_desc["name"] in feature_table.qaqc_result_to_key:
+                    params_for_figure[feature_table.qaqc_result_to_key[section_desc["name"]]] = True
+                    feature_table.QAQC(params_for_figure)
+
 
     def figure(self, section_desc):
         """

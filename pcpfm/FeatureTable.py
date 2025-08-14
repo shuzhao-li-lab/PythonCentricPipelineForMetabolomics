@@ -375,7 +375,7 @@ class FeatureTable:
                 if skip_annot is False:
                     if markers and colors:
                         for x, y, c, m in zip(xs, ys, list(colors[0]), list(markers[0])):
-                            plt.scatter(x, y, c=c, marker=m)
+                            plt.scatter(x, y, c=c, marker=m, s=10)
                     elif markers and not colors:
                         for x, y, m in zip(xs, ys, list(markers[0])):
                             plt.scatter(x, y, marker=m)
@@ -417,9 +417,9 @@ class FeatureTable:
                     )
             elif figure_type == "heatmap":
                 if colors:
-                    sns.clustermap(data, col_colors=colors, yticklabels=y_label)
+                    sns.clustermap(data, col_colors=colors, yticklabels=y_label, cmap='coolwarm')
                 else:
-                    sns.clustermap(data, yticklabels=y_label)
+                    sns.clustermap(data, yticklabels=y_label, cmap='coolwarm')
                 plt.suptitle(title)
                 if fig_params["color_legend"]:
                     plt.tight_layout(rect=[0, 0, 0.75, 1])
@@ -435,9 +435,9 @@ class FeatureTable:
                     )
             elif figure_type == "clustermap":
                 if colors:
-                    sns.clustermap(data, col_colors=colors)
+                    sns.clustermap(data, col_colors=colors, cmap='coolwarm')
                 else:
-                    sns.clustermap(data)
+                    sns.clustermap(data, cmap='coolwarm')
                 plt.xticks
                 plt.suptitle(title)
                 if fig_params["color_legend"]:
@@ -487,9 +487,6 @@ class FeatureTable:
                 plt.suptitle(title)
                 plt.hist(data, bins=bins)
             if fig_params["save_figs"]:
-                
-
-
                 plt.savefig(self.save_fig_path(title.replace(" ", "_")))
             if fig_params["interactive"]:
                 plt.show()
@@ -1189,9 +1186,7 @@ class FeatureTable:
         print("Dropping:")
         for x in starting_columns:
             if x not in self.feature_table.columns:
-                print("\t", x)
-            
-            
+                print("\t", x)    
 
     def drop_samples_by_filter(self, sample_filter, drop_others=False):
         """
