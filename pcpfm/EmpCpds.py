@@ -155,9 +155,16 @@ class EmpCpds:
                 for ms2_spectrum in khipu.get("MS2_Spectra", []):
                     for annotation in ms2_spectrum["annotations"]:
                         annotation_level = annotation["annotation_level"]
+                        
+                        # Start with a copy of the base feature info
                         ms2_annotation = {k: v for k, v in annotation_entry.items()}
-                        ms2_annotation = {"feature": feature, "level": annotation_level}
+                        
+                        # CORRECTED: Use .update() to add new keys instead of overwriting
+                        ms2_annotation.update({"feature": feature, "level": annotation_level})
+                        
+                        # Now, add the specific annotation details
                         ms2_annotation.update(annotation)
+                        
                         annotation_table.append(ms2_annotation)
         return pd.DataFrame(annotation_table)
     
@@ -170,7 +177,8 @@ class EmpCpds:
 
         This needs to be called whenever the MS2 annotations are updated before saving the 
         empcpd object.
-        """        
+        """
+        print("Updating MS2")
         for khipu in self.dict_empcpds.values():
             if "MS2_Spectra" in khipu:
                 new_spectra = []
@@ -178,6 +186,7 @@ class EmpCpds:
                     for match in self.ms2_spectra[spectrum["precursor_ion_id"]]:
                         new_spectra.append(match.embedding())
                 khipu["MS2_Spectra"] = new_spectra
+        print("Updated MS2")
 
     def update_annotations(self, update_ms2=False):
         """
@@ -189,50 +198,54 @@ class EmpCpds:
         if update_ms2:
             self.__update_ms2()
         # update other fields in the empCpds:
-        for _, khipu in self.dict_empcpds.items():
+        
+        print("Updating...")
+        for kp_id, khipu in self.dict_empcpds.items():
+            print("\t", kp_id)
             khipu["identity"] = set()
             khipu["Database_referred"] = set() 
 
             # MS1 only, only Level_1b counts for identity
             if "Level_1b" in khipu:
+                print("\t\t L1b: ", kp_id)
                 for annotation, source in khipu["Level_1b"]:
                     khipu["identity"].add((annotation, "no score - ms1 only"))
                     khipu["Database_referred"].add(source)
 
             # MS1 only, NOT IDENTITY
             if "Level_4" in khipu:
+                print("\t\t L4: ", kp_id)
                 for annotation in khipu["Level_4"]:
                     khipu["Database_referred"].add(annotation["primary_db"])
 
             # MS2, both Level_1a and Level 2 will update identity
             if "MS2_Spectra" in khipu:
+                print("\t\t MS2: ", kp_id)
+                dedup_annotations = {}
                 for ms2_spectrum in khipu["MS2_Spectra"]:
-                    for annotation in ms2_spectrum["annotations"]:
-                        if annotation["annotation_level"] == "Level_2":
-                            khipu["identity"].add(
-                                (
-                                    annotation["reference_id"],
-                                    round(annotation["msms_score"], 3),
-                                )
-                            )
-                            if "primary_db" in annotation:
-                                khipu["Database_referred"].add(annotation["primary_db"])
-                            else:
-                                khipu["Database_referred"].add("MS2")
-                        if annotation["annotation_level"] == "Level_1a":
-                            khipu["identity"].add(
-                                (
-                                    annotation["reference_id"],
-                                    round(annotation["msms_score"], 3),
-                                    "matches standard",
-                                )
-                            )
-                            if "primary_db" in annotation:
-                                khipu["Database_referred"].add(annotation["primary_db"])
-                            else:
-                                khipu["Database_referred"].add("MS2")
+                    for annotation in ms2_spectrum['annotations']:
+                        ref_id = annotation['reference_id']
+                        score = round(annotation['msms_score'], 3)
+                        if ref_id in dedup_annotations:
+                            if score > dedup_annotations[ref_id]['score']:
+                                dedup_annotations[ref_id] = {
+                                    'score': score,
+                                    'annotation': annotation
+                                }
+                for ref_id, ref_id_data in dedup_annotations.items():
+                    khipu['identity'].add((
+                        ref_id,
+                        round(ref_id_data['annotation']['msms_score'], 3),
+                        "matched standard" if ref_id_data['annotation']['annotation_level'] == "Level_1a" else '')
+                        )
+                    if "primary_db" in ref_id_data['annotation']:
+                        khipu["Database_referred"].add(ref_id_data['annotation']["primary_db"])
+                    else:
+                        khipu["Database_referred"].add("MS2")
+
             khipu["identity"] = list(khipu["identity"])
             khipu["Database_referred"] = list(khipu["Database_referred"])
+        print("Done with annotations...")
 
     def get_mz_tree(self, mz_tol, abs_error=False):
         """
@@ -408,12 +421,58 @@ class EmpCpds:
 
         :param save_as_monhiker: an alternative moniker to which to save the table. Defaults to None.
         """
+        def __has_circular_ref(obj):
+            from collections.abc import Mapping
+
+            visited, stack = set(), set()
+            primitives = (str, bytes, int, float, bool, type(None))
+
+            def walk(o):
+                if isinstance(o, primitives): 
+                    return False
+                oid = id(o)
+                if oid in stack: 
+                    return True
+                if oid in visited: 
+                    return False
+                visited.add(oid); stack.add(oid)
+                try:
+                    if isinstance(o, Mapping):
+                        for k, v in o.items():
+                            if walk(k) or walk(v): 
+                                return True
+                    elif isinstance(o, (list, tuple, set)):
+                        for x in o:
+                            if walk(x): 
+                                return True
+                    elif hasattr(o, "__dict__"):
+                        if walk(o.__dict__): 
+                            return True
+                    elif hasattr(o, "__iter__"):
+                        for x in o:
+                            if walk(x): 
+                                return True
+                    return False
+                finally:
+                    stack.discard(oid)
+
+            return walk(obj)
+
+
+
+
+
         save_as_moniker = self.moniker if save_as_moniker is None else save_as_moniker
         self.experiment.empCpds[save_as_moniker] = os.path.join(
             self.experiment.annotation_subdirectory, save_as_moniker + "_empCpds.json"
         )
+
+        print(__has_circular_ref(self.dict_empcpds))
+        
+        print("Saving...")
         with open(self.experiment.empCpds[save_as_moniker], "w+", encoding='utf-8') as out_fh:
             json.dump(self.dict_empcpds, out_fh, indent=4)
+        print("Stopping....")
         self.experiment.save()
 
     @staticmethod
@@ -665,8 +724,8 @@ class EmpCpds:
         mz_tol=5,
         rt_tolerance=30,
         similarity_method="CosineHungarian",
-        min_peaks=1,
-        score_cutoff=0.50,
+        min_peaks=2,
+        score_cutoff=0.80,
     ):
         """
         Perform l1 annotation on the empcpds. Using CD authentic standard library. 
@@ -683,6 +742,7 @@ class EmpCpds:
         similarity_method = get_similarity_method(similarity_method)
         precursor_mz_tree = self.get_precursor_mz_tree(2 * mz_tol)
         precursor_rt_tree = self.get_precursor_rt_tree(rt_tolerance)
+        i = 0
         for db_ms2 in extract_CD_csv(standards_csv, self.experiment.ionization_mode, lazy=True):
             match_tol = db_ms2.prec_mz / 1e6 * mz_tol * 2
             sim_instance = similarity_method(tolerance=match_tol)
@@ -692,13 +752,16 @@ class EmpCpds:
                         sim_res = sim_instance.pair(db_ms2.matchms_spectrum, exp_ms2.matchms_spectrum)
                         score, n_matches = sim_res.tolist()
                         if score >= score_cutoff and n_matches >= min_peaks:
+                            i += 1
+                            print(i)
                             exp_ms2.annotate(
                                 db_ms2,
                                 score,
                                 n_matches,
                                 annotation_level="Level_1a",
                             )
-        self.update_annotations(update_ms2=True)
+        print("Done with L1a")
+        #self.update_annotations(update_ms2=False)
 
     def l1b_annotate(self, standards_csv, mz_tol=5, rt_tolerance=10):
         """
@@ -724,4 +787,4 @@ class EmpCpds:
                     if "Level_1b" not in kp:
                         kp["Level_1b"] = []
                     kp["Level_1b"].append((cname, csv))
-        self.update_annotations()
+        #self.update_annotations()
