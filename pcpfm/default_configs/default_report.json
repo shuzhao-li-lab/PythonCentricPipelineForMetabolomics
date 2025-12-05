@@ -2,7 +2,21 @@
     "sections":
     [
         {
-            "section": "timestamp"
+            "section": "cover_page",
+            "title": "PCPFM Report",
+            "subtitle": "testing",
+            "author": "Joshua M. Mitchell"
+        },
+        {
+            "section": "table_of_contents"
+        },
+        {
+            "section": "summary",
+            "sample_desc_txt": "$SAMPLE_DESC_TEXT",
+            "experiment_goal_txt": "$EXPERIMENT_GOAL_TEXT",
+            "assay_summary": "$ASSAY_SUMMARY_TEXT",
+            "analysis_summary": "$ANALYSIS_SUMMARY",
+            "results_summary": "$RESULTS_SUMMARY"
         },
         {
             "section": "table_summary",
@@ -55,6 +69,7 @@
         {
             "section": "command_history"
         },
+
         {
             "section": "save",
             "report_name": "report.pdf"

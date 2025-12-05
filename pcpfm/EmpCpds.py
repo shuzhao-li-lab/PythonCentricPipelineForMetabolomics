@@ -201,26 +201,22 @@ class EmpCpds:
         
         print("Updating...")
         for kp_id, khipu in self.dict_empcpds.items():
-            print("\t", kp_id)
             khipu["identity"] = set()
             khipu["Database_referred"] = set() 
 
             # MS1 only, only Level_1b counts for identity
             if "Level_1b" in khipu:
-                print("\t\t L1b: ", kp_id)
                 for annotation, source in khipu["Level_1b"]:
                     khipu["identity"].add((annotation, "no score - ms1 only"))
                     khipu["Database_referred"].add(source)
 
             # MS1 only, NOT IDENTITY
             if "Level_4" in khipu:
-                print("\t\t L4: ", kp_id)
                 for annotation in khipu["Level_4"]:
                     khipu["Database_referred"].add(annotation["primary_db"])
 
             # MS2, both Level_1a and Level 2 will update identity
             if "MS2_Spectra" in khipu:
-                print("\t\t MS2: ", kp_id)
                 dedup_annotations = {}
                 for ms2_spectrum in khipu["MS2_Spectra"]:
                     for annotation in ms2_spectrum['annotations']:
@@ -753,7 +749,6 @@ class EmpCpds:
                         score, n_matches = sim_res.tolist()
                         if score >= score_cutoff and n_matches >= min_peaks:
                             i += 1
-                            print(i)
                             exp_ms2.annotate(
                                 db_ms2,
                                 score,
