@@ -332,26 +332,29 @@ class Report():
         rows = [["Name", "#EmpCpds", "#L4 Annotated", "#L2 Annotated", "#L1b Annotated", "#L1a Annotated"]]
 
         for empcpd_moniker in self.experiment.empCpds.keys():
-            empcpds = self.experiment.retrieve_empCpds(empcpd_moniker, True)
-            num_l4, num_l2, num_l1b, num_l1a = 0, 0, 0, 0
+            try:
+                empcpds = self.experiment.retrieve_empCpds(empcpd_moniker, True)
+                num_l4, num_l2, num_l1b, num_l1a = 0, 0, 0, 0
 
-            for kp in empcpds.dict_empcpds.values():
-                num_l1b += int(bool(kp.get("Level_1b", [])))
-                num_l4 += int(bool(kp.get("Level_4")))
-                annotations = [annotation["annotation_level"]
-                            for spectrum in kp.get("MS2_Spectra", [])
-                            for annotation in spectrum.get("annotations", [])]
-                num_l2 += int("Level_2" in annotations)
-                num_l1a += int("Level_1a" in annotations)
+                for kp in empcpds.dict_empcpds.values():
+                    num_l1b += int(bool(kp.get("Level_1b", [])))
+                    num_l4 += int(bool(kp.get("Level_4")))
+                    annotations = [annotation["annotation_level"]
+                                for spectrum in kp.get("MS2_Spectra", [])
+                                for annotation in spectrum.get("annotations", [])]
+                    num_l2 += int("Level_2" in annotations)
+                    num_l1a += int("Level_1a" in annotations)
 
-            rows.append([
-                empcpd_moniker,
-                len(empcpds.dict_empcpds),
-                num_l4,
-                num_l2,
-                num_l1b,
-                num_l1a
-            ])
+                rows.append([
+                    empcpd_moniker,
+                    len(empcpds.dict_empcpds),
+                    num_l4,
+                    num_l2,
+                    num_l1b,
+                    num_l1a
+                ])
+            except:
+                pass
 
         self.__section_table(rows)
 
@@ -400,8 +403,11 @@ class Report():
 
         rows = [["EmpCpd Name", "Num Khipus", "Num Features"]]
         for empcpd in self.experiment.empCpds.keys():
-            obj = self.experiment.retrieve_empCpds(empcpd, True)
-            rows.append([empcpd, obj.num_khipus, obj.num_features])
+            try:
+                obj = self.experiment.retrieve_empCpds(empcpd, True)
+                rows.append([empcpd, obj.num_khipus, obj.num_features])
+            except:
+                pass
         
         self.__section_table(rows)
 

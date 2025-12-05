@@ -779,33 +779,31 @@ class Experiment(core.Experiment):
         force (bool): if true, rerun asari if previously ran
         """
 
-        if (
-            not ("full" in self.feature_tables and "preferred" in self.feature_tables)
-            or force
-        ):
+        if ( not ("full" in self.feature_tables and "preferred" in self.feature_tables) or force):
             mapping = {
                 "$IONIZATION_MODE": self.ionization_mode,
                 "$CONVERTED_SUBDIR": self.converted_subdirectory,
                 "$ASARI_SUBDIR": self.asari_subdirectory,
             }
-
             # find existing asari runs
             existing_dirs = []
-            for _dir, _, _ in os.walk(self.asari_subdirectory):
-                if os.path.isdir(_dir):
+            for _dir, _, _ in os.walk(self.experiment_directory):
+                if "asari_project" in _dir and os.path.isdir(_dir) and 'export' not in _dir:
                     existing_dirs.append(_dir)
 
             job = asari_cmd if isinstance(asari_cmd, list) else asari_cmd.split(" ")
             job = [mapping.get(f, f) for f in asari_cmd]
             completed_process = subprocess.run(job, check=False)
-
+            
+            #exit()
             # find new asari run
             sub_dir = None
-            for _dir, _, _ in os.walk(self.asari_subdirectory):
-                if _dir not in existing_dirs and os.path.isdir(_dir):
-                    sub_dir = _dir
-                    break
-            self.asari_subdirectory = os.path.join(self.asari_subdirectory, sub_dir)
+            for _dir, _, _ in os.walk(self.experiment_directory):
+                if _dir not in existing_dirs:
+                    if "asari_project" in _dir and os.path.isdir(_dir) and 'export' not in _dir:
+                        sub_dir = _dir
+                        break
+            self.asari_subdirectory = os.path.join(self.experiment_directory, sub_dir)
 
             if completed_process.returncode == 0:
                 self.feature_tables.update(
