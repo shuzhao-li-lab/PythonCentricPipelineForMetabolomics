@@ -4,8 +4,8 @@
 
 process() {
     experiment=$(pwd)/$2
-    #pcpfm assemble -o $(pwd) -j $2 -s $1 --filter=$3 --path_field Filepath --name_field "File Name"
-    #pcpfm asari -i $experiment 
+    pcpfm assemble -o $(pwd) -j $2 -s $1 --filter=$3 --path_field Filepath --name_field "File Name"
+    pcpfm asari -i $experiment 
 
     pcpfm blank_masking --table_moniker preferred --new_moniker=preferred_blank_masked --blank_value blank --sample_value unknown --query_field "Sample Type" --blank_intensity_ratio 3 -i $experiment 
     pcpfm drop_samples --table_moniker preferred_blank_masked --new_moniker masked_preferred_unknowns_intermediate --drop_value unknown --drop_field "Sample Type" --drop_others true -i $experiment 
