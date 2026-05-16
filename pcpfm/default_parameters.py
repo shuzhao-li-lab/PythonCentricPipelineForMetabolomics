@@ -7,7 +7,7 @@ This needs to be cleaned up.
 import os
 
 PARAMETERS = {
-    #"preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
+    # "preprocessing_config": "preprocessing_examples/defaultpreprocessing.json",
     "annot_mz_tolerance": 5,
     "annot_rt_tolerance": 30,
     "khipu_mz_tolerance": 5,
@@ -27,27 +27,29 @@ PARAMETERS = {
     "report_config": "default_configs/default_report.json",
     "moniker": "default",
     "multicores": 4,
-    "conversion_command": ['$(which mono)', 
-                           '$BUILTIN_CONVERTER', 
-                           '-f=2', 
-                           '-i', 
-                           '$RAW_PATH', 
-                           '-b',
-                           '$OUT_PATH', 
-                           ' >/dev/null'],
-    "asari_command": [
-        '/Users/mitchjo/Library/Python/3.11/bin/asari',
-        'process',
-        '-m',
-        '$IONIZATION_MODE', 
-        '-i',
-        '$CONVERTED_SUBDIR',
-        '-o',
-        '$ASARI_SUBDIR',
-        '--anno',
-        'False'
+    "conversion_command": [
+        "$(which mono)",
+        "$BUILTIN_CONVERTER",
+        "-f=2",
+        "-i",
+        "$RAW_PATH",
+        "-b",
+        "$OUT_PATH",
+        " >/dev/null",
     ],
-    "filter": '',
+    "asari_command": [
+        "/Users/mitchjo/Library/Python/3.11/bin/asari",
+        "process",
+        "-m",
+        "$IONIZATION_MODE",
+        "-i",
+        "$CONVERTED_SUBDIR",
+        "-o",
+        "$ASARI_SUBDIR",
+        "--anno",
+        "False",
+    ],
+    "filter": "",
     "save_plots": True,
     "interactive_plots": False,
     "color_by": [],
@@ -71,7 +73,7 @@ PARAMETERS = {
     "query_field": "Sample Type",
     "blank_intensity_ratio": 3,
     "by_batch": None,
-    "batch_blanking_logic": 'or',
+    "batch_blanking_logic": "or",
     "drop_name": None,
     "drop_field": None,
     "drop_others": None,
@@ -81,11 +83,14 @@ PARAMETERS = {
     "TIC_normalization_percentile": 0.90,
     "normalize_value": "median",
     "feature_retention_percentile": 0.50,
-    "feature_drop_logic": 'or',
+    "feature_drop_logic": "or",
     "interpolation_ratio": 0.5,
     "interpolate_method": "min",
     "log_transform_mode": "log2",
-    "targets": ["annotation_sources/hmdb_metabolites.json", "annotation_sources/LMSD.json"],
+    "targets": [
+        "annotation_sources/hmdb_metabolites.json",
+        "annotation_sources/LMSD.json",
+    ],
     "search_isotopologues": False,
     "MS1_annotation_name": "MS1_annotations",
     "MS2_annotation_name": "MS2_annotations",
@@ -106,21 +111,22 @@ PARAMETERS = {
     "scan_experiment": True,
     "force": False,
     "file_mode": "link",
-    "comprehensive_output": False
+    "comprehensive_output": False,
 }
 
 this_abs_dir = os.path.abspath(os.path.dirname(__file__))
 
 new_target_files = []
-for v in PARAMETERS['targets']:
+for v in PARAMETERS["targets"]:
     new_target_files.append(os.path.join(this_abs_dir, v))
-PARAMETERS['targets'] = new_target_files
+PARAMETERS["targets"] = new_target_files
 
-if PARAMETERS["conversion_command"][1] == '$BUILTIN_CONVERTER':
-    path = this_abs_dir + '/ThermoRawFileParser.exe'
+if PARAMETERS["conversion_command"][1] == "$BUILTIN_CONVERTER":
+    path = this_abs_dir + "/ThermoRawFileParser.exe"
     PARAMETERS["conversion_command"][1] = path
 
 for k, v in PARAMETERS.items():
-    if isinstance(v, str) and (v.endswith(".json") or v.endswith(".msp") or v.endswith('.txt')):
+    if isinstance(v, str) and (
+        v.endswith(".json") or v.endswith(".msp") or v.endswith(".txt")
+    ):
         PARAMETERS[k] = os.path.join(this_abs_dir, v)
-        
