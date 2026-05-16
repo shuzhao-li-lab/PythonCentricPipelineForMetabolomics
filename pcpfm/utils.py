@@ -200,7 +200,7 @@ def process_ms2_spectrum(
     """
     try:
         identifiers = {k: v for k, v in spectrum.metadata.items()}
-    except:
+    except BaseException:
         identifiers = {}
 
     if not skip_meta:
@@ -216,7 +216,7 @@ def process_ms2_spectrum(
             return None
         try:
             spectrum.set("retention_time", spectrum.metadata["scan_start_time"][0] * 60)
-        except:
+        except BaseException:
             pass
 
         spec_id = []
@@ -345,10 +345,10 @@ log_modes = {"log2": np.log2, "log10": np.log10}
 def delete_dir_or_file(to_delete):
     try:
         shutil.rmtree(to_delete)
-    except:
+    except BaseException:
         try:
             os.remove(to_delete)
-        except:
+        except BaseException:
             "Unable to delete: " + to_delete
 
 

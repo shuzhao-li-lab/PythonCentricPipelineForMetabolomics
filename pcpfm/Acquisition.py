@@ -124,7 +124,7 @@ class Acquisition(Sample):
                     self.__ionization_mode = "neg"
                     self.mode = self.__ionization_mode
                     return self.__ionization_mode
-            except:
+            except BaseException:
                 return self.__ionization_mode
         return self.__ionization_mode
 
@@ -170,7 +170,7 @@ class Acquisition(Sample):
                         if spec.ms_level == 2:
                             self.__has_ms2 = True
                             break
-                except:
+                except BaseException:
                     pass
             if ms_method and self.__has_ms2:
                 self.experiment.MS2_methods.add(ms_method)

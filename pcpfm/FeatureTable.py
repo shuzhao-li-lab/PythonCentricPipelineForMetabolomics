@@ -950,7 +950,7 @@ class FeatureTable:
                 },
             }
             return result
-        except:
+        except BaseException:
             if perplexity > 0:
                 perplexity -= 1
                 return self.tsne(perplexity)

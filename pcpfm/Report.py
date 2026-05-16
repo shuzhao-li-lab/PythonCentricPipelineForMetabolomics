@@ -297,7 +297,7 @@ class Report:
             try:
                 tic_path = acquisition.TIC()
                 self.report.image(tic_path, w=self.max_width)
-            except:
+            except BaseException:
                 print(section_desc)
 
     def study_summary(self, section_desc):
@@ -382,7 +382,7 @@ class Report:
                         num_l1a,
                     ]
                 )
-            except:
+            except BaseException:
                 pass
 
         self.__section_table(rows)
@@ -435,7 +435,7 @@ class Report:
             try:
                 obj = self.experiment.retrieve_empCpds(empcpd, True)
                 rows.append([empcpd, obj.num_khipus, obj.num_features])
-            except:
+            except BaseException:
                 pass
 
         self.__section_table(rows)
@@ -660,7 +660,7 @@ class Report:
                     self.report.image(figure_path, w=self.max_width)
             if "text" in section_desc and section_desc["text"]:
                 self.__section_text(section_desc["text"])
-        except:
+        except BaseException:
             pass
 
 
