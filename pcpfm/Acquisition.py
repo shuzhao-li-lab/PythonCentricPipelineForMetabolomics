@@ -1,11 +1,11 @@
-'''
+"""
 This module implements the Acquisition object which is a set of data collected from a sample.
 
-A sample in this case could mean a biologically-derived sample or a blank or any other unit that 
+A sample in this case could mean a biologically-derived sample or a blank or any other unit that
 is analyzed for analysis.
 
 Each analytical replicate is therefore its own acquisition.
-'''
+"""
 
 import os
 import numpy as np
@@ -31,22 +31,22 @@ class Acquisition(Sample):
         mzml_filepath=None,
         ionization_mode=None,
         has_ms2=None,
-        experiment=None
+        experiment=None,
     ):
-        
+
         super().__init__(
-            experiment = '',
-            registry = {
+            experiment="",
+            registry={
                 "input_file": source_filepath,
                 "name": name,
                 "sample_id": name,
-                "list_retention_time": None
+                "list_retention_time": None,
             },
-            mode = ionization_mode,
-            sample_type = '',
-            input_file = source_filepath,
-            name = name,
-            id = name,
+            mode=ionization_mode,
+            sample_type="",
+            input_file=source_filepath,
+            name=name,
+            id=name,
         )
         self.experiment = experiment
 
@@ -54,14 +54,14 @@ class Acquisition(Sample):
         self.raw_filepath = raw_filepath
         self.mzml_filepath = mzml_filepath
 
-        #lazily_evaluated
+        # lazily_evaluated
         self.__ionization_mode = ionization_mode
         self.__has_ms2 = has_ms2
 
     @property
     def source_filepath(self):
         return self.input_file
-    
+
     @staticmethod
     def load_acquisition(acquisition_data, experiment):
         """
@@ -81,7 +81,7 @@ class Acquisition(Sample):
             mzml_filepath=acquisition_data["mzml_filepath"],
             ionization_mode=acquisition_data["_Acquisition__ionization_mode"],
             has_ms2=acquisition_data["_Acquisition__has_ms2"],
-            experiment=experiment
+            experiment=experiment,
         )
 
     @staticmethod
@@ -104,7 +104,7 @@ class Acquisition(Sample):
             mzml_filepath=None,
             ionization_mode=None,
             has_ms2=None,
-            experiment=experiment
+            experiment=experiment,
         )
 
     @property
@@ -135,7 +135,9 @@ class Acquisition(Sample):
 
         :return: a JSON-friendly dictionary for serialization during experiment saving and loading
         """
-        return recursive_encoder({k: v for k, v in self.__dict__.items() if k != 'experiment'})
+        return recursive_encoder(
+            {k: v for k, v in self.__dict__.items() if k != "experiment"}
+        )
 
     @property
     def has_ms2(self):
@@ -178,10 +180,10 @@ class Acquisition(Sample):
 
     def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
         """
-        This method generates TIC plots for the acquisition. If mz and rt is not provided, 
+        This method generates TIC plots for the acquisition. If mz and rt is not provided,
         this will make the TIC including the entire rt range and all mz values. If mz and rt values
-        are provided as co-indexed lists, then only those regions will be used IN ADDITION to 
-        the entire rt and mz range. These are saved as figures. 
+        are provided as co-indexed lists, then only those regions will be used IN ADDITION to
+        the entire rt and mz range. These are saved as figures.
 
         Args:
             mz (list, optional): mz values to limit the TIC calculation to. Defaults to None.
@@ -192,7 +194,7 @@ class Acquisition(Sample):
 
         Returns:
             str: path to the TIC plot
-        """        
+        """
         if mz is None:
             mz = []
         if rt is None:
@@ -289,4 +291,3 @@ class Acquisition(Sample):
                             passed_filter and must_include == values_to_filter
                         )
         return passed_filter
-    

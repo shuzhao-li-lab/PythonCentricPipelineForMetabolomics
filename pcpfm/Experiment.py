@@ -1,11 +1,11 @@
-'''
-Experiment.py contains the pipeline's implementation of the Experiment object which in turn 
-inherits from the Experiment object in the metdatamodel. 
+"""
+Experiment.py contains the pipeline's implementation of the Experiment object which in turn
+inherits from the Experiment object in the metdatamodel.
 
 The Experiment is largely a computational aid and orchestrates an analysis. This includes
-keeping track of intermediate results and acquisitions. 
+keeping track of intermediate results and acquisitions.
 
-'''
+"""
 
 import os
 import random
@@ -15,13 +15,13 @@ import json
 import subprocess
 import multiprocessing as mp
 import pandas as pd
-import matplotlib.colors as mcolors
 import asari
 from metDataModel import core
 from .utils import recursive_encoder, file_operations, flatten_nested_dicts
 from . import Acquisition
 from . import EmpCpds
 from . import FeatureTable
+
 
 class Experiment(core.Experiment):
     """
@@ -30,7 +30,6 @@ class Experiment(core.Experiment):
     This super vague constructor was useful during testing, now
     will explicitly define all the fields.
     """
-
 
     # this needs to be removed but determines where intermediates are stored
     subdirectories = {
@@ -42,7 +41,7 @@ class Experiment(core.Experiment):
         "ms2_directory": "ms2_acquisitions/",
         "qaqc_figs": "QAQC_figs/",
         "asari_subdirectory": "asari/",
-        "output_subdirectory": "output/"
+        "output_subdirectory": "output/",
     }
 
     # need to minimize parameters
@@ -77,38 +76,38 @@ class Experiment(core.Experiment):
         asari_subdirectory=None,
         output_subdirectory=None,
         ordered_samples=None,
-        parent_study=None
+        parent_study=None,
     ):
-        super().__init__(id=experiment_name,
-                         parent_study= parent_study if parent_study else '',
-                         species=species if species else '',
-                         tissue=tissue if tissue else '',
-                         provenance=provenance if provenance else {
-                                'generated_time': '',
-                                'generated_by': '',
-                                'input_filename': '',
-                                'preprocess_software': '',
-                                'preprocess_parameters': {}
-                            },
-                         chromatography= {
-                                'type': '',
-                                'total_time': '',
-                                'method_file': '',
-                                'column_model': '',
-                                'column_length': ''
-                            },
-                         instrumentation= {
-                                'type': '',
-                                'spectrometer': '',
-                                'method_file': '',
-                                'ionization': ''
-                            },
-                         ObservationAnnotation= {
-                                'sample_list': [],
-                                'file_sample_mapper': {}
-                            },
-                        #ordered_samples = ordered_samples if ordered_samples else [x.acq_name for x in acquisitions] if acquisitions else []
-                         )
+        super().__init__(
+            id=experiment_name,
+            parent_study=parent_study if parent_study else "",
+            species=species if species else "",
+            tissue=tissue if tissue else "",
+            provenance=provenance
+            if provenance
+            else {
+                "generated_time": "",
+                "generated_by": "",
+                "input_filename": "",
+                "preprocess_software": "",
+                "preprocess_parameters": {},
+            },
+            chromatography={
+                "type": "",
+                "total_time": "",
+                "method_file": "",
+                "column_model": "",
+                "column_length": "",
+            },
+            instrumentation={
+                "type": "",
+                "spectrometer": "",
+                "method_file": "",
+                "ionization": "",
+            },
+            ObservationAnnotation={"sample_list": [], "file_sample_mapper": {}},
+            # ordered_samples = ordered_samples if ordered_samples else [x.acq_name for x in acquisitions] if acquisitions else []
+        )
 
         self.experiment_directory = os.path.abspath(experiment_directory)
         self.acquisitions = acquisitions if acquisitions else []
@@ -116,7 +115,9 @@ class Experiment(core.Experiment):
         self.feature_tables = feature_tables if feature_tables else {}
         self.empCpds = empCpds if empCpds else {}
         self.log_transformed_feature_tables = (
-            list(set(log_transformed_feature_tables)) if log_transformed_feature_tables else []
+            list(set(log_transformed_feature_tables))
+            if log_transformed_feature_tables
+            else []
         )
         self.cosmetics = cosmetics if cosmetics else {}
         self.used_cosmetics = used_cosmetics if used_cosmetics else {}
@@ -152,7 +153,7 @@ class Experiment(core.Experiment):
     @property
     def experiment_name(self):
         return self.id
-    
+
     @property
     def study(self):
         return self.parent_study
@@ -202,7 +203,7 @@ class Experiment(core.Experiment):
             ms2_directory=full_subdirs["ms2_directory"],
             qaqc_figs=full_subdirs["qaqc_figs"],
             asari_subdirectory=full_subdirs["asari_subdirectory"],
-            output_subdirectory=full_subdirs["output_subdirectory"]
+            output_subdirectory=full_subdirs["output_subdirectory"],
         )
 
     def save(self):
@@ -212,7 +213,9 @@ class Experiment(core.Experiment):
         """
         try:
             save_path = os.path.join(self.experiment_directory, "experiment.json.tmp")
-            with open(os.path.join(save_path), "w", encoding="utf-8") as save_filehandle:
+            with open(
+                os.path.join(save_path), "w", encoding="utf-8"
+            ) as save_filehandle:
                 self.command_history.append(str(time.time()) + ":" + ";".join(sys.argv))
                 json.dump(recursive_encoder(self.__dict__), save_filehandle, indent=4)
                 file_operations["move"](save_path, save_path.replace(".tmp", ""))
@@ -227,7 +230,7 @@ class Experiment(core.Experiment):
 
         Args:
             experiment_json_filepath (str): path to the JSON file
-        
+
         Returns:
             an experiment object
 
@@ -266,8 +269,8 @@ class Experiment(core.Experiment):
                 ms2_directory=decoded_JSON["ms2_directory"],
                 qaqc_figs=decoded_JSON["qaqc_figs"],
                 asari_subdirectory=decoded_JSON["asari_subdirectory"],
-                output_subdirectory=decoded_JSON['output_subdirectory'],
-                parent_study=decoded_JSON['parent_study']
+                output_subdirectory=decoded_JSON["output_subdirectory"],
+                parent_study=decoded_JSON["parent_study"],
             )
         for x in decoded_JSON["acquisitions"]:
             experiment.acquisitions.append(
@@ -396,7 +399,7 @@ class Experiment(core.Experiment):
 
     def create_sample_annotation_table(self):
         """
-        Create the sample annotation table which maps samples to their metadata. 
+        Create the sample annotation table which maps samples to their metadata.
 
         Returns:
             dataframe: the table as a dataframe
@@ -406,7 +409,7 @@ class Experiment(core.Experiment):
             flat_acq_dict = flatten_nested_dicts(acquisition.__dict__)
             to_delete = []
             for key in flat_acq_dict:
-                if key.startswith('_Acquisition__'):
+                if key.startswith("_Acquisition__"):
                     to_delete.append(key)
             for key_to_delete in to_delete:
                 del flat_acq_dict[key_to_delete]
@@ -415,15 +418,15 @@ class Experiment(core.Experiment):
 
     def add_acquisition(self, acquisition, mode="link"):
         """
-        This method adds an acquisition to the list of acquisitions in the experiment, ensures 
-        there are no duplicates and then links or copies the acquisition, currently only as a 
+        This method adds an acquisition to the list of acquisitions in the experiment, ensures
+        there are no duplicates and then links or copies the acquisition, currently only as a
         .raw file, to the experiment directory
 
         Args:
 
         acquisition (object): an Acquistiion object
         mode (str): how to move acquisitions into the experiment, default "link", can be "copy"
-        method_field (str): this is the field to check for the method name, used to shortcircuit 
+        method_field (str): this is the field to check for the method name, used to shortcircuit
             MS2 determination
         """
         if os.path.exists(acquisition.source_filepath):
@@ -439,10 +442,8 @@ class Experiment(core.Experiment):
                     )
                 acquisition.mzml_filepath = target_path
             elif acquisition.source_filepath.endswith(".raw"):
-                target_path = os.path.join(
-                    self.raw_subdirectory, source_basepath
-                )
-                acquisition.raw_filepath = target_path 
+                target_path = os.path.join(self.raw_subdirectory, source_basepath)
+                acquisition.raw_filepath = target_path
             if target_path is not None and not os.path.exists(target_path):
                 file_operations[mode](acquisition.source_filepath, target_path)
                 self.acquisitions.append(acquisition)
@@ -462,20 +463,22 @@ class Experiment(core.Experiment):
             self.species = set()
         elif self.species is not set():
             self.species = set(self.species)
-        self.species.add(acquisition.metadata_tags.get('species', 'Unknown'))
+        self.species.add(acquisition.metadata_tags.get("species", "Unknown"))
         self.species = list(self.species)
         if self.tissue is None:
             self.tissue = set()
         elif self.tissue is not set():
             self.tissue = set(self.tissue)
-        self.tissue.add(acquisition.metadata_tags.get('species', 'Unknown'))
+        self.tissue.add(acquisition.metadata_tags.get("species", "Unknown"))
         self.tissue = list(self.tissue)
 
-    def generate_output(self, empCpd_moniker, table_moniker, comprehensive_output=False):
+    def generate_output(
+        self, empCpd_moniker, table_moniker, comprehensive_output=False
+    ):
         """
-        This generates and stores the the feature table, sample annotation table, and the 
-        feature annotation table to the output directory. It also copies the JSON for the 
-        desried empcpd and experiment to the directory. 
+        This generates and stores the the feature table, sample annotation table, and the
+        feature annotation table to the output directory. It also copies the JSON for the
+        desried empcpd and experiment to the directory.
 
         Args:
             empCpd_moniker (str): moniker of empcpd to use
@@ -486,18 +489,31 @@ class Experiment(core.Experiment):
         feature_table = self.retrieve_feature_table(table_moniker, True)
         feature_table.feature_table.to_csv(feature_table_path, sep="\t", index=False)
 
-        sample_annotation_table_path = os.path.join(self.output_subdirectory, "sample_annot_table.tsv")
+        sample_annotation_table_path = os.path.join(
+            self.output_subdirectory, "sample_annot_table.tsv"
+        )
         sample_annotation_table = self.create_sample_annotation_table()
-        sample_annotation_table.to_csv(sample_annotation_table_path, sep="\t", index=False)
+        sample_annotation_table.to_csv(
+            sample_annotation_table_path, sep="\t", index=False
+        )
 
-        annotation_table_path = os.path.join(self.output_subdirectory, "annotation_table.tsv")
+        annotation_table_path = os.path.join(
+            self.output_subdirectory, "annotation_table.tsv"
+        )
         empCpds = self.retrieve_empCpds(empCpd_moniker, True)
         annotation_table = empCpds.create_annotation_table(comprehensive_output)
         annotation_table.to_csv(annotation_table_path, sep="\t", index=False)
 
-        file_operations["copy"](self.retrieve_empCpds(empCpd_moniker, False), self.output_subdirectory)
-        file_operations["copy"](self.retrieve_feature_table(table_moniker, False), self.output_subdirectory)
-        file_operations["copy"](os.path.join(self.experiment_directory, "experiment.json"), self.output_subdirectory)
+        file_operations["copy"](
+            self.retrieve_empCpds(empCpd_moniker, False), self.output_subdirectory
+        )
+        file_operations["copy"](
+            self.retrieve_feature_table(table_moniker, False), self.output_subdirectory
+        )
+        file_operations["copy"](
+            os.path.join(self.experiment_directory, "experiment.json"),
+            self.output_subdirectory,
+        )
 
     def convert_raw_to_mzML(self, conversion_command, num_cores=4):
         """
@@ -550,7 +566,7 @@ class Experiment(core.Experiment):
 
     def filter_samples(self, sample_filter, return_field=None):
         """
-        Find the set of acquisitions that pass the provided filter and return either the 
+        Find the set of acquisitions that pass the provided filter and return either the
         acquisition object or the specified field of each passing sample
 
         Args:
@@ -581,7 +597,7 @@ class Experiment(core.Experiment):
         name_field="File Name",
         path_field="Filepath",
         sample_skip_list_fp=None,
-        file_mode="link"
+        file_mode="link",
     ):
         """
         For a given sequence file, create the experiment object, and add all acquisitions
@@ -603,7 +619,7 @@ class Experiment(core.Experiment):
         sample_skip_list = set()
         if sample_skip_list_fp:
             if sample_skip_list_fp.endswith(".txt"):
-                with open(sample_skip_list_fp, encoding='utf-8') as skip_list_fh:
+                with open(sample_skip_list_fp, encoding="utf-8") as skip_list_fh:
                     sample_skip_list = {x.strip() for x in skip_list_fh.readlines()}
 
         if not os.path.exists(os.path.join(experiment_directory, "experiment.json")):
@@ -667,7 +683,7 @@ class Experiment(core.Experiment):
         Standalone drop-in replacement.
         Uses Paul Tol's "muted" palette for colors and a curated set for markers.
         No external helpers or globals.
-        
+
         Expects `self.acquisitions` to be iterable with `metadata_tags[field]`.
         Caches results in `self.cosmetics` / `self.used_cosmetics` like original.
         """
@@ -697,7 +713,10 @@ class Experiment(core.Experiment):
             self.used_cosmetics = {}
 
         # quick cache hit
-        if provided_cos_type in self.cosmetics and field in self.cosmetics[provided_cos_type]:
+        if (
+            provided_cos_type in self.cosmetics
+            and field in self.cosmetics[provided_cos_type]
+        ):
             return self.cosmetics[provided_cos_type][field]
 
         # choose pool
@@ -729,7 +748,7 @@ class Experiment(core.Experiment):
             times = (n // len(pool)) + 1
             available = available + (pool * times)
 
-        #random.shuffle(available)
+        # random.shuffle(available)
         mapping = {u: available[i] for i, u in enumerate(uniques)}
 
         # update caches
@@ -741,7 +760,6 @@ class Experiment(core.Experiment):
             self.save()
 
         return mapping
-
 
     def batches(self, batch_field):
         """
@@ -779,7 +797,10 @@ class Experiment(core.Experiment):
         force (bool): if true, rerun asari if previously ran
         """
 
-        if ( not ("full" in self.feature_tables and "preferred" in self.feature_tables) or force):
+        if (
+            not ("full" in self.feature_tables and "preferred" in self.feature_tables)
+            or force
+        ):
             mapping = {
                 "$IONIZATION_MODE": self.ionization_mode,
                 "$CONVERTED_SUBDIR": self.converted_subdirectory,
@@ -788,19 +809,27 @@ class Experiment(core.Experiment):
             # find existing asari runs
             existing_dirs = []
             for _dir, _, _ in os.walk(self.experiment_directory):
-                if "asari_project" in _dir and os.path.isdir(_dir) and 'export' not in _dir:
+                if (
+                    "asari_project" in _dir
+                    and os.path.isdir(_dir)
+                    and "export" not in _dir
+                ):
                     existing_dirs.append(_dir)
 
             job = asari_cmd if isinstance(asari_cmd, list) else asari_cmd.split(" ")
             job = [mapping.get(f, f) for f in asari_cmd]
             completed_process = subprocess.run(job, check=False)
-            
-            #exit()
+
+            # exit()
             # find new asari run
             sub_dir = None
             for _dir, _, _ in os.walk(self.experiment_directory):
                 if _dir not in existing_dirs:
-                    if "asari_project" in _dir and os.path.isdir(_dir) and 'export' not in _dir:
+                    if (
+                        "asari_project" in _dir
+                        and os.path.isdir(_dir)
+                        and "export" not in _dir
+                    ):
                         sub_dir = _dir
                         break
             self.asari_subdirectory = os.path.join(self.experiment_directory, sub_dir)
