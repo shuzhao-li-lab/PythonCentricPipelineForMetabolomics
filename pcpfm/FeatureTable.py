@@ -239,7 +239,7 @@ class FeatureTable:
         :param fill_value: the value to replace NaN and 0 with, defaults to 1
         :type fill_value: int, optional
         """
-        self.feature_table.fillna(0)
+        self.feature_table = self.feature_table.fillna(0)
         for column in self.sample_columns:
             self.feature_table[column] = [max(x, fill_value) for x in self.feature_table[column]]
 
@@ -1536,19 +1536,19 @@ class FeatureTable:
         :param by_batch: the field on which to batch sampels
         :type by_batch: str
         """
-        if len(self.experiment.batches(by_batch).keys()) > 1:
-            batch_idx_map = {}
-            for batch_idx, (_, acquisition_list) in enumerate(self.experiment.batches(by_batch).items()):
-                for acquisition in acquisition_list:
-                    batch_idx_map[acquisition] = batch_idx
-            batches = [batch_idx_map[x] for x in self.sample_columns]
-            batch_corrected = pycombat(self.feature_table[self.sample_columns], batches)
-            for column in batch_corrected.columns:
-                self.feature_table[column] = batch_corrected[column]
-            self.make_nonnegative(fill_value=1)
-        else:
-            print("Unable to batch correct if only one batch!")
-            sys.exit()
+        num_batches = len(self.experiment.batches(by_batch).keys())
+        if num_batches < 2:
+            sys.exit("Unable to batch correct with only one batch!")
+        batch_idx_map = {}
+        for batch_idx, (_, acquisition_list) in enumerate(self.experiment.batches(by_batch).items()):
+            for acquisition in acquisition_list:
+                batch_idx_map[acquisition] = batch_idx
+        batches = [batch_idx_map[x] for x in self.sample_columns]
+        batch_corrected = pycombat(self.feature_table[self.sample_columns], batches)
+        for column in batch_corrected.columns:
+            self.feature_table[column] = batch_corrected[column]
+        self.make_nonnegative(fill_value=1)
+        return None
 
     def log_transform(self, log_mode="log2"):
         """
