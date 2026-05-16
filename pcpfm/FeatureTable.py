@@ -1183,42 +1183,33 @@ class FeatureTable:
         :type zeros_only: bool, optional
         """
 
-        def __filter_invariant(row, columns):
-            values = set()
-            for column in columns:
-                if column in row:
-                    values.add(row[column])
-            values = list(values)
-            if len(values) == 1:
-                if zeros_only and values[0] == 0:
+        def __filter_invariant(series: pd.Series):
+            nunique = series.nunique()
+            if nunique != 1:
+                return True
+            if zeros_only:
+                if series.max() == 0:
                     return False
-                return False
-            return True
+            return False
 
-        to_keep = []
+        sample_names = [
+            x for x in self.feature_table.columns if x in self.sample_columns
+        ]
 
-        for keep_feature, id_number in zip(
-            self.feature_table.apply(
-                __filter_invariant, axis=1, args=(self.sample_columns,)
-            ),
-            self.feature_table["id_number"],
-        ):
-            if keep_feature:
-                to_keep.append(id_number)
-        self.feature_table = self.feature_table[
-            self.feature_table["id_number"].isin(to_keep)
-        ].copy()
+        rows_to_keep = self.feature_table[sample_names].apply(
+            __filter_invariant, axis=1
+        )  # DataFrame index-based
 
-        for sample_column in self.sample_columns:
-            unique_values = set()
-            for value in self.feature_table[sample_column]:
-                unique_values.add(value)
-            unique_values = list(unique_values)
-            if len(unique_values) == 1:
-                if zeros_only and unique_values[0] == 0:
-                    self.feature_table.drop(columns=[sample_column], inplace=True)
-                else:
-                    self.feature_table.drop(columns=[sample_column], inplace=True)
+        self.feature_table = self.feature_table[rows_to_keep].copy()
+        if zeros_only:
+            columns_to_drop_mask = (self.feature_table[sample_names].nunique() == 1) & (
+                self.feature_table[sample_names].min() != 0
+            )
+        else:
+            columns_to_drop_mask = self.feature_table[sample_names].nunique() == 1
+        columns_to_drop = columns_to_drop_mask[columns_to_drop_mask]
+        self.feature_table.drop(columns_to_drop, inplace=True)
+        return None
 
     def drop_sample_by_name(self, drop_name, drop_others=False):
         """
