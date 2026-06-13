@@ -2,6 +2,7 @@
 Misc helper functions.
 
 """
+
 import os
 import shutil
 import sys
@@ -14,12 +15,13 @@ from mass2chem.formula import calculate_formula_mass
 from matchms.Spectrum import Spectrum
 from .MSnSpectrum import MS2Spectrum
 
+
 def flatten_nested_dicts(nested_dicts):
     """
     For nested dictionaries, i.e., where the value for a key in a dictionary is a dictionary
-    return a flat, dictionary where the nested keys become top level keys. 
+    return a flat, dictionary where the nested keys become top level keys.
 
-    If the same key is used at different levels, the one encountered last will be the 
+    If the same key is used at different levels, the one encountered last will be the
     top level key, value pair.
 
     Args:
@@ -27,7 +29,7 @@ def flatten_nested_dicts(nested_dicts):
 
     Returns:
         dict: flattened dict
-    """    
+    """
     _d = {}
     for k, v in nested_dicts.items():
         if not isinstance(v, dict):
@@ -41,7 +43,7 @@ def extract_CD_csv(
     cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
 ):
     """
-    For a list of compound discover (CD) CSV libraries, read them into a form that is 
+    For a list of compound discover (CD) CSV libraries, read them into a form that is
     usable for level1a annotation.
 
     In lazy mode, this yields the library entries, else a list of them is return.
@@ -151,12 +153,12 @@ def get_similarity_method(method_name):
 
 def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
     """
-    This method takes a list of ms2 files and yields the MS2 spectrum 
-    for each entry. 
+    This method takes a list of ms2 files and yields the MS2 spectrum
+    for each entry.
 
     Args:
         ms2_files (list): list of ms2_files, can be any format matchms supports.
-        mz_tree (interval_tree, optional): interval tree of precursor mzs, if provided, only 
+        mz_tree (interval_tree, optional): interval tree of precursor mzs, if provided, only
         spectra whose precuror matches the tree will be returned. Defaults to None.
 
     Yields:
@@ -197,8 +199,8 @@ def process_ms2_spectrum(
     :return: dictionary summarize MS2 spectrum.
     """
     try:
-        identifiers = {k: v for k,v in spectrum.metadata.items()}
-    except:
+        identifiers = {k: v for k, v in spectrum.metadata.items()}
+    except BaseException:
         identifiers = {}
 
     if not skip_meta:
@@ -214,7 +216,7 @@ def process_ms2_spectrum(
             return None
         try:
             spectrum.set("retention_time", spectrum.metadata["scan_start_time"][0] * 60)
-        except:
+        except BaseException:
             pass
 
         spec_id = []
@@ -228,7 +230,9 @@ def process_ms2_spectrum(
         spectrum = MS2Spectrum(
             spec_id=spec_id,
             precursor_mz=float(spectrum.get("precursor_mz")),
-            precursor_rt=float(spectrum.get("retention_time")) if spectrum.get("retention_time") else None,
+            precursor_rt=float(spectrum.get("retention_time"))
+            if spectrum.get("retention_time")
+            else None,
             list_mz=[],
             list_intensity=[],
             matchms_spectrum=spectrum,
@@ -236,7 +240,7 @@ def process_ms2_spectrum(
             instrument="Unknown",
             collision_energy="Unknown",
             compound_name=reference_id,
-            identifiers=identifiers
+            identifiers=identifiers,
         )
     else:
         spec_id = []
@@ -268,7 +272,7 @@ def process_ms2_spectrum(
             instrument="Unknown",
             collision_energy="Unknown",
             compound_name=reference_id,
-            identifiers=identifiers
+            identifiers=identifiers,
         )
 
     return spectrum
@@ -335,23 +339,22 @@ descriptive_stat_modes = {
     "mean": np.mean,
 }
 
-log_modes = {
-    "log2": np.log2, 
-    "log10": np.log10
-    }
+log_modes = {"log2": np.log2, "log10": np.log10}
+
 
 def delete_dir_or_file(to_delete):
     try:
         shutil.rmtree(to_delete)
-    except:
+    except BaseException:
         try:
             os.remove(to_delete)
-        except:
+        except BaseException:
             "Unable to delete: " + to_delete
+
 
 file_operations = {
     "link": os.link,
     "copy": shutil.copy,
     "move": shutil.move,
-    "delete": delete_dir_or_file
+    "delete": delete_dir_or_file,
 }

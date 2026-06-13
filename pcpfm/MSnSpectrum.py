@@ -1,5 +1,5 @@
 """
-MS2Spectrum contains the constructors for MS2 spectra. These are used for L1a and L2 annotations. 
+MS2Spectrum contains the constructors for MS2 spectra. These are used for L1a and L2 annotations.
 
 The actual MS2 comparisons are performed by matchms in the EmpCpds object.
 
@@ -10,10 +10,12 @@ from matchms.Spectrum import Spectrum
 import numpy as np
 from metDataModel import core
 
+
 class MS2Spectrum(core.Spectrum):
     """
     This represents an MS2 spectrum
     """
+
     def __init__(
         self,
         spec_id,
@@ -27,7 +29,7 @@ class MS2Spectrum(core.Spectrum):
         collision_energy=None,
         compound_name=None,
         annotations=None,
-        identifiers=None
+        identifiers=None,
     ):
         """_summary_
 
@@ -46,7 +48,9 @@ class MS2Spectrum(core.Spectrum):
         """
         super().__init__(spec_id)
         source = os.path.basename(source) if source != "" else os.path.basename(source)
-        self.precursor_ion_id = (str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source))
+        self.precursor_ion_id = (
+            str(precursor_mz) + "_" + str(precursor_rt) + "_" + os.path.basename(source)
+        )
         self.spec_id = spec_id
         self.rtime = precursor_rt
         self.retention_time = precursor_rt
@@ -66,7 +70,6 @@ class MS2Spectrum(core.Spectrum):
             self.list_mz = []
             self.list_intensity = []
 
-
         self.annotations = [] if annotations is None else annotations
         self.compound_name = compound_name
         self.source = source
@@ -75,7 +78,7 @@ class MS2Spectrum(core.Spectrum):
     @property
     def prec_mz(self):
         """
-        Simply a shortcut for accessing the precursor_ion_mz field. This is used because the 
+        Simply a shortcut for accessing the precursor_ion_mz field. This is used because the
         precursor_ion_mz is long and can yield lines that are too long for pylint.
 
         Returns:
@@ -119,7 +122,7 @@ class MS2Spectrum(core.Spectrum):
         Args:
             other_MS2 (object): the other MS2 spectrum, typically from a database
             score (float): the score from the similarity comparison
-            matched_peaks (int): number of peaks 
+            matched_peaks (int): number of peaks
             annotation_level (str, optional): a string designating the annotation level. Defaults to "Unspecified".
         """
         self.annotations.append(
@@ -129,12 +132,12 @@ class MS2Spectrum(core.Spectrum):
                 "db_precursor_mz": other_ms2.precursor_ion_mz,
                 "db_precursor_rt": other_ms2.rtime,
                 "reference_id": other_ms2.compound_name,
-                #"list_mz": [x[0] for x in other_ms2.matchms_spectrum.peaks],
-                #"list_intensity": [x[1] for x in other_ms2.matchms_spectrum.peaks],
+                # "list_mz": [x[0] for x in other_ms2.matchms_spectrum.peaks],
+                # "list_intensity": [x[1] for x in other_ms2.matchms_spectrum.peaks],
                 "primary_db": other_ms2.source,
                 "source": self.source,
                 "annotation_level": annotation_level,
-                "identifiers": other_ms2.identifiers
+                "identifiers": other_ms2.identifiers,
             }
         )
 
