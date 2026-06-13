@@ -1372,16 +1372,6 @@ class FeatureTable:
         :type type_field: str, optional
         """
 
-        def __non_zero_mean(row, columns):
-            non_zero_columns = [x for x in row[columns] if x > 0]
-            return np.mean(non_zero_columns) if len(non_zero_columns) > 0 else 0
-
-        def __any_logical(row, columns):
-            return np.any(row[columns] == True)
-
-        def __all_logical(row, columns):
-            return np.all(row[columns] == True)
-
         blanks = self.experiment.filter_samples(
             {query_field: {"includes": [blank_value]}}
         )
@@ -1398,34 +1388,49 @@ class FeatureTable:
             ).items():
                 batch_blanks = [x for x in batch_name_list if x in blank_names]
                 batch_samples = [x for x in batch_name_list if x in sample_names]
-                blank_means = self.feature_table.apply(
-                    __non_zero_mean, axis=1, args=(batch_blanks,)
+                blank_means = (
+                    self.feature_table[batch_blanks]
+                    .where(self.feature_table[batch_blanks] > 0)
+                    .mean(axis=1)
+                )  # Calculate non-zero mean
+                # If all values per line are 0, mean will return NaN
+                # Will fill it later
+                sample_means = (
+                    self.feature_table[batch_samples]
+                    .where(self.feature_table[batch_samples] > 0)
+                    .mean(axis=1)  # Calculate non-zero mean
                 )
-                sample_means = self.feature_table.apply(
-                    __non_zero_mean, axis=1, args=(batch_samples,)
-                )
+                # If all were 0, mean will return NaN
+                blank_means = blank_means.fillna(0)
+                sample_means = sample_means.fillna(0)
+
                 to_filter = []
                 for blank_mean, sample_mean in zip(blank_means, sample_means):
                     to_filter.append(blank_mean * blank_intensity_ratio > sample_mean)
-                blank_mask_column = "blank_masked_" + batch_name
+                blank_mask_column = f"blank_masked_{batch_name}"
+                # Need to format the batch name because it can be both str and non str
                 blank_mask_columns.append(blank_mask_column)
                 self.feature_table[blank_mask_column] = to_filter
             if logic_mode == "and":
-                self.feature_table["mask_feature"] = self.feature_table.apply(
-                    __all_logical, axis=1, args=(blank_mask_columns,)
-                )
+                self.feature_table["mask_feature"] = (
+                    self.feature_table[blank_mask_columns] == True
+                ).all(axis=1)
             elif logic_mode == "or":
-                self.feature_table["mask_feature"] = self.feature_table.apply(
-                    __any_logical, axis=1, args=(blank_mask_columns,)
-                )
+                self.feature_table["mask_feature"] = (
+                    self.feature_table[blank_mask_columns] == True
+                ).any(axis=1)
             for blank_mask_column in blank_mask_columns:
                 self.feature_table.drop(columns=blank_mask_column, inplace=True)
         else:
-            blank_means = self.feature_table.apply(
-                __non_zero_mean, axis=1, args=(list(blank_names),)
+            blank_means = (
+                self.feature_table[list(blank_names)]
+                .where(self.feature_table[list(blank_names)] > 0)
+                .mean(axis=1)
             )
-            sample_means = self.feature_table.apply(
-                __non_zero_mean, axis=1, args=(list(sample_names),)
+            sample_means = (
+                self.feature_table[list(sample_names)]
+                .where(self.feature_table[list(sample_names)] > 0)
+                .mean(axis=1)
             )
             to_filter = []
             for blank_mean, sample_mean in zip(blank_means, sample_means):
@@ -1436,6 +1441,7 @@ class FeatureTable:
             self.feature_table["mask_feature"] == False
         ]
         self.feature_table.drop(columns="mask_feature", inplace=True)
+        return None
 
     def impute_missing_features(self, ratio=0.5, by_batch=None, method="min"):
         """impute_missing_features
