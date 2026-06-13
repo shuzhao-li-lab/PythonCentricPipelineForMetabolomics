@@ -1443,7 +1443,7 @@ class FeatureTable:
         self.feature_table.drop(columns="mask_feature", inplace=True)
         return None
 
-    def impute_missing_features(self, ratio=0.5, by_batch=None, method="min"):
+    def impute_missing_features(self, ratio=0.5, by_batch=None, method="min") -> None:
         """impute_missing_features
 
         Fill zero values with a small value to make downstream stats more robust. This value is
@@ -1463,7 +1463,7 @@ class FeatureTable:
             return 0
 
         if by_batch:
-            for _, b_sample_names in self.experiment.batches(by_batch).values():
+            for b_sample_names in self.experiment.batches(by_batch).values():
                 b_sample_names = list(
                     set(b_sample_names).intersection(set(self.sample_columns))
                 )
@@ -1488,6 +1488,7 @@ class FeatureTable:
                 )
                 self.feature_table[sample_name] = interp_values
             self.feature_table.drop(columns="interp_value", inplace=True)
+        return None
 
     def TIC_normalize(
         self, tic_normalization_percentile=0.90, by_batch=None, normalize_mode="median"
