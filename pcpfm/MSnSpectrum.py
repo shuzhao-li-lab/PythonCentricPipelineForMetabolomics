@@ -6,6 +6,8 @@ The actual MS2 comparisons are performed by matchms in the EmpCpds object.
 """
 
 import os
+from typing import Any, Dict, List, Optional
+
 from matchms.Spectrum import Spectrum
 import numpy as np
 from metDataModel import core
@@ -18,19 +20,19 @@ class MS2Spectrum(core.Spectrum):
 
     def __init__(
         self,
-        spec_id,
-        precursor_mz,
-        precursor_rt,
-        list_mz=None,
-        list_intensity=None,
-        matchms_spectrum=None,
-        source="",
-        instrument=None,
-        collision_energy=None,
-        compound_name=None,
-        annotations=None,
-        identifiers=None,
-    ):
+        spec_id: Any,
+        precursor_mz: float,
+        precursor_rt: float,
+        list_mz: Optional[List[Any]] = None,
+        list_intensity: Optional[List[Any]] = None,
+        matchms_spectrum: Any = None,
+        source: str = "",
+        instrument: Any = None,
+        collision_energy: Optional[float] = None,
+        compound_name: Optional[str] = None,
+        annotations: Optional[List[Dict[str, Any]]] = None,
+        identifiers: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """_summary_
 
         Args:
@@ -76,7 +78,7 @@ class MS2Spectrum(core.Spectrum):
         self.identifiers = {} if identifiers is None else identifiers
 
     @property
-    def prec_mz(self):
+    def prec_mz(self) -> float:
         """
         Simply a shortcut for accessing the precursor_ion_mz field. This is used because the
         precursor_ion_mz is long and can yield lines that are too long for pylint.
@@ -87,7 +89,7 @@ class MS2Spectrum(core.Spectrum):
         return self.precursor_ion_mz
 
     @staticmethod
-    def from_embedding(embedding):
+    def from_embedding(embedding: Dict[str, Any]) -> "MS2Spectrum":
         """
         This recreates the MS2 object from the serialized version of the object
 
@@ -115,7 +117,13 @@ class MS2Spectrum(core.Spectrum):
             annotations=embedding["annotations"],
         )
 
-    def annotate(self, other_ms2, score, matched_peaks, annotation_level="Unspecified"):
+    def annotate(
+        self,
+        other_ms2: Any,
+        score: float,
+        matched_peaks: int,
+        annotation_level: str = "Unspecified",
+    ) -> None:
         """
         Given another MSnSpectrum object, annotate this MSnSpectrum.
 
@@ -141,7 +149,7 @@ class MS2Spectrum(core.Spectrum):
             }
         )
 
-    def embedding(self):
+    def embedding(self) -> Dict[str, Any]:
         """
         Given an MSnSpectrum, generate a serializable version of the object.
 

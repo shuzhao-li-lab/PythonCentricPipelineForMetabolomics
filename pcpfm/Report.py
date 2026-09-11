@@ -5,12 +5,15 @@ The reports are meant to be a high-level overview of an experiment, the feature 
 empcpds, etc and summarize some of the qaqc results.
 """
 
+from __future__ import annotations
+
 import os
 import platform
 import sys
 import uuid
 import datetime
 import textwrap
+from typing import Any, Iterable, Mapping, MutableMapping, Optional, Sequence
 from pip._vendor import pkg_resources
 from fpdf import FPDF
 import matplotlib.pyplot as plt
@@ -22,18 +25,18 @@ class ReportPDF(FPDF):
     Wrapper around FPDF with consistent header and footer.
     """
 
-    def __init__(self, header_text):
+    def __init__(self, header_text: str) -> None:
         self.header_text = header_text
         super().__init__()
 
-    def header(self):
+    def header(self) -> None:
         print(self.page_no())
         if self.page_no() > 1:
             self.set_font("Arial", "B", 15)
             # self.cell(0, 10, self.header_text, ln=True, align='C')
             self.ln(5)
 
-    def footer(self):
+    def footer(self) -> None:
         self.set_y(-15)
         self.set_font("Arial", "I", 8)
         if self.page_no() > 1:
@@ -54,7 +57,7 @@ class Report:
     method for this object.
     """
 
-    def __init__(self, experiment, parameters) -> None:
+    def __init__(self, experiment: Any, parameters: Mapping[str, Any]) -> None:
         self.experiment = experiment
         self.parameters = parameters
 
@@ -69,7 +72,7 @@ class Report:
         self.style = self.__preprocess_style(self.parameters["report_config"])
         self.__create_report()
 
-    def table_of_contents(self, section_desc):
+    def table_of_contents(self, section_desc: Mapping[str, Any]) -> None:
         """
         Adds a Table of Contents page. Assumes each section = 1 page.
         Automatically lists all sections before 'save', skipping 'cover_page' and TOC itself.
@@ -102,7 +105,13 @@ class Report:
             )
             self.report.cell(0, 10, f"{label_str} {dots} {page}", ln=True)
 
-    def __section_table(self, rows, col_widths=None, header=True, font_size=12):
+    def __section_table(
+        self,
+        rows: Sequence[Sequence[Any]],
+        col_widths: Optional[Sequence[float]] = None,
+        header: bool = True,
+        font_size: int = 12,
+    ) -> None:
         """
         Draws a well-aligned table in the PDF.
 
@@ -127,7 +136,9 @@ class Report:
                 self.report.cell(col_widths[j], 10, str(cell), border=1)
             self.report.ln()
 
-    def __preprocess_style(self, style):
+    def __preprocess_style(
+        self, style: MutableMapping[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         This function takes the provided style and checks that it has
         the required save section and that the defined sections are
@@ -196,7 +207,7 @@ class Report:
                 expanded_sections_ft_empcpd.append(dict(section))
         return expanded_sections_ft_empcpd
 
-    def __create_report(self):
+    def __create_report(self) -> None:
         """
         This function iterates through valid sections and generates the
         report element each section specifies.
@@ -222,7 +233,7 @@ class Report:
 
         self.experiment.save()
 
-    def __reset_font(self):
+    def __reset_font(self) -> None:
         """
         This method resets the font of the report to the default. This
         is needed because the report's font is set at a report-wide
@@ -231,7 +242,7 @@ class Report:
         """
         self.report.set_font(*self.default_font)
 
-    def __section_head(self, title):
+    def __section_head(self, title: str) -> None:
         """
         This writes the header for a section. This uses a larger font
         and sets it to be in bold.
@@ -244,7 +255,9 @@ class Report:
         self.__reset_font()
         self.report.ln(5)
 
-    def __section_line(self, content, options=None):
+    def __section_line(
+        self, content: Any, options: Optional[Iterable[str]] = None
+    ) -> None:
         """
         This writes a line in a section. Optionally, the font can be
         made bold by passing 'B' in options.
@@ -265,7 +278,9 @@ class Report:
             self.report.cell(30, 10, content, 0, 0)
         self.report.ln(5)
 
-    def __section_text(self, text, options=None):
+    def __section_text(
+        self, text: str, options: Optional[Iterable[str]] = None
+    ) -> None:
         """
         This writes a block of text in a section, one line at a time
         using the __section_line function. This also handles chopping
@@ -287,7 +302,7 @@ class Report:
         self.report.ln(5)
         self.report.ln(5)
 
-    def TICs(self, section_desc):
+    def TICs(self, section_desc: Mapping[str, Any]) -> None:
         """
         This generates, if not pre-existing, and includes the TIC of
         each acquisition in the experiment to the report.
@@ -301,10 +316,10 @@ class Report:
             except BaseException:
                 print(section_desc)
 
-    def study_summary(self, section_desc):
+    def study_summary(self, section_desc: Mapping[str, Any]) -> None:
         pass
 
-    def experiment_summary(self, section_desc):
+    def experiment_summary(self, section_desc: Mapping[str, Any]) -> None:
         """
         Summarize key aspects of the experiment concisely.
         """
@@ -337,7 +352,7 @@ class Report:
 
         self.__section_text(summary_text)
 
-    def annotation_summary(self, section_desc):
+    def annotation_summary(self, section_desc: Mapping[str, Any]) -> None:
         """
         Summarizes annotations for each empCpd in a structured table.
         """
@@ -388,7 +403,7 @@ class Report:
 
         self.__section_table(rows)
 
-    def summary(self, section_desc):
+    def summary(self, section_desc: Mapping[str, Any]) -> None:
         self.report.add_page()
         self.__section_head("Experiment Summary")
         subsections = [
@@ -403,7 +418,7 @@ class Report:
             self.report.ln(5)
             self.__section_text(section_desc.get(key, ""))
 
-    def table_summary(self, section_desc):
+    def table_summary(self, section_desc: Mapping[str, Any]) -> None:
         """
         This summarizes the feature tables in the experiment.
 
@@ -422,7 +437,7 @@ class Report:
             rows.append([table, ft.num_samples, ft.num_features])
         self.__section_table(rows)
 
-    def empcpd_summary(self, section_desc):
+    def empcpd_summary(self, section_desc: Mapping[str, Any]) -> None:
         """
         Summarizes the empCpds in the experiment.
         """
@@ -441,7 +456,7 @@ class Report:
 
         self.__section_table(rows)
 
-    def command_history(self, section_desc):
+    def command_history(self, section_desc: Mapping[str, Any]) -> None:
         """
         Summarizes each command that has been executed in the analysis.
         """
@@ -464,7 +479,7 @@ class Report:
             ],
         )
 
-    def cover_page(self, section_desc):
+    def cover_page(self, section_desc: Mapping[str, Any]) -> None:
         """
         Adds a cover page to the report.
 
@@ -497,7 +512,7 @@ class Report:
         if "logo_path" in section_desc and os.path.exists(section_desc["logo_path"]):
             self.report.image(section_desc["logo_path"], x=80, w=50)
 
-    def version_summary(self, section_desc):
+    def version_summary(self, section_desc: Mapping[str, Any]) -> None:
         """
         This summarizes each command that has been executed in the
         analysis.
@@ -531,7 +546,7 @@ class Report:
         __machine_description += f"Python Version was {platform.python_revision()} and system uname was {__uname_string}"
         self.__section_text(__machine_description)
 
-    def computational_performance(self, section_desc):
+    def computational_performance(self, section_desc: Mapping[str, Any]) -> None:
         """
         This summarizes each command and computes the time required
         for that step. This is useful for benchmarking.
@@ -563,7 +578,7 @@ class Report:
         plt.savefig(name)
         self.report.image(name)
 
-    def timestamp(self, section_desc):
+    def timestamp(self, section_desc: Mapping[str, Any]) -> None:
         """
         This will timestamp the report.
 
@@ -574,7 +589,7 @@ class Report:
         # self.__section_head("Timestamp")
         # self.__section_line(timestamp_string)
 
-    def save(self, section_desc):
+    def save(self, section_desc: Mapping[str, Any]) -> None:
         """
         This saves the report pdf to the specified location
 
@@ -587,7 +602,7 @@ class Report:
         print("saving: ", report_path)
         self.report.output(report_path)
 
-    def figure_live(self, section_desc):
+    def figure_live(self, section_desc: Mapping[str, Any]) -> None:
         feature_table = self.experiment.retrieve_feature_table(
             section_desc["table"], True
         )
@@ -602,7 +617,7 @@ class Report:
             ] = True
             feature_table.QAQC(params_for_figure)
 
-    def figure(self, section_desc):
+    def figure(self, section_desc: Mapping[str, Any]) -> None:
         """
         This inserts a figure into the report. Since all figures are
         currently QAQC figures from feature tables, this method

@@ -2,3 +2,6 @@
 
 # raw mass spec data
 *.mzML
+.TODO/
+.plan/
+.

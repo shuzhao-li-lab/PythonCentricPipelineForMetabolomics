@@ -7,6 +7,8 @@ keeping track of intermediate results and acquisitions.
 
 """
 
+from __future__ import annotations
+
 import os
 import random
 import sys
@@ -14,6 +16,8 @@ import time
 import json
 import subprocess
 import multiprocessing as mp
+from typing import Any, Mapping, Optional
+
 import pandas as pd
 import asari
 from metDataModel import core
@@ -46,38 +50,38 @@ class Experiment(core.Experiment):
 
     # need to minimize parameters
     def __init__(
-        self,
-        experiment_name,
-        experiment_directory,
-        acquisitions=None,
-        qcqa_results=None,
-        feature_tables=None,
-        empCpds=None,
-        log_transformed_feature_tables=None,
-        ionization_mode=None,
-        cosmetics=None,
-        used_cosmetics=None,
-        MS2_methods=None,
-        MS1_only_methods=None,
-        command_history=None,
-        study=None,
-        sequence=None,
-        final_empCpds=None,
-        species=None,
-        tissue=None,
-        provenance=None,
-        converted_subdirectory=None,
-        raw_subdirectory=None,
-        acquisition_data=None,
-        annotation_subdirectory=None,
-        filtered_feature_tables_subdirectory=None,
-        ms2_directory=None,
-        qaqc_figs=None,
-        asari_subdirectory=None,
-        output_subdirectory=None,
-        ordered_samples=None,
-        parent_study=None,
-    ):
+        self: "Experiment",
+        experiment_name: str,
+        experiment_directory: str,
+        acquisitions: Any = None,
+        qcqa_results: Any = None,
+        feature_tables: Any = None,
+        empCpds: Any = None,
+        log_transformed_feature_tables: Any = None,
+        ionization_mode: Optional[str] = None,
+        cosmetics: Any = None,
+        used_cosmetics: Any = None,
+        MS2_methods: Any = None,
+        MS1_only_methods: Any = None,
+        command_history: Any = None,
+        study: Any = None,
+        sequence: Any = None,
+        final_empCpds: Any = None,
+        species: Any = None,
+        tissue: Any = None,
+        provenance: Optional[Mapping[str, Any]] = None,
+        converted_subdirectory: Optional[str] = None,
+        raw_subdirectory: Optional[str] = None,
+        acquisition_data: Optional[str] = None,
+        annotation_subdirectory: Optional[str] = None,
+        filtered_feature_tables_subdirectory: Optional[str] = None,
+        ms2_directory: Optional[str] = None,
+        qaqc_figs: Optional[str] = None,
+        asari_subdirectory: Optional[str] = None,
+        output_subdirectory: Optional[str] = None,
+        ordered_samples: Any = None,
+        parent_study: Any = None,
+    ) -> None:
         super().__init__(
             id=experiment_name,
             parent_study=parent_study if parent_study else "",
@@ -151,21 +155,23 @@ class Experiment(core.Experiment):
         self.__ms2_acquisitions = None
 
     @property
-    def experiment_name(self):
+    def experiment_name(self: "Experiment") -> Any:
         return self.id
 
     @property
-    def study(self):
+    def study(self: "Experiment") -> Any:
         return self.parent_study
 
-    def order_samples(self):
+    def order_samples(self: "Experiment") -> None:
         """
         This updates the ordered_samples param, part of metdatamodel implementation.
         """
         self.ordered_samples = [x.name for x in self.acquisitions]
 
     @staticmethod
-    def create_experiment(experiment_name, experiment_directory, sequence=None):
+    def create_experiment(
+        experiment_name: str, experiment_directory: str, sequence: Any = None
+    ) -> "Experiment":
         """
         This is the main constructor for an experiment object.
 
@@ -206,7 +212,7 @@ class Experiment(core.Experiment):
             output_subdirectory=full_subdirs["output_subdirectory"],
         )
 
-    def save(self):
+    def save(self: "Experiment") -> None:
         """
         This saves the experiment object as a JSON object in side the
         experiment directory.
@@ -224,7 +230,7 @@ class Experiment(core.Experiment):
             raise e
 
     @staticmethod
-    def load(experiment_json_filepath):
+    def load(experiment_json_filepath: str) -> "Experiment":
         """
         Reconstitute the experiment object from a saved JSON file representing the object
 
@@ -280,7 +286,7 @@ class Experiment(core.Experiment):
         return experiment
 
     @property
-    def ms2_acquisitions(self):
+    def ms2_acquisitions(self: "Experiment") -> list[Any]:
         """
         This returns all acquisitions in the experiment that have MS2.
         Lazily evaluated.
@@ -293,7 +299,7 @@ class Experiment(core.Experiment):
         return self.__ms2_acquisitions
 
     @property
-    def sample_names(self):
+    def sample_names(self: "Experiment") -> list[str]:
         """
         This returns the name of all acquisitions in the experiment
         Lazily evaluated.
@@ -306,7 +312,7 @@ class Experiment(core.Experiment):
         return self.__acq_names
 
     @property
-    def ionization_mode(self):
+    def ionization_mode(self: "Experiment") -> Optional[str]:
         """
         This returns the user-specified or determined ionization mode
         of the experiment's acquisitions.
@@ -325,7 +331,7 @@ class Experiment(core.Experiment):
                 self.__ionization_mode = list(ion_modes)[0]
         return self.__ionization_mode
 
-    def delete_feature_table(self, moniker):
+    def delete_feature_table(self: "Experiment", moniker: str) -> None:
         """
         This method will safely delete a feature table and unregister it with the experiment.
 
@@ -343,7 +349,7 @@ class Experiment(core.Experiment):
         else:
             print("No such table: ", moniker)
 
-    def delete_empCpds(self, moniker):
+    def delete_empCpds(self: "Experiment", moniker: str) -> None:
         """
         This method will safely delete an empcpd and unregister it with the experiment.
 
@@ -361,7 +367,9 @@ class Experiment(core.Experiment):
         else:
             print("No such empCpds: ", moniker)
 
-    def retrieve_feature_table(self, moniker, as_object=False):
+    def retrieve_feature_table(
+        self: "Experiment", moniker: str, as_object: bool = False
+    ) -> Any:
         """
         For a given moniker return either the feature table object or its path.
 
@@ -379,7 +387,9 @@ class Experiment(core.Experiment):
         print("No such table: ", moniker)
         sys.exit()
 
-    def retrieve_empCpds(self, moniker, as_object=False):
+    def retrieve_empCpds(
+        self: "Experiment", moniker: str, as_object: bool = False
+    ) -> Any:
         """
         For a given moniker return either the empcpd object or its path.
 
@@ -397,7 +407,7 @@ class Experiment(core.Experiment):
         print("No such empCpds: ", moniker)
         sys.exit()
 
-    def create_sample_annotation_table(self):
+    def create_sample_annotation_table(self: "Experiment") -> pd.DataFrame:
         """
         Create the sample annotation table which maps samples to their metadata.
 
@@ -416,7 +426,9 @@ class Experiment(core.Experiment):
             annotation_table.append(flat_acq_dict)
         return pd.DataFrame(annotation_table)
 
-    def add_acquisition(self, acquisition, mode="link"):
+    def add_acquisition(
+        self: "Experiment", acquisition: Any, mode: str = "link"
+    ) -> None:
         """
         This method adds an acquisition to the list of acquisitions in the experiment, ensures
         there are no duplicates and then links or copies the acquisition, currently only as a
@@ -473,8 +485,11 @@ class Experiment(core.Experiment):
         self.tissue = list(self.tissue)
 
     def generate_output(
-        self, empCpd_moniker, table_moniker, comprehensive_output=False
-    ):
+        self: "Experiment",
+        empCpd_moniker: str,
+        table_moniker: str,
+        comprehensive_output: bool = False,
+    ) -> None:
         """
         This generates and stores the the feature table, sample annotation table, and the
         feature annotation table to the output directory. It also copies the JSON for the
@@ -515,7 +530,9 @@ class Experiment(core.Experiment):
             self.output_subdirectory,
         )
 
-    def convert_raw_to_mzML(self, conversion_command, num_cores=4):
+    def convert_raw_to_mzML(
+        self: "Experiment", conversion_command: Any, num_cores: int = 4
+    ) -> None:
         """
         Convert all raw files to mzML
 
@@ -564,7 +581,9 @@ class Experiment(core.Experiment):
                     file_operations["move"](acquisition.mzml_filepath, ms2_path)
                     acquisition.mzml_filepath = ms2_path
 
-    def filter_samples(self, sample_filter, return_field=None):
+    def filter_samples(
+        self: "Experiment", sample_filter: Any, return_field: Optional[str] = None
+    ) -> list[Any]:
         """
         Find the set of acquisitions that pass the provided filter and return either the
         acquisition object or the specified field of each passing sample
@@ -591,14 +610,14 @@ class Experiment(core.Experiment):
 
     @staticmethod
     def construct_experiment_from_CSV(
-        experiment_directory,
-        csv_filepath,
-        sample_filter=None,
-        name_field="File Name",
-        path_field="Filepath",
-        sample_skip_list_fp=None,
-        file_mode="link",
-    ):
+        experiment_directory: str,
+        csv_filepath: str,
+        sample_filter: Any = None,
+        name_field: str = "File Name",
+        path_field: str = "Filepath",
+        sample_skip_list_fp: Optional[str] = None,
+        file_mode: str = "link",
+    ) -> "Experiment":
         """
         For a given sequence file, create the experiment object, and add all acquisitions
 
@@ -667,7 +686,7 @@ class Experiment(core.Experiment):
             print("Experiment already exists!")
             sys.exit()
 
-    def summarize(self):
+    def summarize(self: "Experiment") -> None:
         """
         Print the list of empCpds and feature tables in the experiment to the console
         """
@@ -678,7 +697,12 @@ class Experiment(core.Experiment):
         for moniker, path in self.feature_tables.items():
             print("\t", moniker, " - ", path)
 
-    def generate_cosmetic_map(self, field=None, provided_cos_type="color", seed=None):
+    def generate_cosmetic_map(
+        self: "Experiment",
+        field: Optional[str] = None,
+        provided_cos_type: str = "color",
+        seed: Optional[int] = None,
+    ) -> Mapping[Any, Any]:
         """
         Standalone drop-in replacement.
         Uses Paul Tol's "muted" palette for colors and a curated set for markers.
@@ -761,7 +785,7 @@ class Experiment(core.Experiment):
 
         return mapping
 
-    def batches(self, batch_field):
+    def batches(self: "Experiment", batch_field: str) -> dict[Any, list[str]]:
         """
         This will group samples into 'batches', based on the user
         provided 'batch_field'.
@@ -778,7 +802,7 @@ class Experiment(core.Experiment):
             batches[batch_field_value].append(acquisition.name)
         return batches
 
-    def asari(self, asari_cmd, force=False):
+    def asari(self: "Experiment", asari_cmd: Any, force: bool = False) -> None:
         """
         This command will run asari on the mzml acquisitions in an
         experiment. The details of the command to be ran is defined by

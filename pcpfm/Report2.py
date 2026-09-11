@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import os
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple, Any
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 
@@ -22,24 +24,24 @@ class ReportTheme:
 # ---------- Experiment Mixins --------- #
 
 
-def retrieve_figure(experiment, feature_table):
+def retrieve_figure(experiment: Any, feature_table: Any) -> None:
     params = experiment.parameters
 
 
 # ---------- PDF Wrapper ----------
 class ReportPDF(FPDF):
-    def __init__(self, header_text: str, theme: ReportTheme):
+    def __init__(self, header_text: str, theme: ReportTheme) -> None:
         self.header_text = header_text
         self.theme = theme
         super().__init__()
 
-    def header(self):
+    def header(self) -> None:
         self.set_font(self.theme.font_family, "B", 15)
         self.cell(80)
         self.cell(30, 10, self.header_text, 0, 0, "C")
         self.ln(10)
 
-    def footer(self):
+    def footer(self) -> None:
         self.set_y(-15)
         self.set_font(self.theme.font_family, "I", 8)
         self.cell(0, 10, f"Page {self.page_no()}", 0, 0, "C")
@@ -47,21 +49,21 @@ class ReportPDF(FPDF):
 
 # ---------- Figure Handling ----------
 class FigureRenderer:
-    def __init__(self, dpi: int):
+    def __init__(self, dpi: int) -> None:
         self.dpi = dpi
 
-    def __call__(self, fig, path: str):
+    def __call__(self, fig: Any, path: str) -> None:
         fig.savefig(path, dpi=self.dpi, bbox_inches="tight")
         plt.close(fig)
 
 
 # ---------- Section Dispatcher ----------
 class SectionDispatcher:
-    def __init__(self, pdf: ReportPDF, theme: ReportTheme):
+    def __init__(self, pdf: ReportPDF, theme: ReportTheme) -> None:
         self.pdf = pdf
         self.theme = theme
         self.renderer = FigureRenderer(theme.dpi)
-        self.dispatch: Dict[str, Callable[[Dict[str, Any]], None]] = {
+        self.dispatch: Dict[str, Callable[[Mapping[str, Any]], None]] = {
             "text": self._text,
             "figure": self._figure,
             "toc": self._toc,
@@ -69,14 +71,14 @@ class SectionDispatcher:
         }
         self._toc_positions: List[Tuple[str, int]] = []
 
-    def run(self, section: Dict[str, Any]):
+    def run(self, section: Mapping[str, Any]) -> None:
         kind = section.get("section")
         fn = self.dispatch.get(kind)
         if fn:
             fn(section)
 
     # --- handlers ---
-    def _text(self, sec: Dict[str, Any]):
+    def _text(self, sec: Mapping[str, Any]) -> None:
         self.pdf.set_font(*self.theme.font_tuple)
         title = sec.get("title")
         if title:
@@ -84,7 +86,7 @@ class SectionDispatcher:
         txt = sec.get("text", "")
         self.pdf.multi_cell(0, 8, txt)
 
-    def _figure(self, sec: Dict[str, Any]):
+    def _figure(self, sec: Mapping[str, Any]) -> None:
         fig = sec.get("figure")
         save_path = sec.get("save_path")
         caption = sec.get("caption", "")
@@ -96,7 +98,7 @@ class SectionDispatcher:
                 self.pdf.set_font(self.theme.font_family, "I", 9)
                 self.pdf.multi_cell(0, 5, caption)
 
-    def _toc(self, _: Dict[str, Any]):
+    def _toc(self, _: Mapping[str, Any]) -> None:
         # Insert TOC at end: capture current page, then render
         cur_y = self.pdf.get_y()
         self.pdf.add_page()
@@ -107,7 +109,7 @@ class SectionDispatcher:
             self.pdf.cell(0, 8, f"{title} ....... {page}", ln=1)
         self.pdf.set_y(cur_y)
 
-    def _cover(self, sec: Dict[str, Any]):
+    def _cover(self, sec: Mapping[str, Any]) -> None:
         self.pdf.add_page()
         self.pdf.set_font(self.theme.font_family, "B", 28)
         self.pdf.ln(60)
@@ -119,7 +121,7 @@ class SectionDispatcher:
             self.pdf.cell(0, 10, subtitle, 0, 1, "C")
 
     # --- helpers ---
-    def _section_title(self, title: str):
+    def _section_title(self, title: str) -> None:
         self.pdf.set_font(self.theme.font_family, "B", 14)
         self._toc_positions.append((title, self.pdf.page_no()))
         self.pdf.ln(6)
@@ -129,7 +131,7 @@ class SectionDispatcher:
 
 # ---------- Style Validation ----------
 class ReportStyle:
-    def __init__(self, cfg: Dict[str, Any]):
+    def __init__(self, cfg: Mapping[str, Any]) -> None:
         raw = cfg.get("sections", [])
         self.sections: List[Dict[str, Any]] = [
             s for s in raw if isinstance(s, dict) and "section" in s
@@ -140,11 +142,11 @@ class ReportStyle:
 class Report:
     def __init__(
         self,
-        experiment,
-        parameters: Dict[str, Any],
+        experiment: Any,
+        parameters: Mapping[str, Any],
         output_path: Optional[str] = None,
         theme: Optional[ReportTheme] = None,
-    ):
+    ) -> None:
         self.experiment = experiment
         self.parameters = parameters
         self.theme = theme or ReportTheme()

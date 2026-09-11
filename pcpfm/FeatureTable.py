@@ -4,10 +4,13 @@ wrapper around a pandas dataframe. This also includes methods to
 QAQC and batch correct the feature table.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 import json
 from functools import partial
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -57,7 +60,9 @@ class FeatureTable:
         "cSelectivity_distribution": "properties_distribution",
     }
 
-    def __init__(self, feature_table, experiment, moniker):
+    def __init__(
+        self: FeatureTable, feature_table: pd.DataFrame, experiment: Any, moniker: str
+    ) -> None:
         """
         This object wraps a feature table
 
@@ -106,7 +111,7 @@ class FeatureTable:
         }
         self.figure_params = None
 
-    def get_mz_tree(self, mz_tol):
+    def get_mz_tree(self: FeatureTable, mz_tol: Union[float, int]) -> intervaltree.IntervalTree:
         """
         Construct an interval tree to search for features using a query
         mz and a specific mz tolerance in ppm.
@@ -124,7 +129,7 @@ class FeatureTable:
                 self.__mz_trees[mz_tol].addi(mz - mz_err, mz + mz_err, f_id)
         return self.__mz_trees[mz_tol]
 
-    def get_rt_tree(self, rt_tol):
+    def get_rt_tree(self: FeatureTable, rt_tol: Union[float, int]) -> intervaltree.IntervalTree:
         """
         Construct an interval tree to search for features using a query
         rtime and a specific rtime tolerance in absolute units (sec).
@@ -146,7 +151,7 @@ class FeatureTable:
         return self.__rt_trees[rt_tol]
 
     @property
-    def sample_columns(self):
+    def sample_columns(self: FeatureTable) -> pd.Index:
         """sample_columns
 
         Return a list of the column names in the feature table that are sample names.
@@ -163,7 +168,7 @@ class FeatureTable:
         return self.feature_table.columns[11:]
 
     @property
-    def non_sample_columns(self):
+    def non_sample_columns(self: FeatureTable) -> List[Any]:
         """non_sample_columns
 
         Return a list of the column names in the feature table that are sample names.
@@ -177,7 +182,7 @@ class FeatureTable:
         return [x for x in self.feature_table.columns if x not in self.sample_columns]
 
     @property
-    def log_transformed(self):
+    def log_transformed(self: FeatureTable) -> bool:
         """log_transformed
 
         This property queries the experiment object to determine if the feature table
@@ -194,7 +199,7 @@ class FeatureTable:
         return self.moniker in self.experiment.log_transformed_feature_tables
 
     @property
-    def num_features(self):
+    def num_features(self: FeatureTable) -> int:
         """
         Returns the number of features in the feature table
 
@@ -204,7 +209,7 @@ class FeatureTable:
         return self.feature_table.shape[0] - 1
 
     @property
-    def num_samples(self):
+    def num_samples(self: FeatureTable) -> int:
         """
         Returns the number of samples in the feature table
 
@@ -214,7 +219,7 @@ class FeatureTable:
         return len(self.sample_columns)
 
     @staticmethod
-    def load(moniker, experiment):
+    def load(moniker: str, experiment: Any) -> FeatureTable:
         """
         This method yields a FeatureTable object when given a feature table moniker.
         FeatureTables are registered with the experiment object using a moniker, a
@@ -247,7 +252,9 @@ class FeatureTable:
             moniker,
         )
 
-    def make_nonnegative(self, fill_value=1):
+    def make_nonnegative(
+        self: FeatureTable, fill_value: Union[int, float] = 1
+    ) -> None:
         """
         This replaces all NaN and 0 values in the feature table with the specified fill_value
 
@@ -263,7 +270,11 @@ class FeatureTable:
                 max(x, fill_value) for x in self.feature_table[column]
             ]
 
-    def save(self, new_moniker=None, drop_invariants=True):
+    def save(
+        self: FeatureTable,
+        new_moniker: Optional[str] = None,
+        drop_invariants: bool = True,
+    ) -> None:
         """
         Save the feature table as a pandas-created .tsv and register the new on-disk location
         with the experiment object using the specified new_moniker or reuse the existing moniker.
@@ -311,7 +322,7 @@ class FeatureTable:
                 self.experiment.qaqc_figs + "/" + new_moniker
             )
 
-    def save_fig_path(self, name):
+    def save_fig_path(self: FeatureTable, name: str) -> str:
         """
         Given a desired name for a figure, this returns the path to which this figure should be
         saved.
@@ -342,16 +353,16 @@ class FeatureTable:
         return os.path.join(fig_path, "_" + name + ".png")
 
     def gen_figure(
-        self,
-        figure_type,
-        data,
-        title="",
-        x_label=None,
-        y_label=None,
-        fig_params=None,
-        skip_annot=False,
-        bins=100,
-    ):
+        self: FeatureTable,
+        figure_type: str,
+        data: Any,
+        title: str = "",
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
+        fig_params: Optional[Mapping[str, Any]] = None,
+        skip_annot: bool = False,
+        bins: int = 100,
+    ) -> None:
         """
         A single method is used to generate the figures for the FeatureTable. This allows for
         consistent looking figures to be generated.
@@ -525,8 +536,12 @@ class FeatureTable:
             plt.clf()
 
     def search_for_feature(
-        self, query_mz=None, query_rt=None, mz_tolerance=None, rt_tolerance=None
-    ):
+        self: FeatureTable,
+        query_mz: Optional[float] = None,
+        query_rt: Optional[float] = None,
+        mz_tolerance: Optional[float] = None,
+        rt_tolerance: Optional[float] = None,
+    ) -> Any:
         """
         Given a query_mz and query_rt with corresponding tolerances in ppm and absolute units
         respectively find all features by id_number that have a matching mz and rtime.
@@ -557,7 +572,7 @@ class FeatureTable:
                 return rt_matches
         return list(rt_matches.intersection(mz_matches))
 
-    def intensity_distribution(self, skip_zero=True):
+    def intensity_distribution(self: FeatureTable, skip_zero: bool = True) -> None:
         """
         This method generates various summaries of the intensity distribution in the feature table
         this includes TICs, LogTICs, median and mean intensity values including and excluding zeros
@@ -606,7 +621,7 @@ class FeatureTable:
                 y_label="Counts",
             )
 
-    def properties_distribution(self):
+    def properties_distribution(self: FeatureTable) -> None:
         """
         This method generates figures for the distribution (a histogram) of every parameter in
         the feature table that is not id_number, parent_masstrack_id or actual intensities in
@@ -643,7 +658,9 @@ class FeatureTable:
                 except RuntimeWarning:
                     pass
 
-    def median_correlation_outlier_detection(self, correlation_type="pearson"):
+    def median_correlation_outlier_detection(
+        self: FeatureTable, correlation_type: str = "pearson"
+    ) -> Dict[str, Any]:
         """
         The median correlation of a sample against all other samples can be expressed as a z-score
         against the median of ALL correlations in the experiment. A high or low Z-score indicates
@@ -699,7 +716,7 @@ class FeatureTable:
         }
         return result
 
-    def intensity_analysis(self):
+    def intensity_analysis(self: FeatureTable) -> List[Dict[str, Any]]:
         """
         This will report the sum, mean, median of features as well as
         those values when the missing values are removed or when they
@@ -799,8 +816,11 @@ class FeatureTable:
         return results
 
     def correlation_heatmap(
-        self, correlation_type, log_transform=False, full_results=False
-    ):
+        self: FeatureTable,
+        correlation_type: str,
+        log_transform: bool = False,
+        full_results: bool = False,
+    ) -> Dict[str, Any]:
         """correlation_heatmap
 
         Using a specified correlation function generate a correlation heatmap for the feature
@@ -871,7 +891,7 @@ class FeatureTable:
             }
         return result
 
-    def pca(self, log_transform=False):
+    def pca(self: FeatureTable, log_transform: bool = False) -> Dict[str, Any]:
         """
         Perform PCA on provided feature table, optionally log transform
         it first.
@@ -916,7 +936,7 @@ class FeatureTable:
         }
         return result
 
-    def tsne(self, perplexity=30):
+    def tsne(self: FeatureTable, perplexity: int = 30) -> Dict[str, Any]:
         """
         Perform TSNE on provided feature table
 
@@ -956,7 +976,7 @@ class FeatureTable:
                 return self.tsne(perplexity)
             return {}
 
-    def missing_feature_percentiles(self):
+    def missing_feature_percentiles(self: FeatureTable) -> Dict[str, Any]:
         """
         Calculate the distribution of missing features with respect to percent of smaples with
         feature
@@ -970,7 +990,7 @@ class FeatureTable:
             result: dictionary storing the result of this QCQA operation
         """
 
-        def __count_feature(row, columns):
+        def __count_feature(row: Any, columns: Any) -> Any:
             return np.sum([1 for x in row[columns] if x > 0])
 
         num_sample_with_feature = self.feature_table.apply(
@@ -1001,7 +1021,9 @@ class FeatureTable:
         }
         return result
 
-    def missing_feature_distribution(self, intensity_cutoff=0):
+    def missing_feature_distribution(
+        self: FeatureTable, intensity_cutoff: Union[int, float] = 0
+    ) -> Dict[str, Any]:
         """
         Count the number of missing features or featuers below the specified intensity cutoff per
         features
@@ -1045,7 +1067,9 @@ class FeatureTable:
         }
         return result
 
-    def feature_distribution(self, intensity_cutoff=0):
+    def feature_distribution(
+        self: FeatureTable, intensity_cutoff: Union[int, float] = 0
+    ) -> Dict[str, Any]:
         """
         Count the number of features above the specified intensity cutoff per features
 
@@ -1086,7 +1110,9 @@ class FeatureTable:
         }
         return result
 
-    def feature_distribution_outlier_detection(self, intensity_cutoff=0):
+    def feature_distribution_outlier_detection(
+        self: FeatureTable, intensity_cutoff: Union[int, float] = 0
+    ) -> Dict[str, Any]:
         """
         Count the number of features above the specified intensity cutoff per features and express
         as a Z-score based on feature count across all samples.
@@ -1125,7 +1151,9 @@ class FeatureTable:
         }
         return result
 
-    def MissingFeatureZScores(self, intensity_cutoff=0):
+    def MissingFeatureZScores(
+        self: FeatureTable, intensity_cutoff: Union[int, float] = 0
+    ) -> Dict[str, Any]:
         """
         Count the number of features below the specified intensity cutoff per features and express
         as a Z-score based on missing feature count across all samples.
@@ -1169,7 +1197,7 @@ class FeatureTable:
         }
         return result
 
-    def drop_invariants(self, zeros_only=False):
+    def drop_invariants(self: FeatureTable, zeros_only: bool = False) -> None:
         """
         This method drops features that have all zero intensity or the same intensity across all
         samples.
@@ -1183,7 +1211,7 @@ class FeatureTable:
         :type zeros_only: bool, optional
         """
 
-        def __filter_invariant(series: pd.Series):
+        def __filter_invariant(series: pd.Series) -> bool:
             nunique = series.nunique()
             if nunique != 1:
                 return True
@@ -1211,7 +1239,9 @@ class FeatureTable:
         self.feature_table.drop(columns_to_drop, inplace=True)
         return None
 
-    def drop_sample_by_name(self, drop_name, drop_others=False):
+    def drop_sample_by_name(
+        self: FeatureTable, drop_name: str, drop_others: bool = False
+    ) -> None:
         """
         This method drops a sample from a feature table by its name.x
 
@@ -1233,7 +1263,9 @@ class FeatureTable:
             if x not in self.feature_table.columns:
                 print("\t", x)
 
-    def drop_samples_by_filter(self, sample_filter, drop_others=False):
+    def drop_samples_by_filter(
+        self: FeatureTable, sample_filter: Mapping[str, Any], drop_others: bool = False
+    ) -> None:
         """
         Given a sample filter, a dictionary as described elsewhere, drop all other samples.
 
@@ -1251,7 +1283,9 @@ class FeatureTable:
             print("\t", x)
         self.feature_table.drop(columns=to_drop, inplace=True)
 
-    def drop_samples_by_field(self, value, field, drop_others=False):
+    def drop_samples_by_field(
+        self: FeatureTable, value: Any, field: str, drop_others: bool = False
+    ) -> None:
         """
         For a given field and a value for that field drop all samples that match or all samples
         that do not match.
@@ -1265,7 +1299,12 @@ class FeatureTable:
             {field: {"includes": [value]}}, drop_others=drop_others
         )
 
-    def drop_samples_by_qaqc(self, qaqc_filter, drop_others=False, params=None):
+    def drop_samples_by_qaqc(
+        self: FeatureTable,
+        qaqc_filter: Mapping[str, Any],
+        drop_others: bool = False,
+        params: Optional[Mapping[str, Any]] = None,
+    ) -> None:
         """
         This drops samples based on a qaqc result. This requires an additional
         field in the filter called "conditions" which can accept keys ">" and
@@ -1335,14 +1374,14 @@ class FeatureTable:
         print("\n".join(to_drop))
 
     def blank_mask(
-        self,
-        blank_value="Blank",
-        sample_value="Unknown",
-        query_field="Sample Type",
-        blank_intensity_ratio=3,
-        by_batch=None,
-        logic_mode="or",
-    ):
+        self: FeatureTable,
+        blank_value: str = "Blank",
+        sample_value: str = "Unknown",
+        query_field: str = "Sample Type",
+        blank_intensity_ratio: Union[int, float] = 3,
+        by_batch: Optional[str] = None,
+        logic_mode: str = "or",
+    ) -> None:
         """blank_mask
 
         Given a feature table containing samples that we consider blanks, drop all features in
@@ -1443,7 +1482,12 @@ class FeatureTable:
         self.feature_table.drop(columns="mask_feature", inplace=True)
         return None
 
-    def impute_missing_features(self, ratio=0.5, by_batch=None, method="min") -> None:
+    def impute_missing_features(
+        self: FeatureTable,
+        ratio: float = 0.5,
+        by_batch: Optional[str] = None,
+        method: str = "min",
+    ) -> None:
         """impute_missing_features
 
         Fill zero values with a small value to make downstream stats more robust. This value is
@@ -1456,7 +1500,7 @@ class FeatureTable:
         :type by_batch: str, optional
         """
 
-        def __calc_impute_value(row, sample_names):
+        def __calc_impute_value(row: Any, sample_names: Any) -> Any:
             values = [x for x in row[sample_names] if x > 0]
             if values:
                 return utils.descriptive_stat_modes[method](values) * ratio
@@ -1491,8 +1535,11 @@ class FeatureTable:
         return None
 
     def TIC_normalize(
-        self, tic_normalization_percentile=0.90, by_batch=None, normalize_mode="median"
-    ):
+        self: FeatureTable,
+        tic_normalization_percentile: float = 0.90,
+        by_batch: Optional[str] = None,
+        normalize_mode: str = "median",
+    ) -> None:
         """TIC_normalize
 
         This method will normalize the features of each acquisition based on the TICs of
@@ -1598,7 +1645,7 @@ class FeatureTable:
                 self.feature_table[sample] = self.feature_table[sample] * norm_factor
         self.feature_table.drop(columns="percent_inclusion", inplace=True)
 
-    def batch_correct(self, by_batch):
+    def batch_correct(self: FeatureTable, by_batch: str) -> None:
         """
         This method batch corrects the feature intensities. The
         batches are determined dynamically using the by_batch field.
@@ -1622,7 +1669,7 @@ class FeatureTable:
             print("Unable to batch correct if only one batch!")
             sys.exit()
 
-    def log_transform(self, log_mode="log2"):
+    def log_transform(self: FeatureTable, log_mode: str = "log2") -> None:
         """
         log transform the features in the table.
 
@@ -1635,8 +1682,11 @@ class FeatureTable:
             )
 
     def drop_missing_features(
-        self, by_batch=None, drop_percentile=0.8, logic_mode="or"
-    ):
+        self: FeatureTable,
+        by_batch: Optional[str] = None,
+        drop_percentile: float = 0.8,
+        logic_mode: str = "or",
+    ) -> None:
         """drop_missing_features
 
         This method will drop features that are uncommon in the feature table.
@@ -1654,10 +1704,10 @@ class FeatureTable:
         :type logic_mode: str, optional
         """
 
-        def __any(row, columns, drop_percentile):
+        def __any(row: Any, columns: Any, drop_percentile: float) -> bool:
             return not np.any(row[columns] >= drop_percentile)
 
-        def __all(row, columns, drop_percentile):
+        def __all(row: Any, columns: Any, drop_percentile: float) -> bool:
             return not np.all(row[columns] >= drop_percentile)
 
         batch_columns = []
@@ -1691,7 +1741,9 @@ class FeatureTable:
         ]
         self.feature_table.drop(columns="drop_feature", inplace=True)
 
-    def __gen_color_cosmetic_map(self, colorby, seed=None):
+    def __gen_color_cosmetic_map(
+        self: FeatureTable, colorby: List[str], seed: Optional[int] = None
+    ) -> Dict[Any, Any]:
         """
         This method generates the cosmetic map for the fields in colorby. Essentially,
         this is a mapping of values for the fiels in colorby to colors for plotting.
@@ -1712,7 +1764,9 @@ class FeatureTable:
             )
         return color_cosmetic_map
 
-    def __gen_marker_cosmetic_map(self, markerby, seed=None):
+    def __gen_marker_cosmetic_map(
+        self: FeatureTable, markerby: List[str], seed: Optional[int] = None
+    ) -> Dict[Any, Any]:
         """
         This method generates the cosmetic map for the fields in markerby. Essentially,
         this is a mapping of values for the fiels in markerby to markers for plotting.
@@ -1735,7 +1789,13 @@ class FeatureTable:
             )
         return marker_cosmetic_map
 
-    def generate_cosmetic(self, colorby=None, markerby=None, textby=None, seed=None):
+    def generate_cosmetic(
+        self: FeatureTable,
+        colorby: Optional[List[str]] = None,
+        markerby: Optional[List[str]] = None,
+        textby: Optional[List[str]] = None,
+        seed: Optional[int] = None,
+    ) -> Tuple[Any, Any, Any, Any, Any]:
         """generate_cosmetic
 
         Plots need colors, markers, and text fields. The colors and markers need to defined
@@ -1800,7 +1860,9 @@ class FeatureTable:
         leg_colors, leg_markers = [legends[x] for x in ["colors", "markers"]]
         return cos_colors, cos_markers, cos_texts, leg_colors, leg_markers
 
-    def generate_figure_params(self, params):
+    def generate_figure_params(
+        self: FeatureTable, params: Mapping[str, Any]
+    ) -> None:
         """
         This method generates the parameters used for plotting.
 
@@ -1827,7 +1889,7 @@ class FeatureTable:
             "text_by": params["text_by"],
         }
 
-    def QAQC(self, params):
+    def QAQC(self: FeatureTable, params: Mapping[str, Any]) -> List[Any]:
         """
         This is the wrapper for all the qcqa functions.
 

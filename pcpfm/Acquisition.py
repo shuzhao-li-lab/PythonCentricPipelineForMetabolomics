@@ -8,6 +8,8 @@ Each analytical replicate is therefore its own acquisition.
 """
 
 import os
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pymzml
 import matplotlib.pyplot as plt
@@ -24,15 +26,15 @@ class Acquisition(Sample):
 
     def __init__(
         self,
-        name,
-        source_filepath=None,
-        metadata_tags=None,
-        raw_filepath=None,
-        mzml_filepath=None,
-        ionization_mode=None,
-        has_ms2=None,
-        experiment=None,
-    ):
+        name: str,
+        source_filepath: Optional[str] = None,
+        metadata_tags: Optional[Dict[str, Any]] = None,
+        raw_filepath: Optional[str] = None,
+        mzml_filepath: Optional[str] = None,
+        ionization_mode: Optional[str] = None,
+        has_ms2: Optional[bool] = None,
+        experiment: Any = None,
+    ) -> None:
 
         super().__init__(
             experiment="",
@@ -59,11 +61,13 @@ class Acquisition(Sample):
         self.__has_ms2 = has_ms2
 
     @property
-    def source_filepath(self):
+    def source_filepath(self) -> Any:
         return self.input_file
 
     @staticmethod
-    def load_acquisition(acquisition_data, experiment):
+    def load_acquisition(
+        acquisition_data: Dict[str, Any], experiment: Any
+    ) -> "Acquisition":
         """
         This takes a dict of acquisition data and returns the Acquisition object
 
@@ -85,7 +89,12 @@ class Acquisition(Sample):
         )
 
     @staticmethod
-    def create_acquisition(name, source_filepath, metadata_dict, experiment=None):
+    def create_acquisition(
+        name: str,
+        source_filepath: str,
+        metadata_dict: Dict[str, Any],
+        experiment: Any = None,
+    ) -> "Acquisition":
         """
         This is the primary constructor the acquisition object.
 
@@ -108,7 +117,7 @@ class Acquisition(Sample):
         )
 
     @property
-    def ionization_mode(self):
+    def ionization_mode(self) -> Optional[str]:
         """
         This method determines the ionization mode of the acquisition
 
@@ -129,7 +138,7 @@ class Acquisition(Sample):
         return self.__ionization_mode
 
     @property
-    def json_repr(self):
+    def json_repr(self) -> Dict[str, Any]:
         """
         This generates the dict representation of the acquisition, this is used when the experiment is saved or loaded.
 
@@ -140,7 +149,7 @@ class Acquisition(Sample):
         )
 
     @property
-    def has_ms2(self):
+    def has_ms2(self) -> Optional[bool]:
         """
         Scan the mzml to detect if there are MS2 spectra
 
@@ -178,7 +187,14 @@ class Acquisition(Sample):
                 self.experiment.MS1_only_methods.add(ms_method)
         return self.__has_ms2
 
-    def TIC(self, mz=None, ppm=5, rt=None, rt_tol=2, title=None):
+    def TIC(
+        self,
+        mz: Optional[List[float]] = None,
+        ppm: float = 5,
+        rt: Optional[List[float]] = None,
+        rt_tol: float = 2,
+        title: Optional[str] = None,
+    ) -> str:
         """
         This method generates TIC plots for the acquisition. If mz and rt is not provided,
         this will make the TIC including the entire rt range and all mz values. If mz and rt values
@@ -247,7 +263,7 @@ class Acquisition(Sample):
         plt.close()
         return fig_path
 
-    def filter(self, user_filter):
+    def filter(self, user_filter: Optional[Dict[str, Any]]) -> bool:
         """
         This method filters acquisition based on their metadata keys.
 

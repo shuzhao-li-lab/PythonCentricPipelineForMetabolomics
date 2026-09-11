@@ -6,6 +6,8 @@ Misc helper functions.
 import os
 import shutil
 import sys
+from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Union
+
 import matchms
 import scipy.stats
 import numpy as np
@@ -16,7 +18,7 @@ from matchms.Spectrum import Spectrum
 from .MSnSpectrum import MS2Spectrum
 
 
-def flatten_nested_dicts(nested_dicts):
+def flatten_nested_dicts(nested_dicts: Dict[Any, Any]) -> Dict[Any, Any]:
     """
     For nested dictionaries, i.e., where the value for a key in a dictionary is a dictionary
     return a flat, dictionary where the nested keys become top level keys.
@@ -40,8 +42,12 @@ def flatten_nested_dicts(nested_dicts):
 
 
 def extract_CD_csv(
-    cd_csvs, ionization_mode, min_peaks=1, precursor_to_use="Confirmed", lazy=True
-):
+    cd_csvs: Iterable[str],
+    ionization_mode: str,
+    min_peaks: int = 1,
+    precursor_to_use: str = "Confirmed",
+    lazy: bool = True,
+) -> Generator[Any, None, List[Any]]:
     """
     For a list of compound discover (CD) CSV libraries, read them into a form that is
     usable for level1a annotation.
@@ -119,7 +125,7 @@ def extract_CD_csv(
     return standards_spectra
 
 
-def get_parser(file_extension):
+def get_parser(file_extension: str) -> Callable[..., Any]:
     """
     This will return the correct parser for a given MS2 file from
     matchms.
@@ -135,7 +141,7 @@ def get_parser(file_extension):
     sys.exit()
 
 
-def get_similarity_method(method_name):
+def get_similarity_method(method_name: str) -> Callable[..., Any]:
     """
     This will return the specified similarity method from matchms.
 
@@ -151,7 +157,9 @@ def get_similarity_method(method_name):
     sys.exit()
 
 
-def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
+def lazy_extract_ms2_spectra(
+    ms2_files: Union[str, Iterable[str]], mz_tree: Any = None
+) -> Generator[Any, None, None]:
     """
     This method takes a list of ms2 files and yields the MS2 spectrum
     for each entry.
@@ -184,8 +192,12 @@ def lazy_extract_ms2_spectra(ms2_files, mz_tree=None):
 
 
 def process_ms2_spectrum(
-    spectrum, filename="not_specified", min_peaks=1, skip_meta=False, skip_filters=False
-):
+    spectrum: Any,
+    filename: str = "not_specified",
+    min_peaks: int = 1,
+    skip_meta: bool = False,
+    skip_filters: bool = False,
+) -> Optional[Any]:
     """
     This is the default MS2 processing used by the pipeline.
 
@@ -278,7 +290,7 @@ def process_ms2_spectrum(
     return spectrum
 
 
-def search_for_mzml(sdir):
+def search_for_mzml(sdir: str) -> List[str]:
     """
     Given a directory, encrively search for all files with an .mzml
     extension and return their paths.
@@ -294,7 +306,7 @@ def search_for_mzml(sdir):
     return mzml_found
 
 
-def recursive_encoder(to_encode):
+def recursive_encoder(to_encode: Any) -> Any:
     """
     This method takes a datastructure and makes it JSON-ready by
     recursively calling itself on the datastructure at all depths.
@@ -342,7 +354,7 @@ descriptive_stat_modes = {
 log_modes = {"log2": np.log2, "log10": np.log10}
 
 
-def delete_dir_or_file(to_delete):
+def delete_dir_or_file(to_delete: str) -> None:
     try:
         shutil.rmtree(to_delete)
     except BaseException:

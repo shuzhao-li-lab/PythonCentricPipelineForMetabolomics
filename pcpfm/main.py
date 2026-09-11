@@ -5,6 +5,8 @@ an end user are located here, although API access to the underlying modules is p
 Each function in the Main object maps to a single command on the command line.
 """
 
+from __future__ import annotations
+
 import os
 import json
 import multiprocessing as mp
@@ -14,6 +16,7 @@ import zipfile
 import gdown
 import requests
 import tarfile
+from typing import Any, Dict, Mapping, Optional
 
 from . import Experiment
 from . import EmpCpds
@@ -22,8 +25,12 @@ from . import Report
 
 
 def download_from_cloud_storage(
-    src, dst, extract_dir=None, delete_after_extract=True, use_gdown=False
-):
+    src: str,
+    dst: str,
+    extract_dir: Optional[str] = None,
+    delete_after_extract: bool = True,
+    use_gdown: bool = False,
+) -> None:
     """
     Downloads a file from either Google Drive or a direct URL, extracts it, and optionally deletes the archive.
 
@@ -77,7 +84,7 @@ class Main:
     """
 
     @staticmethod
-    def process_params():
+    def process_params() -> Dict[str, Any]:
         """
         This process parses the command line arguments and returns the
         parameters in a dictionary. Default parameters are specified in
@@ -207,7 +214,7 @@ class Main:
         return params
 
     @staticmethod
-    def download_extras(params):
+    def download_extras(params: Mapping[str, Any]) -> None:
         """
         This method will download the MoNA LC MS/MS library, and the HMDBv5
         and LMSD in a JMS-compliant format. Currently this downloads from my
@@ -293,7 +300,7 @@ class Main:
             )
 
     @staticmethod
-    def preprocess(params):
+    def preprocess(params: Mapping[str, Any]) -> None:
         """
         Using the mappings in the preprocessing config, this will alter
         a provided sequence file and add the extra fields.
@@ -340,11 +347,11 @@ class Main:
                     writer.writerow(entry)
 
     @staticmethod
-    def assemble_study(params):
+    def assemble_study(params: Mapping[str, Any]) -> None:
         raise NotImplementedError
 
     @staticmethod
-    def assemble(params):
+    def assemble(params: Mapping[str, Any]) -> None:
         """
         This is the first command in any pcpfm analysis. Starting with a
         sequence file, specified by '-s', an output directory by '-o'
@@ -378,7 +385,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def convert(params):
+    def convert(params: Mapping[str, Any]) -> None:
         """
         This will convert all .raw files to .mzML using a specified
         command. To provide the command, you can either modify the
@@ -399,7 +406,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def asari(params, gc=False):
+    def asari(params: Mapping[str, Any], gc: bool = False) -> None:
         """
         Perform asari on the experiment's acquisitions. They must be have
         been converted or provided in .mzML format first.
@@ -422,7 +429,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def asari_gc(params):
+    def asari_gc(params: Mapping[str, Any]) -> None:
         """
         Perform asari on the experiment's acquisitions. They must be have
         been converted or provided in .mzML format first.
@@ -459,7 +466,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def QAQC(params):
+    def QAQC(params: Mapping[str, Any]) -> None:
         """
         This will perform various QAQC metrics on the indicated feature
         table. By default "all" QAQC metrics are performed which are
@@ -492,7 +499,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def summarize(params):
+    def summarize(params: Mapping[str, Any]) -> None:
         """
         Print the list of empirical compounds and feature tables registered
         wiht the experiment object.
@@ -506,7 +513,7 @@ class Main:
         experiment.summarize()
 
     @staticmethod
-    def build_empCpds(params):
+    def build_empCpds(params: Mapping[str, Any]) -> None:
         """
         For a given feature table, generate empirical compounds from its 
         features. This uses a user-defined set of isotopes and adducts. 
@@ -554,7 +561,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def blank_masking(params):
+    def blank_masking(params: Mapping[str, Any]) -> None:
         """
         Print the list of empirical compounds and feature tables registered
         wiht the experiment object.
@@ -578,14 +585,14 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def reset_cosmetics(params):
+    def reset_cosmetics(params: Mapping[str, Any]) -> None:
         experiment = Experiment.Experiment.load(params["input"])
         experiment.cosmetics = {}
         experiment.used_cosmetics = {}
         experiment.save()
 
     @staticmethod
-    def drop_outliers(params):
+    def drop_outliers(params: Mapping[str, Any]) -> None:
         """
         This method drop samples from a feature table using the filter in the autodrop json.
 
@@ -604,7 +611,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def drop_samples(params):
+    def drop_samples(params: Mapping[str, Any]) -> None:
         """
         This method drop samples from a feature table. There are 
         different modes to use this command in. 
@@ -646,7 +653,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def finish(params):
+    def finish(params: Mapping[str, Any]) -> None:
         """
         This command is a no-op command for marking the end of an
         anlysis in the command history.
@@ -660,7 +667,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def normalize(params):
+    def normalize(params: Mapping[str, Any]) -> None:
         """
         Normalize a feature table based on the TIC of the features
         present in over a certain percentile of samples.
@@ -689,7 +696,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def drop_missing_features(params):
+    def drop_missing_features(params: Mapping[str, Any]) -> None:
         """
         Drop samples below a given percentile of inclusion.
 
@@ -717,7 +724,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def impute(params):
+    def impute(params: Mapping[str, Any]) -> None:
         """
         Replace remaining missing values with a value to aid statistics
 
@@ -744,7 +751,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def batch_correct(params):
+    def batch_correct(params: Mapping[str, Any]) -> None:
         """
         Use pyCombat to correct for batch effects using the specified batch
         identifier.
@@ -764,7 +771,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def delete(params):
+    def delete(params: Mapping[str, Any]) -> None:
         """
         Delete a specified feature table or empCpd list by moniker.
 
@@ -786,7 +793,7 @@ class Main:
             experiment.delete_empCpds(params["empCpd_moniker"])
 
     @staticmethod
-    def log_transform(params):
+    def log_transform(params: Mapping[str, Any]) -> None:
         """
         Log transform a given table, by default, log2
 
@@ -806,7 +813,7 @@ class Main:
         feature_table.save(params["new_moniker"])
 
     @staticmethod
-    def l4_annotate(params):
+    def l4_annotate(params: Mapping[str, Any]) -> None:
         """
         This will generate MS1 annotations on a provided feature table
         or empcpd list. 
@@ -835,7 +842,7 @@ class Main:
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def l2_annotate(params):
+    def l2_annotate(params: Mapping[str, Any]) -> None:
         """
         This will generate MS2 annotations on a provided feature table
         or empCpd list. Requires that MS2 spectra first be mapped.
@@ -880,7 +887,7 @@ class Main:
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def l1b_annotate(params):
+    def l1b_annotate(params: Mapping[str, Any]) -> None:
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z 
@@ -910,7 +917,7 @@ class Main:
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def l1a_annotate(params):
+    def l1a_annotate(params: Mapping[str, Any]) -> None:
         """
         This will generate level 1 annotations on a empcpd list using
         a csv file(s) with compound names, retention times and m/z
@@ -942,7 +949,7 @@ class Main:
             empCpd.save(params["new_moniker"])
 
     @staticmethod
-    def report(params):
+    def report(params: Mapping[str, Any]) -> None:
         """
         This will generate a pdf report using a JSON template
 
@@ -958,7 +965,7 @@ class Main:
         Report.Report(experiment, params)
 
     @staticmethod
-    def map_ms2(params):
+    def map_ms2(params: Mapping[str, Any]) -> None:
         """
         This maps MS2 spectra to the empCompounds based on rt and mz similarity.
 
@@ -990,7 +997,7 @@ class Main:
         empCpds.save(params["new_moniker"])
 
     @staticmethod
-    def generate_output(params):
+    def generate_output(params: Mapping[str, Any]) -> None:
         """
         This command generates the three table output for downstream
         analysis. This includes a feature table, an annotation table,
@@ -1019,7 +1026,7 @@ class Main:
         )
 
     @staticmethod
-    def reset(params):
+    def reset(params: Mapping[str, Any]) -> None:
         """
         This command resets the experiment object back to when asari was
         ran. This removes all user-generated monikered entities, including
@@ -1067,7 +1074,7 @@ class Main:
         experiment.save()
 
     @staticmethod
-    def __update_metadata(params):
+    def __update_metadata(params: Mapping[str, Any]) -> None:
         raise NotImplementedError
         experiment = Experiment.Experiment.load(params["input"])
         for acquisition in experiment.acquisitions:
@@ -1076,7 +1083,7 @@ class Main:
         experiment.save()
 
 
-def main():
+def main() -> None:
     """
     This is the main function for the pipeline
     """
@@ -1104,7 +1111,7 @@ def main():
             print(traceback.format_exc())
 
 
-def CLI():
+def CLI() -> None:
     """
     This function is called when 'pcpfm' is called in the terminal.
 
