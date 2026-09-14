@@ -1676,10 +1676,9 @@ class FeatureTable:
         :param log_mode: can be log10 or log2, which type of log to use, defaults to "log2"
         :type log_mode: str, optional
         """
-        for sample_name in self.sample_columns:
-            self.feature_table[sample_name] = utils.log_modes[log_mode](
-                self.feature_table[sample_name] + 1
-            )
+        self.feature_table[self.sample_columns] = utils.log_modes[log_mode](
+            self.feature_table[self.sample_columns] + 1
+        )
 
     def drop_missing_features(
         self: FeatureTable,
