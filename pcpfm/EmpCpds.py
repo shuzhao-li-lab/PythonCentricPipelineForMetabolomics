@@ -797,7 +797,7 @@ class EmpCpds:
         # self.update_annotations(update_ms2=False)
 
     def l1b_annotate(
-        self, standards_csv: List[str], mz_tol: float = 5, rt_tolerance: float = 10
+        self, standards_csv: List[str], mz_tol: float = 5, rt_tolerance: float = 30
     ) -> None:
         """
         Level1b annotations are based on mz, rtime tolerance against known standards.
@@ -806,12 +806,19 @@ class EmpCpds:
         rtime and mz to the standard's mz and retention time.
 
         Args:
-            standards_csv (str): path to mzvault export
-            mz_tol (int, optional): mz tolerance in ppm. Defaults to 5.
-            rt_tolerance (int, optional): rt tolerance in seconds. Defaults to 10.
+            standards_csv (List[str]): paths to mzvault export or custom standards csv
+            mz_tol (float, optional): mz tolerance in ppm. Defaults to 5.
+            rt_tolerance (float, optional): rt tolerance in seconds. Defaults to 30.
         """
         for csv in standards_csv:
-            for standard in pd.read_csv(csv).to_dict(orient="records"):
+            for standard in pd.read_csv(
+                csv,
+                dtype={
+                    "Confirm Precursor": "float",
+                    "RT": "float64",
+                    "CompoundName": "str",
+                },
+            ).to_dict(orient="records"):
                 mz, rtime, cname = [
                     standard[k] for k in ["Confirm Precursor", "RT", "CompoundName"]
                 ]
