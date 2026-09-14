@@ -1427,6 +1427,8 @@ class FeatureTable:
             ).items():
                 batch_blanks = [x for x in batch_name_list if x in blank_names]
                 batch_samples = [x for x in batch_name_list if x in sample_names]
+                if len(batch_samples) == 0:
+                    continue
                 blank_means = (
                     self.feature_table[batch_blanks]
                     .where(self.feature_table[batch_blanks] > 0)
@@ -1507,15 +1509,17 @@ class FeatureTable:
             return 0
 
         if by_batch:
-            for b_sample_names in self.experiment.batches(by_batch).values():
-                b_sample_names = list(
-                    set(b_sample_names).intersection(set(self.sample_columns))
+            for batch_samples in self.experiment.batches(by_batch).values():
+                batch_samples = list(
+                    set(batch_samples).intersection(set(self.sample_columns))
                 )
+                if len(batch_samples) == 0:
+                    continue
                 i_v = self.feature_table.apply(
-                    __calc_impute_value, axis=1, args=(b_sample_names,)
+                    __calc_impute_value, axis=1, args=(batch_samples,)
                 )
                 self.feature_table["interp_value"] = i_v
-                for sample_name in b_sample_names:
+                for sample_name in batch_samples:
                     interp_values = self.feature_table[
                         [sample_name, "interp_value"]
                     ].max(axis=1)
@@ -1566,15 +1570,17 @@ class FeatureTable:
 
         if by_batch is not None:
             aggregate_batch_tics = {}
-            for batch_name, batch_name_list in self.experiment.batches(
+            for batch_name, batch_samples in self.experiment.batches(
                 by_batch
             ).items():
-                batch_name_list = [
-                    x for x in batch_name_list if x in self.feature_table.columns
+                batch_samples = [
+                    x for x in batch_samples if x in self.feature_table.columns
                 ]
+                if len(batch_samples) == 0:
+                    continue
                 self.feature_table["percent_inclusion"] = np.sum(
-                    self.feature_table[batch_name_list] > 0, axis=1
-                ) / len(batch_name_list)
+                    self.feature_table[batch_samples] > 0, axis=1
+                ) / len(batch_samples)
                 tics = {
                     sample: np.sum(
                         self.feature_table[
@@ -1582,7 +1588,7 @@ class FeatureTable:
                             > tic_normalization_percentile
                         ][sample]
                     )
-                    for sample in batch_name_list
+                    for sample in batch_samples
                 }
                 norm_factors = {
                     sample: utils.descriptive_stat_modes[normalize_mode](
@@ -1605,13 +1611,13 @@ class FeatureTable:
                 / value
                 for batch, value in aggregate_batch_tics.items()
             }
-            for batch_name, batch_name_list in self.experiment.batches(
+            for batch_name, batch_samples in self.experiment.batches(
                 by_batch
             ).items():
-                batch_name_list = [
-                    x for x in batch_name_list if x in self.feature_table.columns
+                batch_samples = [
+                    x for x in batch_samples if x in self.feature_table.columns
                 ]
-                for sample in batch_name_list:
+                for sample in batch_samples:
                     self.feature_table[sample] = (
                         self.feature_table[sample]
                         * aggregate_batch_tic_corrections[batch_name]
@@ -1718,6 +1724,8 @@ class FeatureTable:
                 filtered_batch_name_list = [
                     x for x in batch_name_list if x in self.sample_columns
                 ]
+                if len(filtered_batch_name_list) == 0:
+                    continue
                 self.feature_table[batch_column] = np.sum(
                     self.feature_table[filtered_batch_name_list] > 0, axis=1
                 ) / len(filtered_batch_name_list)
