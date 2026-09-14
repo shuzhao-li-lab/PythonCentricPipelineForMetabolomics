@@ -911,8 +911,8 @@ class Main:
             empCpd = experiment.retrieve_empCpds(params["empCpd_moniker"], True)
             empCpd.l1b_annotate(
                 params["targets"],
-                float(params["annot_rt_tolerance"]),
-                float(params["annot_mz_tolerance"]),
+                rt_tolerance=float(params["annot_rt_tolerance"]),
+                mz_tol=float(params["annot_mz_tolerance"]),
             )
             empCpd.save(params["new_moniker"])
 
