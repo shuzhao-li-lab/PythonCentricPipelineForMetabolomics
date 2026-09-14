@@ -111,7 +111,9 @@ class FeatureTable:
         }
         self.figure_params = None
 
-    def get_mz_tree(self: FeatureTable, mz_tol: Union[float, int]) -> intervaltree.IntervalTree:
+    def get_mz_tree(
+        self: FeatureTable, mz_tol: Union[float, int]
+    ) -> intervaltree.IntervalTree:
         """
         Construct an interval tree to search for features using a query
         mz and a specific mz tolerance in ppm.
@@ -129,7 +131,9 @@ class FeatureTable:
                 self.__mz_trees[mz_tol].addi(mz - mz_err, mz + mz_err, f_id)
         return self.__mz_trees[mz_tol]
 
-    def get_rt_tree(self: FeatureTable, rt_tol: Union[float, int]) -> intervaltree.IntervalTree:
+    def get_rt_tree(
+        self: FeatureTable, rt_tol: Union[float, int]
+    ) -> intervaltree.IntervalTree:
         """
         Construct an interval tree to search for features using a query
         rtime and a specific rtime tolerance in absolute units (sec).
@@ -252,9 +256,7 @@ class FeatureTable:
             moniker,
         )
 
-    def make_nonnegative(
-        self: FeatureTable, fill_value: Union[int, float] = 1
-    ) -> None:
+    def make_nonnegative(self: FeatureTable, fill_value: Union[int, float] = 1) -> None:
         """
         This replaces all NaN and 0 values in the feature table with the specified fill_value
 
@@ -1429,6 +1431,16 @@ class FeatureTable:
                 batch_samples = [x for x in batch_name_list if x in sample_names]
                 if len(batch_samples) == 0:
                     continue
+                if len(batch_blanks) == 0:
+                    # No blanks in this batch means there is no blank baseline to compare
+                    # against. Masking it against a zero baseline would silently disable
+                    # blank masking (it yields an all-False mask for logic_mode "and"), so
+                    # the batch is skipped and the user is warned instead.
+                    print(
+                        f"Warning: no blanks found for batch {batch_name}."
+                        " Samples in this batch were not blank masked."
+                    )
+                    continue
                 blank_means = (
                     self.feature_table[batch_blanks]
                     .where(self.feature_table[batch_blanks] > 0)
@@ -1452,6 +1464,14 @@ class FeatureTable:
                 # Need to format the batch name because it can be both str and non str
                 blank_mask_columns.append(blank_mask_column)
                 self.feature_table[blank_mask_column] = to_filter
+            if len(blank_mask_columns) == 0:
+                # Combining an empty set of mask columns yields an all-True mask under
+                # logic_mode "and", which would drop every feature. Leave the table as is.
+                print(
+                    "Warning: no batch contained both blanks and study samples."
+                    " No blank masking was applied."
+                )
+                return None
             if logic_mode == "and":
                 self.feature_table["mask_feature"] = (
                     self.feature_table[blank_mask_columns] == True
@@ -1463,6 +1483,13 @@ class FeatureTable:
             for blank_mask_column in blank_mask_columns:
                 self.feature_table.drop(columns=blank_mask_column, inplace=True)
         else:
+            if len(blank_names) == 0:
+                # Without blanks there is no baseline; the comparison below would be all
+                # False against a NaN baseline and silently keep every feature.
+                print(
+                    "Warning: no blanks found in the experiment. No blank masking was applied."
+                )
+                return None
             blank_means = (
                 self.feature_table[list(blank_names)]
                 .where(self.feature_table[list(blank_names)] > 0)
@@ -1570,9 +1597,7 @@ class FeatureTable:
 
         if by_batch is not None:
             aggregate_batch_tics = {}
-            for batch_name, batch_samples in self.experiment.batches(
-                by_batch
-            ).items():
+            for batch_name, batch_samples in self.experiment.batches(by_batch).items():
                 batch_samples = [
                     x for x in batch_samples if x in self.feature_table.columns
                 ]
@@ -1611,9 +1636,7 @@ class FeatureTable:
                 / value
                 for batch, value in aggregate_batch_tics.items()
             }
-            for batch_name, batch_samples in self.experiment.batches(
-                by_batch
-            ).items():
+            for batch_name, batch_samples in self.experiment.batches(by_batch).items():
                 batch_samples = [
                     x for x in batch_samples if x in self.feature_table.columns
                 ]
@@ -1867,9 +1890,7 @@ class FeatureTable:
         leg_colors, leg_markers = [legends[x] for x in ["colors", "markers"]]
         return cos_colors, cos_markers, cos_texts, leg_colors, leg_markers
 
-    def generate_figure_params(
-        self: FeatureTable, params: Mapping[str, Any]
-    ) -> None:
+    def generate_figure_params(self: FeatureTable, params: Mapping[str, Any]) -> None:
         """
         This method generates the parameters used for plotting.
 
