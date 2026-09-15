@@ -1,7 +1,9 @@
 from setuptools import setup, find_packages
 
+version_namespace = {}
 with open("pcpfm/__init__.py") as f:
-    exec([x for x in f.readlines() if '__version__' in x][0])
+    exec([x for x in f.readlines() if '__version__' in x][0], version_namespace)
+__version__ = version_namespace["__version__"]
 
 with open("README.md", "r") as f:
     long_description = f.read()

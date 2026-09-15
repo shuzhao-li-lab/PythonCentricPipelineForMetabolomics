@@ -25,7 +25,7 @@ class ReportTheme:
 
 
 def retrieve_figure(experiment: Any, feature_table: Any) -> None:
-    params = experiment.parameters
+    _params = experiment.parameters
 
 
 # ---------- PDF Wrapper ----------

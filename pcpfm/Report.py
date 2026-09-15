@@ -296,7 +296,6 @@ class Report:
         """
         text = " ".join(text.split(None))
         text = " ".join(text.split("\n"))
-        i = 0
         for line in textwrap.wrap(text, width=95):
             self.__section_line(line, options=options)
         self.report.ln(5)
@@ -610,7 +609,8 @@ class Report:
         params_for_figure["all"] = False
         params_for_figure["save_plots"] = True
         feature_table.generate_figure_params(params_for_figure)
-        figure_path = feature_table.save_fig_path(section_desc["name"])
+        # Creates the figure directory; the path itself is not needed here.
+        feature_table.save_fig_path(section_desc["name"])
         if section_desc["name"] in feature_table.qaqc_result_to_key:
             params_for_figure[
                 feature_table.qaqc_result_to_key[section_desc["name"]]

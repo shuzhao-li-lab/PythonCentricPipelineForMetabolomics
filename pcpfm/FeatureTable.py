@@ -1474,12 +1474,12 @@ class FeatureTable:
                 return None
             if logic_mode == "and":
                 self.feature_table["mask_feature"] = (
-                    self.feature_table[blank_mask_columns] == True
-                ).all(axis=1)
+                    self.feature_table[blank_mask_columns]
+                  ).all(axis=1)
             elif logic_mode == "or":
                 self.feature_table["mask_feature"] = (
-                    self.feature_table[blank_mask_columns] == True
-                ).any(axis=1)
+                    self.feature_table[blank_mask_columns]
+                  ).any(axis=1)
             for blank_mask_column in blank_mask_columns:
                 self.feature_table.drop(columns=blank_mask_column, inplace=True)
         else:
@@ -1506,8 +1506,8 @@ class FeatureTable:
             blank_mask_column = "mask_feature"
             self.feature_table["mask_feature"] = to_filter
         self.feature_table = self.feature_table[
-            self.feature_table["mask_feature"] == False
-        ]
+             ~self.feature_table["mask_feature"].astype(bool)
+          ]
         self.feature_table.drop(columns="mask_feature", inplace=True)
         return None
 
@@ -1767,8 +1767,8 @@ class FeatureTable:
                 / len(self.sample_columns)
             ) < drop_percentile
         self.feature_table = self.feature_table[
-            self.feature_table["drop_feature"] == False
-        ]
+             ~self.feature_table["drop_feature"].astype(bool)
+          ]
         self.feature_table.drop(columns="drop_feature", inplace=True)
 
     def __gen_color_cosmetic_map(

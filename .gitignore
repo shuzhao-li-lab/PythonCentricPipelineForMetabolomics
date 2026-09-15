@@ -5,3 +5,6 @@
 .TODO/
 .plan/
 .
+# pixi environments
+.pixi/*
+!.pixi/config.toml

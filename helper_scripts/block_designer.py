@@ -3,6 +3,7 @@ from copy import deepcopy
 import random
 import numpy as np
 import sys
+import math
 
 
 identity_field = sys.argv[3]
@@ -100,7 +101,7 @@ for sample in samples:
     for k, v in sample.items():
         try:
             new_sample[k.rstrip()] = v.rstrip()
-        except:
+        except Exception:
             new_sample[k] = v
     new_samples.append(new_sample)
 samples = new_samples
@@ -121,8 +122,6 @@ for f in fields:
 
 # This function implements the Euclidean 
 # algorithm to find H.C.F. of two number
-import math
-
 def find_gcd(iterable):
     gcd = int(0)
     for val in iterable:

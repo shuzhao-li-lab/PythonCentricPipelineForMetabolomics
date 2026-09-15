@@ -99,7 +99,7 @@ for sample in samples:
     for k, v in sample.items():
         try:
             new_sample[k.rstrip()] = v.rstrip()
-        except:
+        except Exception:
             new_sample[k] = v
     new_samples.append(new_sample)
 samples = new_samples
