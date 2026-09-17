@@ -133,20 +133,40 @@ class Main:
         parser.add_argument("-bb", "--by_batch")
         parser.add_argument("-mb", "--marker_by", default=[])
         parser.add_argument("-tb", "--text_by", default=[])
-        parser.add_argument("--all")
-        parser.add_argument("--pca")
-        parser.add_argument("--tsne")
-        (parser.add_argument("--spearman"),)
-        (parser.add_argument("--kendall"),)
-        parser.add_argument("--missing_feature_distribution")
-        parser.add_argument("--missing_feature_percentiles")
-        parser.add_argument("--median_correlation_outlier_detection")
-        parser.add_argument("--missing_feature_outlier_detection")
-        parser.add_argument("--intensity_analysis")
-        parser.add_argument("--feature_distribution")
-        parser.add_argument("--feature_outlier_detection")
-        parser.add_argument("--interactive_plots", default=False)
-        parser.add_argument("--save_plots", default=False)
+        parser.add_argument(
+            "--all", action="store_true"
+        )  # Should be bool flag. If this is triggered then the boolen flags from pca, tsne to feature_outlier_detection should not be used. Create mutual exclusive parser
+        parser.add_argument("--pca", action="store_true")
+        parser.add_argument("--tsne", action="store_true")
+        parser.add_argument("--spearman", action="store_true")
+        parser.add_argument("--kendall", action="store_true")
+        parser.add_argument(
+            "--missing_feature_distribution", action="store_true"
+        )
+        parser.add_argument(
+            "--missing_feature_percentiles", action="store_true"
+        )
+        parser.add_argument(
+            "--median_correlation_outlier_detection", action="store_true"
+        )
+        parser.add_argument(
+            "--missing_feature_outlier_detection", action="store_true"
+        )
+        parser.add_argument(
+            "--intensity_analysis", action="store_true"
+        )
+        parser.add_argument(
+            "--feature_distribution", action="store_true"
+        )
+        parser.add_argument(
+            "--feature_outlier_detection", action="store_true"
+        )
+        parser.add_argument(
+            "--interactive_plots", action="store_true"
+        )
+        parser.add_argument(
+            "--save_plots", action="store_true"
+        )
         parser.add_argument("--khipu_isotopes")
         parser.add_argument("--khipu_charges")
         parser.add_argument("--khipu_extended_adducts")
@@ -197,6 +217,25 @@ class Main:
         for k, v in args.__dict__.items():
             if v:
                 params[k] = v
+
+        qaqc_selectors = (
+            "pca",
+            "tsne",
+            "spearman",
+            "kendall",
+            "missing_feature_distribution",
+            "missing_feature_percentiles",
+            "median_correlation_outlier_detection",
+            "missing_feature_outlier_detection",
+            "intensity_analysis",
+            "feature_distribution",
+            "feature_outlier_detection",
+        )
+        if args.all:
+            params["all"] = True
+        elif any(getattr(args, selector, False) for selector in qaqc_selectors):
+            params["all"] = False
+
         params["multicores"] = min(mp.cpu_count(), params["multicores"])
 
         if "targets" in params:
