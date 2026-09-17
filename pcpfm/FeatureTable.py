@@ -1472,16 +1472,17 @@ class FeatureTable:
                     " No blank masking was applied."
                 )
                 return None
+            if logic_mode not in ["and", "or"]:
+                raise ValueError("Unexpected blank_mask logic")
             if logic_mode == "and":
                 self.feature_table["mask_feature"] = (
                     self.feature_table[blank_mask_columns]
-                  ).all(axis=1)
-            elif logic_mode == "or":
+                ).all(axis=1)
+            else:  # Means or
                 self.feature_table["mask_feature"] = (
                     self.feature_table[blank_mask_columns]
-                  ).any(axis=1)
-            for blank_mask_column in blank_mask_columns:
-                self.feature_table.drop(columns=blank_mask_column, inplace=True)
+                ).any(axis=1)
+            self.feature_table.drop(columns=blank_mask_columns, inplace=True)
         else:
             if len(blank_names) == 0:
                 # Without blanks there is no baseline; the comparison below would be all
@@ -1506,8 +1507,8 @@ class FeatureTable:
             blank_mask_column = "mask_feature"
             self.feature_table["mask_feature"] = to_filter
         self.feature_table = self.feature_table[
-             ~self.feature_table["mask_feature"].astype(bool)
-          ]
+            ~self.feature_table["mask_feature"].astype(bool)
+        ]
         self.feature_table.drop(columns="mask_feature", inplace=True)
         return None
 
@@ -1767,8 +1768,8 @@ class FeatureTable:
                 / len(self.sample_columns)
             ) < drop_percentile
         self.feature_table = self.feature_table[
-             ~self.feature_table["drop_feature"].astype(bool)
-          ]
+            ~self.feature_table["drop_feature"].astype(bool)
+        ]
         self.feature_table.drop(columns="drop_feature", inplace=True)
 
     def __gen_color_cosmetic_map(
@@ -1944,6 +1945,7 @@ class FeatureTable:
         """
         self.generate_figure_params(params)
         qaqc_result = []
+        sys.setrecursionlimit(100000)
         for name, method in self.method_map.items():
             if (name in params and params[name]) or ("all" in params and params["all"]):
                 try:
@@ -1952,17 +1954,6 @@ class FeatureTable:
                         qaqc_result.extend(result)
                     else:
                         qaqc_result.append(result)
-                except RecursionError:
-                    sys.setrecursionlimit(100000)
-                    try:
-                        result = method()
-                        if isinstance(result, list):
-                            qaqc_result.extend(result)
-                        else:
-                            qaqc_result.append(result)
-                    except Exception as e:
-                        print("Failure Executing Method: " + name)
-                        print(e)
                 except Exception as e:
                     print("Failure Executing Method: " + name)
                     print(e)

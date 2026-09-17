@@ -6,7 +6,8 @@ platforms = ["osx-arm64"]
 version = "0.1.0"
 
 [tasks]
-lint="ruff check"
+lint = "ruff check"
+test = "pytest -q"
 
 [dependencies]
 python = "==3.11"
@@ -32,3 +33,4 @@ setuptools = ">=84.0.0, <85"
 asari-metabolomics = ">=1.18.5, <2"
 gdown = ">=6.2.0, <7"
 isocor = ">=2.2.4, <3"
+pytest = ">=8.3, <9"

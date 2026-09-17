@@ -42,6 +42,7 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/37/c6/608a9e6c172bf9124aa687ec8b9f0e8e5d697d59a5f4fad0e2d5ec2a7556/fpdf-1.7.2.tar.gz
       - pypi: https://files.pythonhosted.org/packages/c3/40/64585bb47dc79d9b03cbd4f009db2e39d6d0fc2115819a0b627c47ffda9d/gdown-6.2.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a1/d3/20a61a248feb1249cd81f83ce731f0bdf5170ed96a08a298f7081cda9e90/interface_meta-2.0.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/83/7f/8a80a1c7c2ed05822b5a2b312d2995f30c533641f8198366ba2e26a7bb03/intervaltree-3.2.1-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fa/97/442791d1881e8e10e69a39e8f9ebc382f76dc9a7ca684504fff71b3389fb/isocor-2.2.4-py3-none-any.whl
@@ -68,12 +69,15 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/20/70/cd3cf5cff538323076a879edef02cce6f13f7d75e03d12f211b0a0dbd178/patsy-1.0.3-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/02/ad/40ba18d3a88ccce689687a5b6b246f7c651823c48d2e3051d9cd53afafe5/pickydict-0.5.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b2/5b/a02d30018abd97ced9f5a6c63d28597694a00d066516b9c1c6de45859fc9/pillow-12.3.0-cp311-cp311-macosx_11_0_arm64.whl
+      - pypi: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/6b/e3/2c887645f21b94d992a16775bcf81cdf6dcc36cf1606782cb2a3c86e9a35/pubchempy-1.0.5-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/d4/be/e7bc844f503ac41b482a855a6a86260443d0cb2710dcd06cd895993b216f/pycombat-0.20-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/fb/31/ff1cb3938dc728db3a5abe6eed019c17c26dff853702c932278737607a59/pymzml-2.6.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/8d/59/b4572118e098ac8e46e399a1dd0f2d85403ce8bbaad9ec79373ed6badaf9/PySocks-1.7.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a5/33/4efd15ab9c41f20c107eef35aea6c92dedfb1f12003576ea2ec32766fdaf/pyteomics-5.0.1-py3-none-any.whl
+      - pypi: https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/ec/57/56b9bcc3c9c6a792fcbaf139543cee77261f3651ca9da0c93f5c1221264b/python_dateutil-2.9.0.post0-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/16/19/13de8e4377ed53079ee996e1ab0a9c33ec2faf808a4647b7b4c0d46dd239/pyyaml-6.0.3-cp311-cp311-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/6c/55/ee0a6a65a8d2c0fd4c272dcc5e6531b4c9779026b6557802b7d59bfb7e87/rdkit-2026.3.6-cp311-cp311-macosx_11_0_arm64.whl
@@ -316,6 +320,11 @@ packages:
   - hypothesis>=6.141.1 ; extra == 'all'
   - coverage>=7.10.0 ; extra == 'all'
   requires_python: '>=3.9'
+- pypi: https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl
+  name: iniconfig
+  version: 2.3.0
+  sha256: f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12
+  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/a1/d3/20a61a248feb1249cd81f83ce731f0bdf5170ed96a08a298f7081cda9e90/interface_meta-2.0.1-py3-none-any.whl
   name: interface-meta
   version: 2.0.1
@@ -820,6 +829,17 @@ packages:
   - trove-classifiers>=2024.10.12 ; extra == 'tests'
   - defusedxml ; extra == 'xmp'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/54/20/4d324d65cc6d9205fabedc306948156824eb9f0ee1633355a8f7ec5c66bf/pluggy-1.6.0-py3-none-any.whl
+  name: pluggy
+  version: 1.6.0
+  sha256: e920276dd6813095e9377c0bc5566d94c932c33b27a3e3945d8389c374dd4746
+  requires_dist:
+  - pre-commit ; extra == 'dev'
+  - tox ; extra == 'dev'
+  - pytest ; extra == 'testing'
+  - pytest-benchmark ; extra == 'testing'
+  - coverage ; extra == 'testing'
+  requires_python: '>=3.9'
 - pypi: https://files.pythonhosted.org/packages/6b/e3/2c887645f21b94d992a16775bcf81cdf6dcc36cf1606782cb2a3c86e9a35/pubchempy-1.0.5-py3-none-any.whl
   name: pubchempy
   version: 1.0.5
@@ -836,6 +856,13 @@ packages:
   - numpy
   - scikit-learn
   requires_python: '>=3.6'
+- pypi: https://files.pythonhosted.org/packages/71/46/17f022dd3e953bf20a04a028a21ec746d942f8d2af30fa0f124fa0e6a684/pygments-2.21.0-py3-none-any.whl
+  name: pygments
+  version: 2.21.0
+  sha256: 2363c69b61c4a97c838da3b130dcd6468f4848992b21a82f2a63ec34377137d9
+  requires_dist:
+  - colorama>=0.4.6 ; extra == 'windows-terminal'
+  requires_python: '>=3.9'
 - pypi: https://files.pythonhosted.org/packages/fb/31/ff1cb3938dc728db3a5abe6eed019c17c26dff853702c932278737607a59/pymzml-2.6.1-py3-none-any.whl
   name: pymzml
   version: 2.6.1
@@ -901,6 +928,26 @@ packages:
   - hdf5plugin ; extra == 'all'
   - spectrum-utils>=0.4 ; extra == 'all'
   requires_python: '>=3.10'
+- pypi: https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl
+  name: pytest
+  version: 8.4.2
+  sha256: 872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79
+  requires_dist:
+  - colorama>=0.4 ; sys_platform == 'win32'
+  - exceptiongroup>=1 ; python_full_version < '3.11'
+  - iniconfig>=1
+  - packaging>=20
+  - pluggy>=1.5,<2
+  - pygments>=2.7.2
+  - tomli>=1 ; python_full_version < '3.11'
+  - argcomplete ; extra == 'dev'
+  - attrs>=19.2 ; extra == 'dev'
+  - hypothesis>=3.56 ; extra == 'dev'
+  - mock ; extra == 'dev'
+  - requests ; extra == 'dev'
+  - setuptools ; extra == 'dev'
+  - xmlschema ; extra == 'dev'
+  requires_python: '>=3.9'
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/python-3.11.0-h3ba56d0_1_cpython.conda
   build_number: 1
   sha256: 28a54d78cd2624a12bd2ceb0f1816b0cba9b4fd97df846b5843b3c1d51642ab2
