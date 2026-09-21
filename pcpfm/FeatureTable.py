@@ -306,6 +306,13 @@ class FeatureTable:
 
         if drop_invariants:
             self.drop_invariants()
+
+        # If parent is log_transformed then the offspring should
+        # also be log_transformed
+        if self.log_transformed and new_moniker not in self.experiment.log_transformed_feature_tables:
+            self.experiment.log_transformed_feature_tables.append(new_moniker)
+            # TODO: Need to write test for that.
+
         output_path = os.path.join(
             self.experiment.filtered_feature_tables_subdirectory,
             new_moniker + "_Feature_table.tsv",
