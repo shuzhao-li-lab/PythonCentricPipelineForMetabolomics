@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import pandas as pd
 import intervaltree
-from combat.pycombat import pycombat
+from inmoose.pycombat import pycombat_norm
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
@@ -1698,7 +1698,9 @@ class FeatureTable:
                 for acquisition in acquisition_list:
                     batch_idx_map[acquisition] = batch_idx
             batches = [batch_idx_map[x] for x in self.sample_columns]
-            batch_corrected = pycombat(self.feature_table[self.sample_columns], batches)
+            batch_corrected = pycombat_norm(
+                self.feature_table[self.sample_columns], batches
+            )
             for column in batch_corrected.columns:
                 self.feature_table[column] = batch_corrected[column]
             self.make_nonnegative(fill_value=1)

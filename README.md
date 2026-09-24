@@ -359,7 +359,7 @@ The default imputation ratio is .5.
 
 Goal: correct for systematic biases across batches in feature intensity.
 
-Batch effects are best avoided through proper experimental design (randomized and stratified); however, they are not completely avoidable. This command will use the batches, determed by the `--by_batch` flag to batch correct the feature table. Batch correction is performed using pycombat. 
+Batch effects are best avoided through proper experimental design (randomized and stratified); however, they are not completely avoidable. This command will use the batches, determed by the `--by_batch` flag to batch correct the feature table. Batch correction is performed using InMoose's `pycombat_norm` implementation of ComBat.
 
 Note that batch correction is difficult and may require non-default options for removing rare features or other params to achieve the desired result. Batch correction cannot handle missing values well either, which are often present in metabolomics data.
 
