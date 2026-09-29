@@ -25,6 +25,37 @@ Please cite these publications if you use PCPFM and Asari:
 
 - Li, S., Siddiqa, A., Thapa, M., Chi, Y. and Zheng, S., 2023. Trackable and scalable LC-MS metabolomics data processing using asari. Nature Communications, 14(1), p.4113. (https://www.nature.com/articles/s41467-023-39889-1)
 
+# Version 2 (in development)
+
+PCPFM 2 is a rewrite. A project directory holds a record file, `pcpfm_project.json`, that tracks inputs, Asari runs, step status and available outputs; steps are no longer encoded in file names. The v1 documentation below does not apply to version 2.
+
+```
+pcpfm process -p my_project -m pos --metadata meta.csv -i /path/to/mzML_dir
+pcpfm qc      -p my_project --qc-samples sample_type=pooled
+pcpfm analyze -p my_project
+pcpfm status  -p my_project
+```
+
+- `process` runs Asari (1.18 or later) with `--files`, so data files can come from any directories. With `--metadata`, blank samples (`sample_type` containing "blank") are processed in a separate Asari run from other samples; without metadata, all files go into one run. Sample features are matched to blank features by closest m/z and retention time, and features whose blank intensity × 3 is at least the sample intensity are flagged (`blank_flag`).
+- `qc` computes per-sample metrics (detected features, intensities, correlation, PCA Hotelling T², Asari alignment landmarks) and per-feature metrics (Asari peak quality, detection rate, CV and D-ratio in QC samples, dilution-series linearity), writes `qc/qc_report.html`, and two tables: `tables/feature_table_filtered.tsv` (blank-flagged and undetected features removed, raw intensities) and `tables/feature_table_analysis.tsv` (filtered table after normalization, batch correction, imputation and log2 transform; the entry point for data analysis). Normalization (`--normalize tic|median`) follows v1 TIC normalization; batch correction (`--batch-correct`) is a placeholder; imputation defaults to half of the feature minimum.
+- `analyze` tests each feature against metadata variables among study samples (blanks, QC, pooled and standards are excluded by `sample_type`, or select with `--samples`). Categorical variables: Welch t-test for two groups, one-way ANOVA for more; continuous variables: linear regression. P-values are adjusted by Benjamini-Hochberg. Outputs per variable in `analysis/<variable>/`: `stats.tsv`, volcano plot, p-value histogram, heatmap and boxplots (or scatter plots) of top features, plus `analysis/analysis_report.html`.
+- Metadata columns: `sample` (required), `original_file_name` or `file_path`, `sample_type`, and optionally `group`, `batch`, `injection_order`, `dilution_factor`.
+
+Project layout:
+
+```
+my_project/
+  pcpfm_project.json    project record
+  metadata.tsv          metadata with resolved file paths
+  asari/                Asari file lists, logs and outputs, one per run
+  tables/               feature_table.tsv, blank_feature_table.tsv,
+                        feature_table_filtered.tsv, feature_table_analysis.tsv
+  qc/                   sample_qc.tsv, feature_qc.tsv, qc_report.html
+  analysis/             summary.tsv, analysis_report.html, one folder per variable
+```
+
+Annotation (`pcpfm annotate`) will be added at a later stage.
+
 # Recent Changes 
 
 Please see the VERSION_LOG.md for details on recent changes. This is for documentation but also because the manuscript is under review. Notably there was an issue regarding sample names that do not match their mzML file names. This has been fixed as of 2/28/24.

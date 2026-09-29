@@ -2,3 +2,4 @@
 
 # raw mass spec data
 *.mzML
+__pycache__/

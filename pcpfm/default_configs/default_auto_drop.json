@@ -1,9 +1,0 @@
-{
-    "feature_count_z_scores": {
-        "Action": "Drop",
-        "Conditions": {
-            ">": 2.5,
-            "<": -2.5
-        }
-    }
-}

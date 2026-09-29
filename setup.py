@@ -33,15 +33,13 @@ setup(
     'Topic :: Software Development :: Libraries :: Python Modules',
   ],
 
-  packages=find_packages(
-    include=['*', '']
-  ),
+  packages=find_packages(include=['pcpfm', 'pcpfm.*']),
   include_package_data=True,
   #zip_safe=True,
   entry_points = {
-        'console_scripts': ['pcpfm=pcpfm.main:CLI'],
+        'console_scripts': ['pcpfm=pcpfm.cli:main'],
     },
 
-  python_requires='>=3.7',
+  python_requires='>=3.9',
   install_requires=requirements,
 )
