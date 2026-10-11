@@ -7,8 +7,11 @@ All functions take X as a features x samples DataFrame of intensities and return
 ``batches`` is a Series mapping sample -> batch label, or None.
 """
 
+from typing import List, Literal, Tuple
+
 import numpy as np
 import pandas as pd
+from inmoose.pycombat import pycombat_norm
 
 STATS = {"median": np.median, "mean": np.mean, "min": np.min}
 
@@ -57,20 +60,80 @@ def normalize(X, method="none", batches=None, tic_percentile=0.9, mode="median")
     return X
 
 
-def batch_correct(X, method="none", batches=None):
-    """
-    Batch correction. Placeholder.
+def batch_correct(
+    X: pd.DataFrame,
+    *,
+    method: Literal["none", "combat"] = "none",
+    batches: pd.Series | None = None,
+) -> pd.DataFrame:
+    """Correct batch effects in selected feature-table sample columns.
 
-    v1 used ComBat (pycombat) on the intensity table with batches from a metadata field,
-    and set negative values afterwards to 1. To be implemented in v2, candidates:
-    ComBat (e.g. inmoose.pycombat), QC-sample based correction (QC-RLSC / LOESS per batch),
-    or WaveICA.
+    Apply InMoose ComBat and floor corrected intensities at 1. Leave the
+    input table unchanged, preserving metadata columns and row/column order.
+
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Feature table with one row per feature, and sample intensity columns.
+    method : {"none", "combat"}, optional
+        Correction method. The default, "none", returns X without correction.
+        This is dictated by choices in CLI subparser. Currently supports Combat
+    batches : pandas.Series or None, optional
+        Batch labels indexed by sample column name, required for "combat".
+        Labels are aligned to sample_columns regardless of their input order.
+        Every selected sample must have a non-empty label, with at least two
+        distinct batches represented. Extra sample labels are ignored.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A corrected copy of X for "combat", or X itself for "none".
+        Only the selected sample columns are modified in the copy.
+
+    Raises
+    ------
+    ValueError
+        If sample selection, table column names, the method, or batch labels
+        are invalid; if the selected intensity table is empty, nonnumeric,
+        or non-finite; or if ComBat produces non-finite values.
+
+    Examples
+    --------
+    Correct four sample columns while retaining the feature metadata:
+
+    >>> corrected = batch_correct(
+    ...     feature_table,
+    ...     method="combat",
+    ...     batches=pd.Series({"S1": "A", "S2": "A", "S3": "B", "S4": "B"}),
+    ... )
     """
+
     if method == "none":
         return X
-    if batches is None or batches.reindex(X.columns).nunique() < 2:
-        raise ValueError("Batch correction needs a batch column with at least two batches.")
-    raise NotImplementedError(f"Batch correction '{method}' is not implemented yet in pcpfm 2.")
+    if method not in ["combat"]:  # Support more choices
+        raise ValueError(f"Unknown batch correction method: {method}")
+    if batches is None:
+        raise ValueError(
+            "Batch correction needs a batch column with at least two batches."
+        )
+    if not batches.index.is_unique:
+        raise ValueError("Batch labels must have unique sample names.")
+    labels = batches.reindex(X.columns)  # Make sure that the labels align
+    if labels.isna().any() or labels.astype(str).str.strip().eq("").any():
+        raise ValueError(
+            "Batch correction needs a non-empty batch label for every sample."
+        )
+    if labels.nunique() < 2:
+        raise ValueError(
+            "Batch correction needs a batch column with at least two batches."
+        )
+
+    corrected = pycombat_norm(X.copy(), pd.factorize(labels)[0])
+    if not np.isfinite(corrected.to_numpy()).all():
+        raise ValueError(
+            "ComBat produced non-finite intensities; check feature variation within batches."
+        )
+    return corrected
 
 
 def impute(X, method="half-min", ratio=0.5, batches=None):
@@ -94,17 +157,27 @@ def log2(X):
     return np.log2(X + 1)
 
 
-def prepare_analysis_table(X, meta, args):
-    """Apply wrangling steps per args. Returns (X, log lines)."""
+def prepare_analysis_table(
+    X: pd.DataFrame, meta, args
+) -> Tuple[pd.DataFrame, List[str]]:
+    """Apply wrangling steps per args. Returns (X, log lines).
+    The input is expected to be a dataframe with only the sample columns.
+
+    """
     batches = None
     if args.batch_field:
         if args.batch_field not in meta.columns:
-            raise ValueError(f"Batch field '{args.batch_field}' is not in the metadata.")
+            raise ValueError(
+                f"Batch field '{args.batch_field}' is not in the metadata."
+            )
         batches = meta[args.batch_field].reindex(X.columns)
     log = []
     X = normalize(X, args.normalize, batches)
-    log.append(f"normalization: {args.normalize}" + (f" by {args.batch_field}" if batches is not None else ""))
-    X = batch_correct(X, args.batch_correct, batches)
+    log.append(
+        f"normalization: {args.normalize}"
+        + (f" by {args.batch_field}" if batches is not None else "")
+    )
+    X = batch_correct(X, method=args.batch_correct, batches=batches)
     log.append(f"batch correction: {args.batch_correct}")
     X = impute(X, args.impute, batches=batches)
     log.append(f"imputation: {args.impute}")

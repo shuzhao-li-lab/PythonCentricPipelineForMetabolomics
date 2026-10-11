@@ -1,4 +1,5 @@
 asari-metabolomics>=1.18
+inmoose>=0.9.1,<0.10
 numpy
 pandas
 scipy

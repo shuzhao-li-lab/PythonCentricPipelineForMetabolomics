@@ -40,6 +40,6 @@ setup(
         'console_scripts': ['pcpfm=pcpfm.cli:main'],
     },
 
-  python_requires='>=3.9',
+  python_requires='>=3.11',
   install_requires=requirements,
 )

@@ -179,10 +179,6 @@ class TestWrangle(unittest.TestCase):
         self.assertEqual(I.at[2, "a"], 5.0)
         self.assertTrue(np.allclose(wrangle.log2(pd.DataFrame({"x": [0.0, 1.0]}))["x"], [0, 1]))
 
-    def test_batch_correct_placeholder(self):
-        self.assertIs(wrangle.batch_correct(self.X, "none"), self.X)
-        with self.assertRaises(NotImplementedError):
-            wrangle.batch_correct(self.X, "combat", pd.Series({"a": 1, "b": 1, "c": 2, "d": 2}))
 
 
 class TestAnalyze(unittest.TestCase):

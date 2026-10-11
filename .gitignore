@@ -3,3 +3,7 @@
 # raw mass spec data
 *.mzML
 __pycache__/
+
+# dev environment used for module-type testing of new functions
+.dev
+

@@ -98,7 +98,7 @@ def build_parser():
     q.add_argument("--batch-field", help="metadata column with batch labels, for per-batch normalization, "
                                          "imputation and batch correction")
     q.add_argument("--batch-correct", choices=["none", "combat"], default="none",
-                   help="analysis table: batch correction (placeholder; combat not implemented yet)")
+                   help="analysis table: ComBat correction using InMoose (requires --batch-field)")
     q.add_argument("--impute", choices=["none", "half-min"], default="half-min",
                    help="analysis table: fill zeros with half of the feature minimum")
     q.add_argument("--no-log2", action="store_true", help="analysis table: skip the log2(x + 1) transform")
