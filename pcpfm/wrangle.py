@@ -1,13 +1,16 @@
 """
-Data wrangling from the filtered feature table to the analysis table:
+Transform filtered feature intensities into an analysis table.
 
     filtered table -> normalization -> batch correction -> imputation -> log2 -> analysis table
 
-All functions take X as a features x samples DataFrame of intensities and return a new DataFrame.
+All transformations take X as a features x samples DataFrame of intensities.
+Inputs are not modified; disabled transformations return X itself.
 ``batches`` is a Series mapping sample -> batch label, or None.
 """
 
-from typing import List, Literal, Tuple
+from argparse import Namespace
+from collections.abc import Hashable
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -16,29 +19,75 @@ from inmoose.pycombat import pycombat_norm
 STATS = {"median": np.median, "mean": np.mean, "min": np.min}
 
 
-def _groups(X, batches):
+def _groups(
+    X: pd.DataFrame, batches: pd.Series | None
+) -> dict[Hashable | None, list[str]]:
+    """Group intensity columns by their aligned batch labels.
+
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+    batches : pandas.Series | None
+        Batch labels indexed by sample column name, or None for a single group.
+
+    Returns
+    -------
+    dict[Hashable | None, list[str]]
+        Batch labels mapped to sample columns; one None group when batches are
+        absent.
+
+    Notes
+    -----
+    Missing batch labels form the empty-string group.
+    """
     if batches is None:
         return {None: list(X.columns)}
     b = batches.reindex(X.columns).fillna("")
     return {k: list(v.index) for k, v in b.groupby(b)}
 
 
-def normalize(X, method="none", batches=None, tic_percentile=0.9, mode="median"):
-    """
-    Sample normalization.
+def normalize(
+    X: pd.DataFrame,
+    method: Literal["none", "median", "tic"] = "none",
+    batches: pd.Series | None = None,
+    tic_percentile: float = 0.9,
+    mode: Literal["median", "mean", "min"] = "median",
+) -> pd.DataFrame:
+    """Normalize sample intensities by median intensity or shared-feature TIC.
 
-    tic: ported from v1 FeatureTable.TIC_normalize. Per-sample TIC is summed over features
-        present (> 0) in more than ``tic_percentile`` of the batch's samples; each sample is
-        scaled to the median (or mean) TIC. With batches, normalize within each batch, then
-        scale batch-level TICs to each other. Zeros stay zero.
-    median: scale each sample to the median of per-sample median non-zero intensities.
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+    method : Literal['none', 'median', 'tic'], optional
+        Normalization method; "none" skips normalization.
+    batches : pandas.Series | None, optional
+        Batch labels indexed by sample column name, or None for a single group.
+    tic_percentile : float, optional
+        Minimum fraction of samples detecting a feature for inclusion in TIC.
+    mode : Literal['median', 'mean', 'min'], optional
+        Statistic used to choose the target intensity or TIC.
 
-    Raises ValueError when a sample cannot be scaled (no common features, a TIC of 0, or a
-    sample without detected features). Returning NaN instead would be imputed to 0 later and
-    silently produce an all-zero analysis table. The input X is never modified.
+    Returns
+    -------
+    pd.DataFrame
+        Normalized intensities, or X itself for method="none". The input is not
+        modified.
 
-    TODO: more methods, e.g. probabilistic quotient normalization (PQN), internal standards,
-    QC-based drift correction (LOESS on injection order).
+    Raises
+    ------
+    ValueError
+        If the method is unknown or a sample cannot be scaled because it has no detected features, no shared TIC features, or zero TIC.
+
+    Notes
+    -----
+    TIC normalization sums features detected in strictly more than
+    tic_percentile of a batch, scales within batches, then scales batch TICs to
+    a common target. Median normalization uses positive per-sample medians
+    across all samples. Zeros remain zero.
     """
     if method not in ["none", "median", "tic"]:
         raise ValueError(f"Unknown normalization method: {method}")
@@ -91,48 +140,37 @@ def batch_correct(
     method: Literal["none", "combat"] = "none",
     batches: pd.Series | None = None,
 ) -> pd.DataFrame:
-    """Correct batch effects in selected feature-table sample columns.
-
-    Apply InMoose ComBat and floor corrected intensities at 1. Leave the
-    input table unchanged, preserving metadata columns and row/column order.
+    """Correct batch effects in an intensity-only feature matrix using ComBat.
 
     Parameters
     ----------
     X : pandas.DataFrame
-        Feature table with one row per feature, and sample intensity columns.
-    method : {"none", "combat"}, optional
-        Correction method. The default, "none", returns X without correction.
-        This is dictated by choices in CLI subparser. Currently supports Combat
-    batches : pandas.Series or None, optional
-        Batch labels indexed by sample column name, required for "combat".
-        Labels are aligned to sample_columns regardless of their input order.
-        Every selected sample must have a non-empty label, with at least two
-        distinct batches represented. Extra sample labels are ignored.
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+    method : Literal['none', 'combat'], optional
+        Correction method, also constrained by the CLI choices.
+    batches : pandas.Series | None, optional
+        Batch labels indexed by sample column name. Required for "combat"; every
+        sample needs a non-empty label.
 
     Returns
     -------
-    pandas.DataFrame
-        A corrected copy of X for "combat", or X itself for "none".
-        Only the selected sample columns are modified in the copy.
+    pd.DataFrame
+        ComBat-corrected intensities with the input labels, or X itself for
+        method="none".
 
     Raises
     ------
     ValueError
-        If sample selection, table column names, the method, or batch labels
-        are invalid; if the selected intensity table is empty, nonnumeric,
-        or non-finite; or if ComBat produces non-finite values.
+        If the method is unknown, the ComBat input is empty, batch labels are missing or duplicated, fewer than two batches remain, or ComBat returns non-finite values.
 
-    Examples
-    --------
-    Correct four sample columns while retaining the feature metadata:
-
-    >>> corrected = batch_correct(
-    ...     feature_table,
-    ...     method="combat",
-    ...     batches=pd.Series({"S1": "A", "S2": "A", "S3": "B", "S4": "B"}),
-    ... )
+    Notes
+    -----
+    Pass only sample intensity columns, excluding feature annotations. Batch
+    labels are aligned to X.columns; extra labels are ignored. The input is not
+    modified. Corrected values are returned without clipping. InMoose validates
+    the numeric input and may raise additional errors.
     """
-
     if method == "none":
         return X
     if method not in ["combat"]:  # Support more choices
@@ -163,35 +201,95 @@ def batch_correct(
     return corrected
 
 
-def impute(X, method="half-min", ratio=0.5, batches=None):
-    """
-    Fill zeros with ratio x the minimum non-zero value of each feature (v1 impute_missing_features),
-    optionally per batch. Features never detected stay 0.
+def impute(
+    X: pd.DataFrame,
+    method: Literal["none", "half-min"] = "half-min",
+    ratio: float = 0.5,
+    batches: pd.Series | None = None,
+) -> pd.DataFrame:
+    """Replace undetected intensities with a fraction of each feature minimum.
+
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+    method : Literal['none', 'half-min'], optional
+        Imputation method; "none" leaves the data unchanged.
+    ratio : float, optional
+        Fraction of the minimum positive intensity used for filling.
+    batches : pandas.Series | None, optional
+        Batch labels indexed by sample column name, or None for a single group.
+
+    Returns
+    -------
+    pd.DataFrame
+        Imputed copy, or X itself for method="none".
+
+    Raises
+    ------
+    ValueError
+        If the imputation method is unknown.
+
+    Notes
+    -----
+    For each batch, nonpositive and missing values are replaced by ratio times
+    the minimum positive feature intensity. Features never detected in a batch
+    remain zero.
     """
     if method == "none":
         return X
     if method != "half-min":
         raise ValueError(f"Unknown imputation method: {method}")
     X = X.copy()
-    for _, cols in _groups(X, batches).items():
+    for cols in _groups(X, batches).values():
         sub = X[cols]
         fill = sub.where(sub > 0).min(axis=1) * ratio
         X[cols] = sub.where(sub > 0, fill, axis=0).fillna(0)
     return X
 
 
-def log2(X):
+def log2(X: pd.DataFrame) -> pd.DataFrame:
+    """Vectorized Transform intensities with log2(x + 1).
+
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Transformed intensities with the same row and column labels.
+    """
     return np.log2(X + 1)
 
 
 def prepare_analysis_table(
-    X: pd.DataFrame, meta, args
-) -> Tuple[pd.DataFrame, List[str]]:
-    """Apply wrangling steps per args. Returns (X, log lines).
-    The input is expected to be a dataframe with only the sample columns.
+    X: pd.DataFrame, meta: pd.DataFrame, args: Namespace
+) -> tuple[pd.DataFrame, list[str]]:
+    """Normalize, batch-correct, impute and optionally log-transform intensities.
 
-    Raises ValueError if the result contains NaN or infinite values, so a step that fails
-    silently can never write an unusable analysis table.
+    Parameters
+    ----------
+    X : pandas.DataFrame
+        Intensity-only DataFrame with features as rows and sample IDs as
+        columns.
+    meta : pandas.DataFrame
+        Sample metadata indexed by sample ID.
+    args : Namespace
+        Parsed command options for this pipeline step.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, list[str]]
+        Analysis intensity table and descriptions of the applied steps.
+
+    Raises
+    ------
+    ValueError
+        If the batch field is missing, a wrangling step rejects its input, or the final table contains non-finite values.
     """
     batches = None
     if args.batch_field:

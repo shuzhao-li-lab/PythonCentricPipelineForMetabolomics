@@ -58,10 +58,14 @@ class TestTables(unittest.TestCase):
             tables.load_table(self.record, "table")
 
     def test_invalid_schema_does_not_fall_back(self):
-        for cols in (["missing"], ["S1", "S1"], [], "S1"):
+        for cols in (["missing"], ["S1", "S1"], []):
             with self.subTest(columns=cols), self.assertRaises(ValueError):
                 self.register(sample_columns=cols)
                 tables.load_table(self.record, "table")
+
+        self.register(sample_columns="S1")
+        with self.assertRaisesRegex(TypeError, "sample_columns must be a list"):
+            tables.load_table(self.record, "table")
 
     def test_duplicate_sample_columns_are_rejected(self):
         self.register(sample_columns=["S1", "S1"])
