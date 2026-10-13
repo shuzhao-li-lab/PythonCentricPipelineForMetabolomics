@@ -45,16 +45,25 @@ def check_asari(cmd):
     return version
 
 
-def run_signature(files, args):
-    """Hash of inputs and arguments, used to decide whether a previous run can be reused."""
+def run_signature(files, args, asari_version):
+    """
+    Hash used to decide whether a previous Asari run can be reused.
+
+    Covers each file's absolute path, size and modification time (sorted by path, so input
+    order does not matter), the arguments in order, and the Asari version.
+    A re-converted mzML or an Asari upgrade triggers a rerun.
+    """
     h = hashlib.sha1()
-    for p in sorted(files):
-        h.update(p.encode())
-    h.update(" ".join(args).encode())
+    # Using absolute paths to ensure the files are treated correctly
+    for p in sorted(os.path.abspath(f) for f in files):
+        st = os.stat(p)
+        h.update(f"{p}\0{st.st_size}\0{st.st_mtime_ns}\n".encode())
+    h.update("\0".join(args).encode())
+    h.update(f"\nasari {asari_version}".encode())
     return h.hexdigest()[:16]
 
 
-def run_asari(cmd, run_name, files, run_dir, mode, extra_args=(), cores=None, ppm=None):
+def run_asari(cmd, run_name, files, run_dir, mode, extra_args=(), cores=None, ppm=None, asari_version=None):
     """
     Run ``asari process`` on ``files``. Outputs go under ``run_dir``.
 
@@ -100,7 +109,7 @@ def run_asari(cmd, run_name, files, run_dir, mode, extra_args=(), cores=None, pp
         "log": log_path,
         "output_dir": output_dir,
         "command": " ".join(cmd + args),
-        "signature": run_signature(files, list(extra_args) + [mode, str(ppm)]),
+        "signature": run_signature(files, list(extra_args) + [mode, str(ppm)], asari_version),
         "n_files": len(files),
         "elapsed_seconds": elapsed,
         "alignment": parse_alignment(log_path),
