@@ -28,28 +28,53 @@ def normalize(X, method="none", batches=None, tic_percentile=0.9, mode="median")
     Sample normalization.
 
     tic: ported from v1 FeatureTable.TIC_normalize. Per-sample TIC is summed over features
-        present in more than ``tic_percentile`` of samples; each sample is scaled to the
-        median (or mean) TIC. With batches, normalize within each batch, then scale
-        batch-level TICs to each other.
+        present (> 0) in more than ``tic_percentile`` of the batch's samples; each sample is
+        scaled to the median (or mean) TIC. With batches, normalize within each batch, then
+        scale batch-level TICs to each other. Zeros stay zero.
     median: scale each sample to the median of per-sample median non-zero intensities.
+
+    Raises ValueError when a sample cannot be scaled (no common features, a TIC of 0, or a
+    sample without detected features). Returning NaN instead would be imputed to 0 later and
+    silently produce an all-zero analysis table. The input X is never modified.
 
     TODO: more methods, e.g. probabilistic quotient normalization (PQN), internal standards,
     QC-based drift correction (LOESS on injection order).
     """
+    if method not in ["none", "median", "tic"]:
+        raise ValueError(f"Unknown normalization method: {method}")
+
     if method == "none":
         return X
     stat = STATS[mode]
     if method == "median":
         med = X.where(X > 0).median(axis=0)
+        # a sample with no detected features has a NaN median, which would make the
+        # target (median of medians) NaN for every sample
+        empty = med.index[med.isna()].tolist()
+        if empty:
+            raise ValueError(
+                f"median normalization: samples with no detected features: {empty}"
+            )
         return X / med * stat(med.to_numpy())
-    if method != "tic":
-        raise ValueError(f"Unknown normalization method: {method}")
 
     X = X.copy()
     batch_tics = {}
     for b, cols in _groups(X, batches).items():
         present = (X[cols] > 0).mean(axis=1) > tic_percentile
+        # without common features there is no TIC to scale to
+        if not present.any():
+            where = "all samples" if b is None else f"samples in batch '{b}'"
+            raise ValueError(
+                f"TIC normalization: no feature is present in more than {tic_percentile:.0%} "
+                f"of {where}; use --normalize median or none."
+            )
         tics = X.loc[present, cols].sum(axis=0)
+        # a sample with TIC 0 would be divided by zero
+        zero = tics.index[tics == 0].tolist()
+        if zero:
+            raise ValueError(
+                f"TIC normalization: samples with a TIC of 0 cannot be scaled: {zero}"
+            )
         target = stat(tics.to_numpy())
         X[cols] = X[cols] * (target / tics)
         batch_tics[b] = target
@@ -112,6 +137,8 @@ def batch_correct(
         return X
     if method not in ["combat"]:  # Support more choices
         raise ValueError(f"Unknown batch correction method: {method}")
+    if X.empty:
+        raise ValueError("Batch correction input table is empty")
     if batches is None:
         raise ValueError(
             "Batch correction needs a batch column with at least two batches."
@@ -163,6 +190,8 @@ def prepare_analysis_table(
     """Apply wrangling steps per args. Returns (X, log lines).
     The input is expected to be a dataframe with only the sample columns.
 
+    Raises ValueError if the result contains NaN or infinite values, so a step that fails
+    silently can never write an unusable analysis table.
     """
     batches = None
     if args.batch_field:
@@ -184,4 +213,8 @@ def prepare_analysis_table(
     if not args.no_log2:
         X = log2(X)
         log.append("log2(x + 1) transform")
+    if not np.isfinite(X.to_numpy(dtype=float)).all():
+        raise ValueError(
+            f"analysis table contains NaN or infinite values after: {'; '.join(log)}"
+        )
     return X, log
