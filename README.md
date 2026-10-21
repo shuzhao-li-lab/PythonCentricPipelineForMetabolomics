@@ -31,15 +31,34 @@ PCPFM 2 is a rewrite. A project directory holds a record file, `pcpfm_project.js
 
 ```
 pcpfm process -p my_project -m pos --metadata meta.csv -i /path/to/mzML_dir
+pcpfm replicates -p my_project --rep-col biosample    # only if replicate injections exist. See below
 pcpfm qc      -p my_project --qc-samples sample_type=pooled
 pcpfm analyze -p my_project
 pcpfm status  -p my_project
 ```
 
 - `process` runs Asari (1.18 or later) with `--files`, so data files can come from any directories. With `--metadata`, blank samples (`sample_type` containing "blank") are processed in a separate Asari run from other samples; without metadata, all files go into one run. Sample features are matched to blank features by closest m/z and retention time, and features whose blank intensity × 3 is at least the sample intensity are flagged (`blank_flag`).
+- `replicates` (optional, run right after `process` when samples were injected in replicate) groups samples by the metadata column given with `--rep-col`, ommiting samples with empty values. Metadata is taken from the project, or from `--metadata`. 
+Replicates are numbered by `injection_order` if it exists (metadata row order otherwise) and the Pearson correlation of log2(x + 1) intensities is computed for each pair of replicates (`--no-log2` uses raw intensities). 
+Output `replicates/replicate_correlations.xlsx` lists, per sample, the pairwise correlations, their minimum, maximum and average, and a flag. When flag is `max < 0.7` no replicate agrees with another (rho < 0.7) and the sample is excluded; with `min < 0.7` replicates without any correlation of at least 0.7 to another replicate are dropped. 
+The cutoff for the correlation is set with `--pearson` (default 0.7); `--no-drop-flagged` keeps all replicates regardless of correlation values. 
+The remaining replicates are replaced by their median, stored in the column of the first remaining replicate, in `tables/feature_table_replicates.tsv` (raw intensities);
+use it in QC with `pcpfm qc --table feature_table_replicates`.
 - `qc` computes per-sample metrics (detected features, intensities, correlation, PCA Hotelling T², Asari alignment landmarks) and per-feature metrics (Asari peak quality, detection rate, CV and D-ratio in QC samples, dilution-series linearity), writes `qc/qc_report.html`, and two tables: `tables/feature_table_filtered.tsv` (blank-flagged and undetected features removed, raw intensities) and `tables/feature_table_analysis.tsv` (filtered table after normalization, batch correction, imputation and log2 transform; the entry point for data analysis). Normalization (`--normalize tic|median`) follows v1 TIC normalization; batch correction (`--batch-correct combat --batch-field batch`) uses InMoose ComBat before imputation and log transformation, with corrected intensities floored at 1 as in v1; imputation defaults to half of the feature minimum.
 - `analyze` tests each feature against metadata variables among study samples (blanks, QC, pooled and standards are excluded by `sample_type`, or select with `--samples`). Categorical variables: Welch t-test for two groups, one-way ANOVA for more; continuous variables: linear regression. P-values are adjusted by Benjamini-Hochberg. Outputs per variable in `analysis/<variable>/`: `stats.tsv`, volcano plot, p-value histogram, heatmap and boxplots (or scatter plots) of top features, plus `analysis/analysis_report.html`.
-- Metadata columns: `sample` (required), `original_file_name` or `file_path`, `sample_type`, and optionally `group`, `batch`, `injection_order`, `dilution_factor`.
+- Metadata columns: `sample` (required), `original_file_name` or `file_path`, `sample_type`, and optionally `group`, `batch`, `injection_order`, `dilution_factor` and a replicate group column for `replicates`.
+- Replicate metadata example: keep one row per injection, because each `sample` ID becomes a column of the Asari feature table and must be unique. Give the injections of one biological sample the same value in a separate column, here `biosample`, and pass it with `--rep-col biosample`. Do not use a replicate number (1, 2, 3) as the group column, as that would group all first injections together. Pooled QC rows leave `biosample` empty and are kept as they are.
+
+
+Example metadata with replicate injections
+  ```
+  sample,original_file_name,sample_type,injection_order,biosample
+  plasma_P001_rep1,plasma_P001_rep1.mzML,analysis,1,P001
+  plasma_P001_rep2,plasma_P001_rep2.mzML,analysis,2,P001
+  plasma_P002_rep1,plasma_P002_rep1.mzML,analysis,3,P002
+  plasma_P002_rep2,plasma_P002_rep2.mzML,analysis,4,P002
+  pooled_QC_01,pooled_QC_01.mzML,pooled,5,
+  ```
 
 Project layout:
 
@@ -48,8 +67,9 @@ my_project/
   pcpfm_project.json    project record
   metadata.tsv          metadata with resolved file paths
   asari/                Asari file lists, logs and outputs, one per run
-  tables/               feature_table.tsv, blank_feature_table.tsv,
+  tables/               feature_table.tsv, blank_feature_table.tsv, feature_table_replicates.tsv,
                         feature_table_filtered.tsv, feature_table_analysis.tsv
+  replicates/           replicate_correlations.xlsx
   qc/                   sample_qc.tsv, feature_qc.tsv, qc_report.html
   analysis/             summary.tsv, analysis_report.html, one folder per variable
 ```

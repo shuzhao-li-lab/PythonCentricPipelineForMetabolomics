@@ -2,6 +2,7 @@
 Command line interface.
 
     pcpfm process -p PROJECT_DIR -m pos [--metadata META] [--files LIST | --input DIR ...]
+    pcpfm replicates -p PROJECT_DIR --rep-col COLUMN [--metadata META] [--pearson 0.7] [...]
     pcpfm qc      -p PROJECT_DIR [--qc-samples sample_type=pooled] [...]
     pcpfm analyze -p PROJECT_DIR [--variables group,age] [...]
     pcpfm status  -p PROJECT_DIR
@@ -27,6 +28,20 @@ def cmd_process(args: argparse.Namespace) -> None:
 
     record = ProjectRecord.load_or_create(args.project, args.name)
     _run(record, process.run, args)
+
+
+def cmd_replicates(args: argparse.Namespace) -> None:
+    """Collapse replicate injections in an existing project.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command options for this pipeline step.
+    """
+    from . import replicates
+
+    record = ProjectRecord.load(args.project)
+    _run(record, replicates.run, args)
 
 
 def cmd_qc(args: argparse.Namespace) -> None:
@@ -119,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     Returns
     -------
     argparse.ArgumentParser
-        Configured parser for process, qc, analyze and status.
+        Configured parser for process, replicates, qc, analyze and status.
     """
     parser = argparse.ArgumentParser(
         prog="pcpfm",
@@ -199,6 +214,53 @@ def build_parser() -> argparse.ArgumentParser:
         help="rerun Asari even if an identical run is recorded",
     )
     p.set_defaults(func=cmd_process)
+
+    # ---- replicates ----
+    r = sub.add_parser(
+        "replicates",
+        help="correlate replicate injections and collapse them to their median",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    r.add_argument("-p", "--project", required=True, help="project directory")
+    r.add_argument(
+        "--table",
+        default="feature_table",
+        help="artifact name of the feature table with replicate samples",
+    )
+    r.add_argument(
+        "--metadata",
+        help="sample metadata CSV/TSV with a 'sample' column and the replicate column; "
+        "if omitted, the project metadata copy made by process is used",
+    )
+    r.add_argument(
+        "--rep-col",
+        "--rep_col",
+        dest="rep_col",
+        required=True,
+        help="metadata column assigning samples to replicate groups; "
+        "samples with an empty value are kept as they are",
+    )
+    r.add_argument(
+        "--pearson",
+        type=float,
+        default=0.7,
+        help="Pearson correlation cutoff for replicate agreement",
+    )
+    r.add_argument(
+        "--no-log2",
+        "--no_log2",
+        dest="no_log2",
+        action="store_true",
+        help="correlate raw intensities instead of log2(x + 1)",
+    )
+    r.add_argument(
+        "--no-drop-flagged",
+        "--no_drop_flagged",
+        dest="no_drop_flagged",
+        action="store_true",
+        help="take the median of all replicates of every group, ignoring flags",
+    )
+    r.set_defaults(func=cmd_replicates)
 
     # ---- qc ----
     q = sub.add_parser(
