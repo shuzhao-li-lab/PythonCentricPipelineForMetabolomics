@@ -32,6 +32,9 @@ PENDING, RUNNING, COMPLETED, FAILED, SKIPPED = (
     "skipped",
 )
 
+# Steps of analyses
+STEPS = ("process", "blank_filter", "replicates", "qc", "analyze", "annotate")
+
 
 def now() -> str:
     """Format the current local time for a project record.
@@ -477,11 +480,13 @@ class ProjectRecord:
                 f"Asari run '{run}': {info.get('n_files')} files, status {info.get('status')}, "
                 f"output {info.get('output_dir')}"
             )
+        # --- Steps
         lines.append("Steps:")
-        for name in ("process", "blank_filter", "qc", "analyze", "annotate"):
+        for name in STEPS:
             s = self.step(name)
             extra = f"  finished {s['finished']}" if s.get("finished") else ""
             lines.append(f"  {name:<13} {s.get('status')}{extra}")
+        # --- Artifacts
         lines.append("Artifacts:")
         if not d["artifacts"]:
             lines.append("  (none)")
