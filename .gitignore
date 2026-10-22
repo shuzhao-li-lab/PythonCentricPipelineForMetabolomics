@@ -1,7 +1,9 @@
 .DS_Store
 
-# raw mass spec data
+# raw mass spec data and test files/data
 *.mzML
+./test_data/
+./plans/
 __pycache__/
 
 # dev environment used for module-type testing of new functions
