@@ -199,6 +199,11 @@ def list_input_files(
         Paths in first-occurrence order: list entries followed by sorted
         directory entries.
 
+    Raises
+    ------
+    ValueError
+        If an input directory does not exist or is not a directory.
+
     Notes
     -----
     Blank lines and comments beginning with # are ignored. Relative list entries
@@ -218,9 +223,20 @@ def list_input_files(
                         line if os.path.isabs(line) else os.path.join(base, line)
                     )
     for d in input_dirs or []:
-        paths += sorted(
-            p for p in glob.glob(os.path.join(d, "*")) if p.lower().endswith(MZML_EXT)
+        if not os.path.exists(d):
+            raise ValueError(f"Input directory does not exist: {d}")
+        if not os.path.isdir(d):
+            raise ValueError(f"Input path is not a directory: {d}")
+        matches = sorted(
+            p for p in glob.glob(os.path.join(d, "*"))
+            if p.lower().endswith(MZML_EXT) and os.path.isfile(p)
         )
+        if not matches:
+            print(
+                f"[pcpfm] Warning: no mzML files found directly in input directory: {d}. "
+                "Subdirectories are not searched."
+            )
+        paths += matches
     # normalize before de-duplicating: one file can be reached by an absolute path
     # in --files and by a relative --input directory
     return list(dict.fromkeys(os.path.abspath(p) for p in paths))
