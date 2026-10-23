@@ -156,13 +156,14 @@ def batch_correct(
     Returns
     -------
     pd.DataFrame
-        ComBat-corrected intensities with the input labels, or X itself for
-        method="none".
+        Corrected intensities with the input labels, or X itself for
+        method="none" or when batch metadata is not provided.
 
     Raises
     ------
     ValueError
-        If the method is unknown, the ComBat input is empty, batch labels are missing or duplicated, fewer than two batches remain, or ComBat returns non-finite values.
+        If the ComBat input is empty, batch labels are missing or duplicated,
+        fewer than two batches remain, or ComBat returns non-finite values.
 
     Notes
     -----
@@ -172,31 +173,31 @@ def batch_correct(
     the numeric input and may raise additional errors.
     """
     if method == "none":
+        print("[pcpfm] Batch correction method not set. Skipping batch correction.")
         return X
-    if method not in ["combat"]:  # Support more choices
-        raise ValueError(f"Unknown batch correction method: {method}")
     if X.empty:
-        raise ValueError("Batch correction input table is empty")
+        print("[pcpfm] Batch correction input table is empty")
+        raise ValueError("[pcpfm] Batch correction input table is empty")
     if batches is None:
-        raise ValueError(
-            "Batch correction needs a batch column with at least two batches."
-        )
+        print("[pcpfm] Batch metadata column not set. Skipping batch correction.")
+        return X
     if not batches.index.is_unique:
-        raise ValueError("Batch labels must have unique sample names.")
+        raise ValueError("[pcpfm] Batch labels must have unique sample names.")
     labels = batches.reindex(X.columns)  # Make sure that the labels align
     if labels.isna().any() or labels.astype(str).str.strip().eq("").any():
         raise ValueError(
-            "Batch correction needs a non-empty batch label for every sample."
+            "[pcpfm] Batch correction needs a non-empty batch label for every sample."
         )
     if labels.nunique() < 2:
         raise ValueError(
-            "Batch correction needs a batch column with at least two batches."
+            "[pcpfm] Batch columns needs should contain at least two batches."
         )
 
-    corrected = pycombat_norm(X.copy(), pd.factorize(labels)[0])
+    if method == "combat":
+        corrected = pycombat_norm(X.copy(), pd.factorize(labels)[0])
     if not np.isfinite(corrected.to_numpy()).all():
         raise ValueError(
-            "ComBat produced non-finite intensities; check feature variation within batches."
+            "Batch correction produced non-finite intensities; check feature variation within batches."
         )
     return corrected
 

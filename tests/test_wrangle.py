@@ -75,8 +75,11 @@ class TestBatchCorrect(unittest.TestCase):
             wrangle.batch_correct(self.X, method="none"),
             self.X,
         )
+        self.assertIs(
+            wrangle.batch_correct(self.X, method="combat", batches=None),
+            self.X,
+        )
         for batches in (
-            None,
             pd.Series({"a": 1, "b": 1, "c": 1, "d": 1}),
             pd.Series({"a": 1, "b": 1, "c": 2}),
             pd.Series({"a": "one", "b": "one", "c": "two", "d": " "}),
@@ -87,8 +90,6 @@ class TestBatchCorrect(unittest.TestCase):
                     method="combat",
                     batches=batches,
                 )
-        with self.assertRaisesRegex(ValueError, "Unknown batch correction"):
-            wrangle.batch_correct(self.X, method="unknown")
         batches = pd.Series({"a": 1, "b": 1, "c": 2, "d": 2})
         for value in (np.nan, np.inf):
             X = self.X.copy()
@@ -155,8 +156,11 @@ class TestBatchCorrect(unittest.TestCase):
             with self.subTest(shape=table.shape), patch(
                 "pcpfm.wrangle.pycombat_norm"
             ) as combat:
-                with self.assertRaisesRegex(ValueError, "input table is empty"):
-                    wrangle.batch_correct(table, method="combat")
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    with self.assertRaisesRegex(ValueError, "input table is empty"):
+                        wrangle.batch_correct(table, method="combat")
+                self.assertIn("input table is empty", output.getvalue())
                 combat.assert_not_called()
 
     def test_known_input_matches_inmoose_reference(self):

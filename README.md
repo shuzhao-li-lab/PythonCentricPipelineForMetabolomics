@@ -52,12 +52,12 @@ use it in QC with `pcpfm qc --table feature_table_replicates`.
 
 Example metadata with replicate injections
   ```
-  sample,original_file_name,sample_type,injection_order,biosample
-  plasma_P001_rep1,plasma_P001_rep1.mzML,analysis,1,P001
-  plasma_P001_rep2,plasma_P001_rep2.mzML,analysis,2,P001
-  plasma_P002_rep1,plasma_P002_rep1.mzML,analysis,3,P002
-  plasma_P002_rep2,plasma_P002_rep2.mzML,analysis,4,P002
-  pooled_QC_01,pooled_QC_01.mzML,pooled,5,
+  sample,filepath,sample_type,injection_order,biosample
+  plasma_P001_rep1,/path/to/plasma_P001_rep1.mzML,analysis,1,P001
+  plasma_P001_rep2,/path/to/plasma_P001_rep2.mzML,analysis,2,P001
+  plasma_P002_rep1,/path/to/plasma_P002_rep1.mzML,analysis,3,P002
+  plasma_P002_rep2,/path/to/plasma_P002_rep2.mzML,analysis,4,P002
+  pooled_QC_01,/path/to/pooled_QC_01.mzML,pooled,5,
   ```
 
 Project layout:
