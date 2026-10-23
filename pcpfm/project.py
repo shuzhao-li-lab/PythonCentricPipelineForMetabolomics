@@ -316,6 +316,30 @@ class ProjectRecord:
             entry["summary"] = summary
         if message is not None:
             entry["message"] = message
+        if status == COMPLETED:
+            entry.pop("stale", None)
+            entry.pop("stale_reason", None)
+        self.save()
+
+    def mark_stale_steps(self, names: Sequence[str], reason: str) -> None:
+        """Mark completed steps and their artifacts stale after an upstream change.
+
+        Parameters
+        ----------
+        names : Sequence[str]
+            Downstream step names whose outputs depend on changed inputs.
+        reason : str
+            Short explanation shown in project status.
+        """
+        for name in names:
+            step = self.data["steps"].get(name)
+            if step and step.get("status") == COMPLETED:
+                step["stale"] = True
+                step["stale_reason"] = reason
+        for artifact in self.data["artifacts"].values():
+            if artifact.get("step") in names:
+                artifact["stale"] = True
+                artifact["stale_reason"] = reason
         self.save()
 
     def is_completed(self, name: str) -> bool:
@@ -485,12 +509,20 @@ class ProjectRecord:
         for name in STEPS:
             s = self.step(name)
             extra = f"  finished {s['finished']}" if s.get("finished") else ""
-            lines.append(f"  {name:<13} {s.get('status')}{extra}")
+            stale_reason = f" ({s['stale_reason']})" if s.get("stale_reason") else ""
+            stale = f"  ⚠ STALE{stale_reason}" if s.get("stale") else ""
+            lines.append(f"  {name:<13} {s.get('status')}{stale}{extra}")
         # --- Artifacts
         lines.append("Artifacts:")
         if not d["artifacts"]:
             lines.append("  (none)")
         for name, a in d["artifacts"].items():
-            flag = "ok" if os.path.exists(self.abspath(a["path"])) else "MISSING"
+            flag = (
+                "STALE"
+                if a.get("stale")
+                else "ok"
+                if os.path.exists(self.abspath(a["path"]))
+                else "MISSING"
+            )
             lines.append(f"  [{flag:>7}] {name:<24} {a['path']}")
         return lines

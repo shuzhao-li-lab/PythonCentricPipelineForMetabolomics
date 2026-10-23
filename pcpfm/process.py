@@ -95,6 +95,10 @@ def _run_or_reuse(
         info[k] = record.relpath(info[k])
     info["status"] = COMPLETED
     record.data["runs"][run_name] = info
+    record.mark_stale_steps(
+        ("replicates", "qc", "analyze"),
+        f"Asari run '{run_name}' changed; rerun downstream steps.",
+    )
     record.save()
     return info
 
@@ -155,6 +159,10 @@ def _process(args: Namespace, record: ProjectRecord) -> dict[str, Any]:
             "No input: give --metadata with a file_path column, or --files / --input."
         )
     if metadata is not None and "file_path" not in metadata.columns and not candidates:
+        if args.files or args.input:
+            raise ValueError(
+                "No mzML files found from --files or --input; input directories are scanned non-recursively."
+            )
         raise ValueError(
             "Metadata has no file_path column; also give --files or --input to locate mzML files."
         )

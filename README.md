@@ -46,13 +46,13 @@ The remaining replicates are replaced by their median, stored in the column of t
 use it in QC with `pcpfm qc --table feature_table_replicates`.
 - `qc` computes per-sample metrics (detected features, intensities, correlation, PCA Hotelling T², Asari alignment landmarks) and per-feature metrics (Asari peak quality, detection rate, CV and D-ratio in QC samples, dilution-series linearity), writes `qc/qc_report.html`, and two tables: `tables/feature_table_filtered.tsv` (blank-flagged and undetected features removed, raw intensities) and `tables/feature_table_analysis.tsv` (filtered table after normalization, batch correction, imputation and log2 transform; the entry point for data analysis). Normalization (`--normalize tic|median`) follows v1 TIC normalization; batch correction (`--batch-correct combat --batch-field batch`) uses InMoose ComBat before imputation and log transformation, with corrected intensities floored at 1 as in v1; imputation defaults to half of the feature minimum.
 - `analyze` tests each feature against metadata variables among study samples (blanks, QC, pooled and standards are excluded by `sample_type`, or select with `--samples`). Categorical variables: Welch t-test for two groups, one-way ANOVA for more; continuous variables: linear regression. P-values are adjusted by Benjamini-Hochberg. Outputs per variable in `analysis/<variable>/`: `stats.tsv`, volcano plot, p-value histogram, heatmap and boxplots (or scatter plots) of top features, plus `analysis/analysis_report.html`.
-- Metadata columns: `sample` (required), `original_file_name` or `file_path`, `sample_type`, and optionally `group`, `batch`, `injection_order`, `dilution_factor` and a replicate group column for `replicates`.
+- Metadata requires `sample`; `file_path` is optional when you supply `--files` or `-i`/`--input`. Optional columns include `sample_type` (important for blank masking), `group`, `batch`, `injection_order`, `dilution_factor` and a replicate group column (e.g. biosample). Without `file_path`, `original_file_name` or `sample` matches candidate files by mzML filename stem. `--files` and `-i`/`--input` can be combined; PCPFM uses files from both sources and removes duplicate paths. Input directories are scanned non-recursively.
 - Replicate metadata example: keep one row per injection, because each `sample` ID becomes a column of the Asari feature table and must be unique. Give the injections of one biological sample the same value in a separate column, here `biosample`, and pass it with `--rep-col biosample`. Do not use a replicate number (1, 2, 3) as the group column, as that would group all first injections together. Pooled QC rows leave `biosample` empty and are kept as they are.
 
 
 Example metadata with replicate injections
   ```
-  sample,filepath,sample_type,injection_order,biosample
+  sample,file_path,sample_type,injection_order,biosample
   plasma_P001_rep1,/path/to/plasma_P001_rep1.mzML,analysis,1,P001
   plasma_P001_rep2,/path/to/plasma_P001_rep2.mzML,analysis,2,P001
   plasma_P002_rep1,/path/to/plasma_P002_rep1.mzML,analysis,3,P002
@@ -73,6 +73,8 @@ my_project/
   qc/                   sample_qc.tsv, feature_qc.tsv, qc_report.html
   analysis/             summary.tsv, analysis_report.html, one folder per variable
 ```
+
+When `process` creates a new Asari run, downstream replicate, QC and analysis outputs remain on disk and in the project record, marked `STALE` by `pcpfm status`. Rerun those steps to refresh them.
 
 Annotation (`pcpfm annotate`) will be added at a later stage.
 
