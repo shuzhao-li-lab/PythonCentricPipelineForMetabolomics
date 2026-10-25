@@ -34,6 +34,10 @@ PALETTE = [
     "#9c6b4e",
 ]
 
+DPI = (
+    110  # Should make this user configurable in case it is desired as a paper subpanel
+)
+
 
 def _colors(types: list[str]) -> tuple[list[str], dict[str, str]]:
     """Assign palette colors to sample types in first-occurrence order.
@@ -82,7 +86,7 @@ def _png(fig: Figure) -> str:
         Base64-encoded PNG image.
     """
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+    fig.savefig(buf, format="png", dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode()
 
@@ -545,6 +549,7 @@ def write_report(
         + e(
             json.dumps(
                 {
+                    "metadata": record.data.get("metadata", {}),
                     "runs": {
                         k: {
                             x: v.get(x)
@@ -559,8 +564,22 @@ def write_report(
                         for k, v in record.data["runs"].items()
                     },
                     "steps": {
-                        k: {x: v.get(x) for x in ("status", "finished", "summary")}
+                        k: {
+                            x: v.get(x)
+                            for x in (
+                                "status",
+                                "started",
+                                "finished",
+                                "params",
+                                "summary",
+                                "message",
+                            )
+                        }
                         for k, v in record.data["steps"].items()
+                    },
+                    "qc_operations": {
+                        "filtering": summary.get("filtering", []),
+                        "analysis_table": summary.get("wrangling", []),
                     },
                 },
                 indent=2,

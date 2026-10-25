@@ -29,7 +29,7 @@ from numpy.typing import ArrayLike, NDArray
 from scipy import stats
 
 from .metadata import is_blank, is_study_sample
-from .project import COMPLETED, FAILED, ProjectRecord
+from .project import COMPLETED, FAILED, PENDING, SKIPPED, ProjectRecord
 from .tables import load_table, parse_selector, sample_info, select
 
 ZSCORE_LIMIT = 3.0
@@ -516,6 +516,9 @@ def run(args: Namespace, record: ProjectRecord) -> None:
         record.finish_step("qc", FAILED, message=str(e))
         raise
     record.finish_step("qc", COMPLETED, summary=summary)
+    # If QC is run without replicates, it's either non-replicate project or user error
+    if record.step("replicates").get("status") == PENDING: 
+        record.finish_step("replicates", SKIPPED)
 
 
 def _qc(args: Namespace, record: ProjectRecord) -> dict[str, Any]:
