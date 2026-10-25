@@ -109,6 +109,8 @@ def normalize(
     X = X.copy()
     batch_tics = {}
     for b, cols in _groups(X, batches).items():
+        # If batches are not supplied, then this loop iterates over None, samples
+        # and will treat all samples as one batch
         present = (X[cols] > 0).mean(axis=1) > tic_percentile
         # without common features there is no TIC to scale to
         if not present.any():
@@ -178,7 +180,9 @@ def batch_correct(
     if X.empty:
         print("[pcpfm] Batch correction input table is empty")
         raise ValueError("[pcpfm] Batch correction input table is empty")
-    if batches is None:
+    if (
+        batches is None
+    ):  # This is already taken care of from the calling function . Leave it here for future proofing
         print("[pcpfm] Batch metadata column not set. Skipping batch correction.")
         return X
     if not batches.index.is_unique:
@@ -191,7 +195,7 @@ def batch_correct(
     if labels.nunique() < 2:
         raise ValueError(
             "[pcpfm] Batch columns needs should contain at least two batches."
-        )
+        )  # This is taken care of in calling function.
 
     if method == "combat":
         corrected = pycombat_norm(X.copy(), pd.factorize(labels)[0])
@@ -290,23 +294,39 @@ def prepare_analysis_table(
     Raises
     ------
     ValueError
-        If the batch field is missing, a wrangling step rejects its input, or the final table contains non-finite values.
+        If a wrangling step rejects its input or the final table contains
+        non-finite values.
     """
+    log = []
     batches = None
+    batch_skip = None  # Skip batch operations
     if args.batch_field:
         if args.batch_field not in meta.columns:
-            raise ValueError(
-                f"Batch field '{args.batch_field}' is not in the metadata."
-            )
-        batches = meta[args.batch_field].reindex(X.columns)
-    log = []
+            batch_skip = f"metadata has no '{args.batch_field}' field"
+        else:
+            labels = meta[args.batch_field].reindex(X.columns)
+            if labels.isna().any() or labels.astype(str).str.strip().eq("").any():
+                batch_skip = f"'{args.batch_field}' is missing for one or more samples"
+            else:
+                batches = labels
     X = normalize(X, args.normalize, batches)
     log.append(
         f"normalization: {args.normalize}"
-        + (f" by {args.batch_field}" if batches is not None else "")
+        + (
+            f" by {args.batch_field}"
+            if args.normalize == "tic" and batches is not None
+            else ""
+        )
     )
-    X = batch_correct(X, method=args.batch_correct, batches=batches)
-    log.append(f"batch correction: {args.batch_correct}")
+    if args.batch_correct != "none" and batches is not None and batches.nunique() < 2:
+        batch_skip = "Batch correction needs at least two batch labels"
+    if batch_skip:
+        print(f"[pcpfm] Warning: batch correction skipped: {batch_skip}.")
+        log.append(f"batch correction: skipped ({batch_skip})")
+    else:
+        X = batch_correct(X, method=args.batch_correct, batches=batches)
+        log.append(f"batch correction: {args.batch_correct}")
+
     X = impute(X, args.impute, batches=batches)
     log.append(f"imputation: {args.impute}")
     if not args.no_log2:
