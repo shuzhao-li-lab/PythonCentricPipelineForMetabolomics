@@ -5,6 +5,7 @@ Command line interface.
     pcpfm replicates -p PROJECT_DIR --rep-col COLUMN [--metadata META] [--pearson 0.7] [...]
     pcpfm qc      -p PROJECT_DIR [--qc-samples sample_type=pooled] [...]
     pcpfm analyze -p PROJECT_DIR [--variables group,age] [...]
+    pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [...]
     pcpfm status  -p PROJECT_DIR
 """
 
@@ -72,6 +73,20 @@ def cmd_analyze(args: argparse.Namespace) -> None:
     _run(record, analyze.run, args)
 
 
+def cmd_annotate_lc(args: argparse.Namespace) -> None:
+    """Annotate an LC-MS feature table of an existing project.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command options for this pipeline step.
+    """
+    from .annotate import lc
+
+    record = ProjectRecord.load(args.project)
+    _run(record, lc.run, args)
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     """Print project inputs, step status and artifact availability.
 
@@ -134,7 +149,7 @@ def build_parser() -> argparse.ArgumentParser:
     Returns
     -------
     argparse.ArgumentParser
-        Configured parser for process, replicates, qc, analyze and status.
+        Configured parser for process, replicates, qc, analyze, annotate and status.
     """
     parser = argparse.ArgumentParser(
         prog="pcpfm",
@@ -384,6 +399,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="number of top features in the heatmap",
     )
     a.set_defaults(func=cmd_analyze)
+
+    # ---- annotate ----
+    an = sub.add_parser("annotate", help="annotate features; choose a workflow")
+    workflows = an.add_subparsers(dest="workflow", required=True)
+    lc = workflows.add_parser(
+        "lc",
+        help="LC-MS feature table: pre-annotation, L4, L1b, L2, L1a",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    lc.add_argument("-p", "--project", required=True, help="project directory")
+    lc.add_argument(
+        "--table",
+        default="feature_table",
+        help="artifact name of the feature table to annotate",
+    )
+    lc.set_defaults(func=cmd_annotate_lc)
 
     # ---- status ----
     s = sub.add_parser(

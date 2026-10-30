@@ -36,6 +36,29 @@ PENDING, RUNNING, COMPLETED, FAILED, SKIPPED = (
 STEPS = ("process", "blank_filter", "replicates", "qc", "analyze", "annotate")
 
 
+def _levels_text(levels: dict[str, dict[str, Any]]) -> str:
+    """Format per-level annotation outcomes on one status line.
+
+    Parameters
+    ----------
+    levels : dict[str, dict[str, Any]]
+        Level name -> ``{"status", "n_*" counts, ...}``.
+
+    Returns
+    -------
+    str
+        For example ``"grouping 812 empcpds · L4 430 features · L1b skipped"``.
+    """
+    parts = []
+    for name, lv in levels.items():
+        counts = ", ".join(
+            f"{v} {k.removeprefix('n_')}" for k, v in lv.items() if k.startswith("n_")
+        )
+        done = lv.get("status") == COMPLETED and counts
+        parts.append(f"{name} {counts}" if done else f"{name} {lv.get('status')}")
+    return " · ".join(parts)
+
+
 def now() -> str:
     """Format the current local time for a project record.
 
@@ -512,6 +535,13 @@ class ProjectRecord:
             stale_reason = f" ({s['stale_reason']})" if s.get("stale_reason") else ""
             stale = f"  ⚠ STALE{stale_reason}" if s.get("stale") else ""
             lines.append(f"  {name:<13} {s.get('status')}{stale}{extra}")
+            if name == "annotate":
+                workflows = (s.get("summary") or {}).get("workflows", {})
+                for wf, info in workflows.items():
+                    lines.append(
+                        f"    {wf} (run {info.get('run_id')}): "
+                        f"{_levels_text(info.get('levels', {}))}"
+                    )
         # --- Artifacts
         lines.append("Artifacts:")
         if not d["artifacts"]:
