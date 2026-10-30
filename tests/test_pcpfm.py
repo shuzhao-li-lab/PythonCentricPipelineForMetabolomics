@@ -1,14 +1,16 @@
 """Unit tests for pcpfm v2. Run with `python -m unittest discover tests` or `pytest tests`."""
 
 import argparse
+import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 import pandas as pd
 
-from pcpfm import analyze, asari_runner, blanks, metadata, qc, wrangle
+from pcpfm import analyze, asari_runner, blanks, metadata, process, qc, wrangle
 from pcpfm.project import COMPLETED, ProjectRecord
 
 
@@ -120,6 +122,35 @@ class TestAsariLog(unittest.TestCase):
         self.assertTrue(a["Blank_003"]["is_reference"])
         self.assertEqual(a["Blank_001"]["landmark_peaks"], 50)
         self.assertFalse(a["Bad_sample"]["aligned"])
+
+    def test_read_project_keeps_workflow_and_mode(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "project.json"), "w") as f:
+                json.dump({"asari_version": "1.18.5", "workflow": "LC", "mode": "neg"}, f)
+            p = asari_runner.read_asari_project(d)
+            self.assertEqual((p["workflow"], p["mode"]), ("LC", "neg"))
+
+    def test_read_project_without_workflow(self):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "project.json"), "w") as f:
+                json.dump({"asari_version": "1.13"}, f)
+            p = asari_runner.read_asari_project(d)
+            self.assertIsNone(p["workflow"])
+            self.assertIsNone(p["mode"])
+
+
+class TestProcessStale(unittest.TestCase):
+    def test_new_asari_run_marks_annotate_stale(self):
+        with tempfile.TemporaryDirectory() as d:
+            record = ProjectRecord.load_or_create(d)
+            record.start_step("annotate")
+            record.finish_step("annotate")
+            args = argparse.Namespace(mode="pos", ppm=5, cores=1, force=True)
+            out = os.path.join(d, "asari", "run")
+            info = {"files_list": out, "log": out, "output_dir": out}
+            with mock.patch.object(process.asari_runner, "run_asari", return_value=info):
+                process._run_or_reuse(record, args, ["asari"], "samples", [], [], "1.18.5")
+            self.assertTrue(record.step("annotate").get("stale"))
 
 
 class TestQC(unittest.TestCase):

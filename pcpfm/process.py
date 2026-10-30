@@ -96,7 +96,7 @@ def _run_or_reuse(
     info["status"] = COMPLETED
     record.data["runs"][run_name] = info
     record.mark_stale_steps(
-        ("replicates", "qc", "analyze"),
+        ("replicates", "qc", "analyze", "annotate"),
         f"Asari run '{run_name}' changed; rerun downstream steps.",
     )
     record.save()

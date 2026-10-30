@@ -257,6 +257,9 @@ def read_asari_project(output_dir: str) -> dict[str, Any]:
         "dropped_samples": p.get("dropped_samples", []),
         "reference": p.get("reference"),
         "mz_tolerance_ppm": p.get("mz_tolerance_ppm"),
+        # processing context for annotate; None when an older Asari did not record it
+        "workflow": p.get("workflow"),
+        "mode": p.get("mode"),
     }
 
 
