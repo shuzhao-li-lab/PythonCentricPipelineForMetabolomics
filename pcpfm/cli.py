@@ -5,7 +5,7 @@ Command line interface.
     pcpfm replicates -p PROJECT_DIR --rep-col COLUMN [--metadata META] [--pearson 0.7] [...]
     pcpfm qc      -p PROJECT_DIR [--qc-samples sample_type=pooled] [...]
     pcpfm analyze -p PROJECT_DIR [--variables group,age] [...]
-    pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [...]
+    pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [--preannot-ppm 5] [--preannot-rt 2]
     pcpfm status  -p PROJECT_DIR
 """
 
@@ -413,6 +413,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--table",
         default="feature_table",
         help="artifact name of the feature table to annotate",
+    )
+    lc.add_argument(
+        "--preannot-ppm",
+        type=float,
+        default=5,
+        help="m/z tolerance in ppm for Asari grouping and the L4 search",
+    )
+    lc.add_argument(
+        "--preannot-rt",
+        type=float,
+        default=2,
+        help="retention-time tolerance in seconds for Asari grouping",
     )
     lc.set_defaults(func=cmd_annotate_lc)
 

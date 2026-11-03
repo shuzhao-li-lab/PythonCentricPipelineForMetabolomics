@@ -538,10 +538,7 @@ class ProjectRecord:
             if name == "annotate":
                 workflows = (s.get("summary") or {}).get("workflows", {})
                 for wf, info in workflows.items():
-                    lines.append(
-                        f"    {wf} (run {info.get('run_id')}): "
-                        f"{_levels_text(info.get('levels', {}))}"
-                    )
+                    lines.append(f"    {wf}: {_levels_text(info.get('levels', {}))}")
         # --- Artifacts
         lines.append("Artifacts:")
         if not d["artifacts"]:
