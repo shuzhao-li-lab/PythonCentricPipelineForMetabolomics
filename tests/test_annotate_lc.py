@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from pcpfm import cli
-from pcpfm.annotate import lc
+from pcpfm.annotate import lc, lc_preannotation
 from pcpfm.annotate.lc_evidence import (
     EVIDENCE_COLUMNS,
     empty_evidence,
@@ -93,6 +93,29 @@ def make_project(d, workflow="LC", mode="pos"):
     record.data["runs"]["samples"] = {"workflow": workflow, "mode": mode}
     record.save()
     return record
+
+
+def extra_steps(*steps):
+    """Patch the plan so these steps run after the planned ones."""
+    plan = lc._plan
+
+    def patched(args, mode):
+        planned, references, warnings = plan(args, mode)
+        return planned + list(steps), references, warnings
+
+    return mock.patch.object(lc, "_plan", patched)
+
+
+def write_standards(path, rows):
+    """Write a Compound Discoverer-style CSV; rows are (name, polarity, RT minutes, m/z).
+
+    The second "Confirm Precursor" column holds a wrong m/z, which must be ignored.
+    """
+    with open(path, "w") as f:
+        f.write("CompoundName,ChemicalFormula,Polarity,RT,Confirm Precursor,Confirm Extracted,Confirm Precursor\n")
+        for name, polarity, rt, mz in rows:
+            f.write(f"{name},C1H1,{polarity},{rt!r},{mz!r},50.0,{mz + 1}\n")
+    return path
 
 
 def annotate(argv):
@@ -274,12 +297,7 @@ class TestAnnotateLcCommand(unittest.TestCase):
             seen.append(len(run.membership))
             raise ValueError("bad standards file")
 
-        plan = lc._plan
-        steps = lambda args: plan(args) + [
-            lc.Step("L1b", failing, required=False),
-            lc.Step("L2", later, required=False),
-        ]
-        with mock.patch.object(lc, "_plan", steps):
+        with extra_steps(lc.Step("L1b", failing, False), lc.Step("L2", later, False)):
             annotate(["lc", "-p", self.d])
         # later steps see what pre-annotation produced
         self.assertEqual(seen, [6])
@@ -296,8 +314,7 @@ class TestAnnotateLcCommand(unittest.TestCase):
     def test_optional_step_with_bad_columns_fails_alone(self):
         make_project(self.d)
         bad = mock.Mock(return_value=(pd.DataFrame({"typo": [1]}), {}))
-        plan = lc._plan
-        with mock.patch.object(lc, "_plan", lambda args: plan(args) + [lc.Step("L2", bad, False)]):
+        with extra_steps(lc.Step("L2", bad, False)):
             annotate(["lc", "-p", self.d])
         step = ProjectRecord.load(self.d).step("annotate")
         self.assertEqual(step["status"], COMPLETED)
@@ -306,9 +323,7 @@ class TestAnnotateLcCommand(unittest.TestCase):
     def test_failed_preannotation_stops_later_steps(self):
         make_project(self.d)
         later = mock.Mock()
-        plan = lc._plan
-        steps = lambda args: plan(args) + [lc.Step("L1b", later, required=False)]
-        with mock.patch.object(lc, "_plan", steps), mock.patch.object(
+        with extra_steps(lc.Step("L1b", later, False)), mock.patch.object(
             FakeAnnotation, "error", KeyError("mz")
         ):
             with self.assertRaisesRegex(RuntimeError, "Asari pre-annotation failed"):
@@ -318,6 +333,69 @@ class TestAnnotateLcCommand(unittest.TestCase):
         self.assertEqual(record.step("annotate")["status"], FAILED)
         self.assertIn("Asari pre-annotation failed", record.step("annotate")["message"])
         self.assertFalse(record.has_artifact("annotations_lc"))
+
+    def test_l1b_rows_and_record(self):
+        record = make_project(self.d)
+        # F2 at 63 s: an RT left in minutes (1.0) would miss it
+        path = record.artifact_path("feature_table")
+        table = pd.read_csv(path, sep="\t")
+        table.loc[2, "rtime"] = 63.0
+        table.to_csv(path, sep="\t", index=False)
+        csv = write_standards(
+            os.path.join(self.d, "std.csv"),
+            [
+                ("Std2", "+", 1.0, 2.0),
+                # 3 ppm off F3: inside the default 5 ppm, outside --ms1-std-ppm 2
+                ("StdPpm", "+", 3.0 / 60, 3.0 * (1 + 3e-6)),
+                # 7 s off F4: inside the default 10 s, outside --ms1-std-rt 5
+                ("StdRt", "+", 11.0 / 60, 4.0),
+            ],
+        )
+        annotate(["lc", "-p", self.d, "--ms1-standards", csv, "--ms1-std-ppm", "2", "--ms1-std-rt", "5"])
+        record = ProjectRecord.load(self.d)
+        levels = record.step("annotate")["summary"]["workflows"]["lc"]["levels"]
+        self.assertEqual(
+            levels["L1b"], {"status": COMPLETED, "n_features": 1, "n_standards": 1, "n_rows": 1}
+        )
+        evidence = pd.read_csv(record.abspath(record.data["artifacts"]["annotations_lc"]["path"]), sep="\t")
+        l1b = evidence[evidence["level"] == "1b"].iloc[0]
+        self.assertEqual(
+            (l1b["feature_id"], l1b["empcpd_id"], l1b["reference_name"], l1b["reference_id"]),
+            ("F2", "kp2_200.0", "Std2", "std.csv:2"),
+        )
+        self.assertEqual(len(evidence), 5)
+        with open(record.abspath(record.data["artifacts"]["annotations_lc"]["manifest"])) as f:
+            refs = json.load(f)["references"]["ms1_standards"]
+        self.assertEqual((refs[0]["sha256"], refs[0]["n_used"]), (file_sha256(csv), 3))
+
+    def test_l1b_skipped_without_standards(self):
+        make_project(self.d)
+        annotate(["lc", "-p", self.d])
+        levels = ProjectRecord.load(self.d).step("annotate")["summary"]["workflows"]["lc"]["levels"]
+        self.assertEqual(levels["L1b"], {"status": "skipped", "reason": "no --ms1-standards"})
+
+    def test_unusable_standards_fail_before_asari(self):
+        make_project(self.d)
+        wrong_polarity = write_standards(os.path.join(self.d, "neg.csv"), [("S", "-", 1.0, 2.0)])
+        os.makedirs(os.path.join(self.d, "b"))
+        same_name = [wrong_polarity, write_standards(os.path.join(self.d, "b", "neg.csv"), [("S", "+", 1.0, 2.0)])]
+        cases = (
+            ([os.path.join(self.d, "missing.csv")], FileNotFoundError),
+            ([wrong_polarity], ValueError),
+            (same_name, ValueError),
+        )
+        for csvs, error in cases:
+            with self.assertRaises(error):
+                annotate(["lc", "-p", self.d, "--ms1-standards", *csvs])
+            self.assertEqual(FakeAnnotation.calls, [])
+            self.assertEqual(ProjectRecord.load(self.d).step("annotate")["status"], FAILED)
+
+    def test_tolerances_must_be_positive(self):
+        make_project(self.d)
+        for flag, value in (("--ms1-std-ppm", "0"), ("--ms1-std-rt", "-10"), ("--preannot-ppm", "nan")):
+            with self.assertRaises(SystemExit) as cm:
+                annotate(["lc", "-p", self.d, flag, value])
+            self.assertIn("must be a positive number", str(cm.exception))
 
     def test_output_dir_not_private(self):
         make_project(self.d)
@@ -415,14 +493,13 @@ class FakeAnnotation:
 
 
 def fake_asari():
-    """Patch sys.modules so the adapter imports FakeAnnotation instead of Asari."""
+    """Patch the adapter so it calls FakeAnnotation instead of Asari."""
     FakeAnnotation.calls = []
-    pkg = types.ModuleType("asari")
-    pkg.__version__ = "9.9.9"
-    mod = types.ModuleType("asari.annotate")
-    mod.LCMS_Annotation = FakeAnnotation
-    pkg.annotate = mod
-    return mock.patch.dict(sys.modules, {"asari": pkg, "asari.annotate": mod})
+    return mock.patch.multiple(
+        lc_preannotation,
+        LCMS_Annotation=FakeAnnotation,
+        asari=types.SimpleNamespace(__version__="9.9.9"),
+    )
 
 
 class TestAsariInput(unittest.TestCase):
