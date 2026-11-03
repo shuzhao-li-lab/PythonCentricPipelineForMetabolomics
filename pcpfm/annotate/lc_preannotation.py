@@ -137,7 +137,6 @@ def run_asari_preannotation(
         os.remove(json_path)
     with tempfile.TemporaryDirectory() as tmp:
         infile = os.path.join(tmp, "asari_input.tsv")
-        # validate the table before paying for the Asari import
         write_asari_input(table, sample_cols, infile)
 
         with (

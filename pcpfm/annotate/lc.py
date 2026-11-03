@@ -19,6 +19,7 @@ import os
 from argparse import Namespace
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, NamedTuple
 
 import pandas as pd
@@ -41,6 +42,8 @@ from .lc_preannotation import (
     mz_correction,
     run_asari_preannotation,
 )
+from .lc_references import load_standards
+from .lc_search import search_standards_ms1
 
 WORKFLOW = "lc"
 ASARI_WORKFLOW = "LC"
@@ -150,24 +153,51 @@ class Step(NamedTuple):
     required: bool
 
 
-def _plan(args: Namespace) -> list[Step]:
-    """List the steps the given inputs allow, in run order.
+def _plan(
+    args: Namespace, mode: str | None
+) -> tuple[list[Step], dict[str, list[dict[str, Any]]], list[str]]:
+    """List the steps the given inputs allow, in run order, and load their references.
 
     Pre-annotation always runs first: Asari groups the features and searches L4
-    in one call, and the later levels attach their hits to its empCpds.
+    in one call, and the later levels attach their hits to its empCpds. References
+    are read here, so an unreadable file fails the run before Asari starts.
 
     Parameters
     ----------
     args : argparse.Namespace
         Parsed options for ``annotate lc``.
+    mode : str | None
+        Ionization mode of the source run, used to pick standards.
 
     Returns
     -------
-    list[Step]
-        Steps to run.
+    tuple[list[Step], dict[str, list[dict[str, Any]]], list[str]]
+        Steps to run, reference fingerprints for the manifest, and warnings.
+
+    Raises
+    ------
+    FileNotFoundError
+        If a reference file does not exist.
+    ValueError
+        If a reference file cannot be used.
     """
-    # L1b, L2 and L1a join here when their reference flags are given
-    return [Step("preannotation", _preannotate, required=True)]
+    steps = [Step("preannotation", _preannotate, required=True)]
+    references, warnings = {}, []
+    if args.ms1_standards:
+        names = [os.path.basename(p) for p in args.ms1_standards]
+        # evidence rows name a library by its file name
+        if len(set(names)) < len(names):
+            raise ValueError(f"--ms1-standards files need distinct names: {names}")
+        tables = []
+        for path in args.ms1_standards:
+            standards, w = load_standards(path, mode)
+            tables.append(standards)
+            warnings += w
+            references.setdefault("ms1_standards", []).append(
+                {"path": os.path.abspath(path), "sha256": file_sha256(path), "n_used": len(standards)}
+            )
+        steps.append(Step("L1b", partial(_l1b, pd.concat(tables, ignore_index=True)), False))
+    return steps, references, warnings
 
 
 def _annotate(
@@ -205,13 +235,18 @@ def _annotate(
         "n_features": len(table),
         "sample_columns": sample_cols,
     }
+    steps, references, plan_warnings = _plan(args, context["mode"])
+    for w in plan_warnings:
+        print(f"[pcpfm] Warning: {w}")
+    warnings += plan_warnings
     levels = {name: {"status": SKIPPED, "reason": "not implemented yet"} for name in LEVELS}
+    levels["L1b"]["reason"] = "no --ms1-standards"
 
     out_dir = os.path.join(record.subdir("annotations"), WORKFLOW)
     with staged_dir(out_dir) as staging:
         run_inputs = _Run(args, table, sample_cols, context["mode"], staging)
         evidence = []
-        for step in _plan(args):
+        for step in steps:
             try:
                 rows, outcome = step.run(run_inputs)
                 rows = evidence_frame(rows)
@@ -236,6 +271,7 @@ def _annotate(
             "source": source,
             "source_context": context,
             "preannotation": run_inputs.provenance,
+            "references": references,
             "levels": levels,
             "n_evidence_rows": n_rows,
             "outputs": {
@@ -314,3 +350,31 @@ def _preannotate(run: _Run) -> tuple[pd.DataFrame, dict[str, dict[str, Any]]]:
         },
     }
     return rows, levels
+
+
+def _l1b(standards: pd.DataFrame, run: _Run) -> tuple[pd.DataFrame, dict[str, dict[str, Any]]]:
+    """Match features to authentic standards by m/z and RT.
+
+    Parameters
+    ----------
+    standards : pd.DataFrame
+        Standards of the run's polarity, from :func:`lc_references.load_standards`.
+    run : _Run
+        Run inputs; uses ``ms1_std_ppm`` and ``ms1_std_rt`` from ``run.args``.
+
+    Returns
+    -------
+    tuple[pd.DataFrame, dict[str, dict[str, Any]]]
+        L1b evidence rows and the outcome of the ``L1b`` level.
+    """
+    rows = search_standards_ms1(
+        run.table, standards, run.membership, run.args.ms1_std_ppm, run.args.ms1_std_rt
+    )
+    return rows, {
+        "L1b": {
+            "status": COMPLETED,
+            "n_features": rows["feature_id"].nunique(),
+            "n_standards": rows["reference_name"].nunique(),
+            "n_rows": len(rows),
+        }
+    }

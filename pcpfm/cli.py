@@ -5,11 +5,12 @@ Command line interface.
     pcpfm replicates -p PROJECT_DIR --rep-col COLUMN [--metadata META] [--pearson 0.7] [...]
     pcpfm qc      -p PROJECT_DIR [--qc-samples sample_type=pooled] [...]
     pcpfm analyze -p PROJECT_DIR [--variables group,age] [...]
-    pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [--preannot-ppm 5] [--preannot-rt 2]
+    pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [--preannot-ppm 5] [--preannot-rt 2] [--ms1-standards CSV ...]
     pcpfm status  -p PROJECT_DIR
 """
 
 import argparse
+import math
 import sys
 from collections.abc import Callable, Sequence
 
@@ -125,6 +126,33 @@ def _run(
         record.log_command(["pcpfm"] + args.argv, "failed")
         raise
     record.log_command(["pcpfm"] + args.argv, "completed")
+
+
+def _positive(text: str) -> float:
+    """Parse a tolerance that must be a finite number above zero.
+
+    Parameters
+    ----------
+    text : str
+        Option value.
+
+    Returns
+    -------
+    float
+        Parsed value.
+
+    Raises
+    ------
+    argparse.ArgumentTypeError
+        If the value is not a finite positive number.
+    """
+    try:
+        value = float(text)
+    except ValueError:
+        value = float("nan")
+    if not (math.isfinite(value) and value > 0):
+        raise argparse.ArgumentTypeError(f"must be a positive number, got {text!r}")
+    return value
 
 
 def _csv(text: str) -> list[str]:
@@ -416,15 +444,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     lc.add_argument(
         "--preannot-ppm",
-        type=float,
+        type=_positive,
         default=5,
         help="m/z tolerance in ppm for Asari grouping and the L4 search",
     )
     lc.add_argument(
         "--preannot-rt",
-        type=float,
+        type=_positive,
         default=2,
         help="retention-time tolerance in seconds for Asari grouping",
+    )
+    lc.add_argument(
+        "--ms1-standards",
+        nargs="+",
+        metavar="CSV",
+        help="authentic-standard libraries (Compound Discoverer CSV) for L1b",
+    )
+    lc.add_argument(
+        "--ms1-std-ppm", type=_positive, default=5, help="L1b precursor m/z tolerance in ppm"
+    )
+    lc.add_argument(
+        "--ms1-std-rt", type=_positive, default=10, help="L1b retention-time tolerance in seconds"
     )
     lc.set_defaults(func=cmd_annotate_lc)
 
