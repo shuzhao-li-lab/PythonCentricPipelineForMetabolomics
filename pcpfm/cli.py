@@ -6,6 +6,7 @@ Command line interface.
     pcpfm qc      -p PROJECT_DIR [--qc-samples sample_type=pooled] [...]
     pcpfm analyze -p PROJECT_DIR [--variables group,age] [...]
     pcpfm annotate lc -p PROJECT_DIR [--table feature_table] [--preannot-ppm 5] [--preannot-rt 2] [--ms1-standards CSV ...]
+    pcpfm annotate gc -p PROJECT_DIR --kovats TSV --db MSP [--table feature_table] [--denovo F] [...]
     pcpfm status  -p PROJECT_DIR
 """
 
@@ -88,6 +89,11 @@ def cmd_annotate_lc(args: argparse.Namespace) -> None:
     _run(record, lc.run, args)
 
 
+def cmd_annotate_gc(args: argparse.Namespace) -> None:
+    """Annotate a GC-MS feature table of an existing project (not implemented yet)."""
+    raise SystemExit("[pcpfm] Error: annotate gc is not implemented yet")
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     """Print project inputs, step status and artifact availability.
 
@@ -153,6 +159,13 @@ def _positive(text: str) -> float:
     if not (math.isfinite(value) and value > 0):
         raise argparse.ArgumentTypeError(f"must be a positive number, got {text!r}")
     return value
+
+
+def _positive_int(text: str) -> int:
+    """Parse a count that must be a whole number above zero."""
+    if not text.isdigit() or int(text) == 0:
+        raise argparse.ArgumentTypeError(f"must be a positive integer, got {text!r}")
+    return int(text)
 
 
 def _csv(text: str) -> list[str]:
@@ -473,6 +486,43 @@ def build_parser() -> argparse.ArgumentParser:
         "--ms1-std-rt", type=_positive, default=10, help="L1b retention-time tolerance in seconds"
     )
     lc.set_defaults(func=cmd_annotate_lc)
+
+    # flag names follow `asari annotate --workflow GC` and Asari's GC parameters
+    gc = workflows.add_parser(
+        "gc",
+        help="GC-MS feature table: EI library and Kovats retention-index search with Asari",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    gc.add_argument("-p", "--project", required=True, help="project directory")
+    gc.add_argument(
+        "--table", default="feature_table", help="feature table artifact to annotate"
+    )
+    gc.add_argument(
+        "--kovats", required=True, help="alkane TSV: Kovats index, RT in minutes"
+    )
+    gc.add_argument("--db", required=True, help="EI spectral library in MSP or JSON")
+    gc.add_argument(
+        "--denovo", choices=["T", "F"], default="F", help="build de novo pseudospectra"
+    )
+    gc.add_argument(
+        "--denovo-limit",
+        type=_positive_int,
+        default=20000,
+        help="features used de novo",
+    )
+    gc.add_argument(
+        "--ri-tolerance", type=_positive, default=30, help="retention-index tolerance"
+    )
+    gc.add_argument(
+        "--score-cutoff-cosine", type=float, default=0.4, help="minimum cosine score"
+    )
+    gc.add_argument(
+        "--score-cutoff-entropy", type=float, default=0.4, help="minimum entropy score"
+    )
+    gc.add_argument(
+        "--corr-cutoff", type=float, default=0.6, help="minimum fragment correlation"
+    )
+    gc.set_defaults(func=cmd_annotate_gc)
 
     # ---- status ----
     s = sub.add_parser(
