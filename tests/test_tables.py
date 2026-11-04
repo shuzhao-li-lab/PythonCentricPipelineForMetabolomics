@@ -1,7 +1,9 @@
 """Explicit sample-column schemas survive annotation additions and QC filtering."""
 
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from unittest.mock import patch
 
@@ -164,6 +166,14 @@ class TestTables(unittest.TestCase):
         info = tables.sample_info(self.record, ["S2", "S1"])
         self.assertEqual(info["injection_order"].tolist(), [1, 0])
         self.assertEqual(tables.select(info, tables.parse_selector("sample_type=pooled")), ["S2"])
+
+    def test_process_workflow_option(self):
+        base = ["process", "-p", str(self.root), "-m", "pos"]
+        parser = cli.build_parser()
+        self.assertEqual(parser.parse_args(base).workflow, "lc")
+        self.assertEqual(parser.parse_args(base + ["--workflow", "gc"]).workflow, "gc")
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            parser.parse_args(base + ["--workflow", "GC"])
 
     def test_process_and_qc_register_table_samples(self):
         for name in ("S1", "S2", "blank"):

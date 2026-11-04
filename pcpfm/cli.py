@@ -212,6 +212,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "-m", "--mode", required=True, choices=["pos", "neg"], help="ionization mode"
     )
+    p.add_argument(
+        "--workflow",
+        choices=["lc", "gc", "lcmsms"],
+        default="lc",
+        help="Asari processing workflow",
+    )
     p.add_argument("--ppm", type=float, default=5, help="Asari mass tolerance in ppm")
     p.add_argument("-c", "--cores", type=int, default=4, help="CPU cores for Asari")
     p.add_argument(
