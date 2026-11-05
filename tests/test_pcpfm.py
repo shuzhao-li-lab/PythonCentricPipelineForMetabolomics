@@ -153,6 +153,24 @@ class TestProcessStale(unittest.TestCase):
             self.assertTrue(record.step("annotate").get("stale"))
 
 
+class TestAsariWorkflow(unittest.TestCase):
+    def test_workflow_always_passed_to_asari(self):
+        for workflow, flag in (("lc", "LC"), ("gc", "GC"), ("lcmsms", "LCMSMS")):
+            args = argparse.Namespace(workflow=workflow, asari_args="--autoheight True")
+            self.assertEqual(
+                process.asari_extra_args(args),
+                ["--autoheight", "True", "--workflow", flag],
+            )
+
+    def test_workflow_changes_run_signature(self):
+        lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))
+        gc = process.asari_extra_args(argparse.Namespace(workflow="gc", asari_args=""))
+        self.assertNotEqual(
+            asari_runner.run_signature([], lc + ["pos", "5"], "1.18.5"),
+            asari_runner.run_signature([], gc + ["pos", "5"], "1.18.5"),
+        )
+
+
 class TestQC(unittest.TestCase):
     def setUp(self):
         rng = np.random.default_rng(1)

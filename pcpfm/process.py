@@ -103,6 +103,26 @@ def _run_or_reuse(
     return info
 
 
+def asari_extra_args(args: Namespace) -> list[str]:
+    """Build the Asari arguments that come from the process options.
+
+    The workflow is always passed, even ``LC`` (Asari's default), so the Asari
+    command and the run signature state it explicitly.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Process command options, including ``workflow`` and ``asari_args``.
+
+    Returns
+    -------
+    list[str]
+        The user's ``--asari-args`` followed by ``--workflow LC|GC|LCMSMS``.
+    """
+    extra = args.asari_args.split() if args.asari_args else []
+    return extra + ["--workflow", args.workflow.upper()]
+
+
 def run(args: Namespace, record: ProjectRecord) -> None:
     """Run the process step and record its status and summary.
 
@@ -223,7 +243,7 @@ def _process(args: Namespace, record: ProjectRecord) -> dict[str, Any]:
     cmd = asari_runner.asari_command(args.asari_cmd)
     version = asari_runner.check_asari(cmd)
     print(f"[pcpfm] Using Asari {version}: {' '.join(cmd)}")
-    extra = args.asari_args.split() if args.asari_args else []
+    extra = asari_extra_args(args)
     stem_to_sample = {x["stem"]: x["sample"] for x in available}
 
     runs = {}
