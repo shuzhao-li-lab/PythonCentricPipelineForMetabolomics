@@ -133,6 +133,27 @@ def asari_extra_args(args: Namespace) -> list[str]:
     return extra + ["--workflow", args.workflow.upper()]
 
 
+def resolve_asari_table(args: Namespace) -> str:
+    """Choose the Asari feature table when ``--asari-table`` was not given.
+
+    The choice is written back to ``args.asari_table``, so the recorded process
+    parameters show the table actually used.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Process command options; ``asari_table`` is None when not given.
+
+    Returns
+    -------
+    str
+        ``"preferred"`` or ``"full"``.
+    """
+    if args.asari_table is None:
+        args.asari_table = "preferred"
+    return args.asari_table
+
+
 def run(args: Namespace, record: ProjectRecord) -> None:
     """Run the process step and record its status and summary.
 
@@ -148,6 +169,7 @@ def run(args: Namespace, record: ProjectRecord) -> None:
     Exception
         Re-raises processing errors after marking the step as failed.
     """
+    resolve_asari_table(args)
     params = {k: v for k, v in vars(args).items() if k not in ("func", "argv")}
     record.start_step("process", params)
     try:
@@ -270,7 +292,8 @@ def _process(args: Namespace, record: ProjectRecord) -> dict[str, Any]:
     tables_dir = record.subdir("tables")
     sample_ft, sample_cols = load_asari_table(
         asari_runner.feature_table_path(
-            record.abspath(runs["samples"]["output_dir"]), args.asari_table
+            record.abspath(runs["samples"]["output_dir"]),
+            resolve_asari_table(args),  # already chosen when called from run()
         ),
         stem_to_sample,
     )
