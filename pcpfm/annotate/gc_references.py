@@ -5,6 +5,9 @@ Both are checked here before Asari runs, so an unusable file fails with a clear
 message instead of an error deep inside Asari.
 """
 
+import math
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
@@ -58,11 +61,24 @@ def load_kovats(path: str) -> tuple[float, float]:
     return float(rt.iloc[0] * 60), float(rt.iloc[-1] * 60)
 
 
+def _is_number(value: Any) -> bool:
+    """Return True if ``value`` is a finite number, as Asari needs for RI and mass.
+
+    ``nan`` and ``inf`` parse but never match within an RI window.
+    """
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
 def check_db(path: str) -> tuple[int, list[str]]:
     """Check an EI library the way Asari reads it and count the usable entries.
 
     Asari keeps the entries that have peaks and a ``RETENTIONTIME`` (used as
-    the retention index) and drops the others without notice.
+    the retention index) and drops the others without notice. A kept entry
+    with no peaks, or a missing or non-numeric RI or ``ExactMass``, makes
+    Asari fail later with an unclear error, so it is reported here.
 
     Parameters
     ----------
@@ -77,7 +93,8 @@ def check_db(path: str) -> tuple[int, list[str]]:
     Raises
     ------
     ValueError
-        If the format is not MSP or JSON, or no entry is usable.
+        If the format is not MSP or JSON, a kept entry cannot be read by Asari,
+        or no entry is usable.
     """
     from asari.gcms import load_gcms_dbfile
 
@@ -87,6 +104,18 @@ def check_db(path: str) -> tuple[int, list[str]]:
     entries = load_gcms_dbfile(path) or []
     # same rule as asari.gcms.reformat_gcms_lib
     kept = [e for e in entries if "peaks" in e and e.get("RETENTIONTIME")]
+    broken = [
+        e.get("Name", "?")
+        for e in kept
+        if not e["peaks"]
+        or not _is_number(e["RETENTIONTIME"])
+        or not _is_number(e.get("ExactMass"))
+    ]
+    if broken:
+        raise ValueError(
+            f"EI library {path}: {len(broken)} entries need peaks and numeric "
+            f"RETENTIONTIME and ExactMass, e.g. {broken[:3]}"
+        )
     if not kept:
         raise ValueError(
             f"EI library {path} has no entry with peaks and RETENTIONTIME."

@@ -40,6 +40,16 @@ class TestCheckDb(unittest.TestCase):
         self.assertEqual(len(warnings), 1)
         self.assertIn("1 entries", warnings[0])
 
+    def test_entry_asari_cannot_read_fails(self):
+        for case, entry in {
+            "no ExactMass": msp_entry("A", mass=None),
+            "text RI": msp_entry("A", ri="n/a"),
+            "zero peaks": msp_entry("A", peaks=()),
+            "nan RI": msp_entry("A", ri="nan"),
+        }.items():
+            with self.subTest(case), self.assertRaisesRegex(ValueError, "numeric"):
+                check_db(self.write(entry))
+
     def test_no_usable_entry_fails(self):
         with self.assertRaisesRegex(ValueError, "no entry"):
             check_db(self.write(msp_entry("A", ri=None)))
