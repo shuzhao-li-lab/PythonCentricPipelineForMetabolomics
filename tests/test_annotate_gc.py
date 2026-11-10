@@ -2,12 +2,18 @@
 
 import contextlib
 import io
+import json
+import os
 import tempfile
 import unittest
+from unittest import mock
+
+import pandas as pd
 
 from pcpfm import cli
 from pcpfm.annotate import gc
 from pcpfm.project import ProjectRecord
+from tests.test_annotate_gc_asari import gc_table
 
 REQUIRED = ["annotate", "gc", "-p", "proj", "--kovats", "k.tsv", "--db", "lib.msp"]
 
@@ -81,3 +87,74 @@ class TestSourceContext(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, found),
             ):
                 gc.source_context(self.record(d, workflow))
+
+
+# Asari output for the fake run: F0 matched inside the Kovats range, F2 outside it
+FAKE_FEATURES = (
+    "feature\tmz\trtime\tRI\tempCpd\tquant_ion\tscore_cosine\tscore_entropy\tname\t"
+    "inchikey\tlib_RI\tdelta_RI\n"
+    "F0\t73.0\t400.0\t1150.0\tempCpd_0001\tF0\t0.8\t0.7\tA\tKEY-A\t1140.0\t10.0\n"
+    "F2\t75.0\t900.0\t1900.0\tempCpd_0002\tF2\t0.8\t0.7\tB\tKEY-B\t1900.0\t0.0\n"
+)
+
+
+def fake_asari(infile, outdir, KovatsIndex, database_file, **kwargs):
+    """Stand-in for Asari's GC annotation: write the fake Features table."""
+    name = kwargs["project_name_handle"]
+    with open(os.path.join(outdir, f"Features_{name}.tsv"), "w") as f:
+        f.write(FAKE_FEATURES)
+
+
+def make_gc_project(d):
+    """A GC project with a 3-feature table, a Kovats file and a 1-entry library."""
+    record = ProjectRecord.load_or_create(d)
+    path = os.path.join(record.subdir("tables"), "feature_table.tsv")
+    gc_table().to_csv(path, sep="\t", index=False)
+    record.add_artifact(
+        "feature_table", path, "test input", "process", sample_columns=["S1", "S2"]
+    )
+    record.data["runs"]["samples"] = {"workflow": "GC", "mode": "pos"}
+    record.save()
+    with open(os.path.join(d, "kovats.tsv"), "w") as f:
+        f.write("RI\tRT\n1000\t5.0\n1500\t10.0\n")  # 300-600 s
+    with open(os.path.join(d, "lib.msp"), "w") as f:
+        f.write(
+            "Name: A\nRETENTIONTIME: 1140\nExactMass: 100.0\nNum Peaks: 1\n73.0 999\n\n"
+        )
+    return record
+
+
+def gc_args(d):
+    """Parsed `annotate gc` options for the test project."""
+    k, db = os.path.join(d, "kovats.tsv"), os.path.join(d, "lib.msp")
+    return cli.build_parser().parse_args(
+        ["annotate", "gc", "-p", d, "--kovats", k, "--db", db]
+    )
+
+
+class TestAnnotateGc(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.d = tmp.name
+        self.record = make_gc_project(self.d)
+        patch = mock.patch("asari.annotate.annotate_gcms_full", side_effect=fake_asari)
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def out(self, name):
+        return os.path.join(self.d, "annotations", "gc", name)
+
+    def test_writes_evidence_and_manifest(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            summary, warnings = gc._annotate(gc_args(self.d), self.record, {})
+        rows = pd.read_csv(self.out("annotations.tsv"), sep="\t")
+        self.assertEqual(list(rows["feature_id"]), ["F0"])
+        self.assertEqual(
+            (summary["n_evidence_rows"], summary["n_outside_kovats"]), (1, 1)
+        )
+        self.assertIn("outside the Kovats range", warnings[0])
+        with open(self.out("manifest.json")) as f:
+            manifest = json.load(f)
+        self.assertEqual(manifest["source_context"], {"workflow": "GC"})
+        self.assertEqual(manifest["counts"]["n_library_entries"], 1)

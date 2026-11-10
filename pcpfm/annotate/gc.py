@@ -12,12 +12,21 @@ run. A failed run leaves the previous outputs and the ``annotations_gc``
 artifact unchanged.
 """
 
+import os
+from argparse import Namespace
 from typing import Any
 
-from ..project import ProjectRecord
+from .. import __version__
+from ..project import ProjectRecord, now
+from ..tables import load_table
+from .gc_asari import gc_evidence_rows, run_asari_gc
+from .gc_evidence import staged_dir, write_evidence, write_manifest
+from .gc_references import check_db, load_kovats
 
 WORKFLOW = "gc"
 ASARI_WORKFLOW = "GC"
+EVIDENCE_FILE = "annotations.tsv"
+MANIFEST_FILE = "manifest.json"
 
 
 def source_context(record: ProjectRecord) -> dict[str, Any]:
@@ -49,3 +58,82 @@ def source_context(record: ProjectRecord) -> dict[str, Any]:
             "Rerun `pcpfm process --workflow gc`."
         )
     return {"workflow": workflow}
+
+
+def _annotate(
+    args: Namespace, record: ProjectRecord, params: dict[str, Any]
+) -> tuple[dict[str, Any], list[str]]:
+    """Check inputs, run Asari and write the evidence table and manifest.
+
+    Both reference files are checked before Asari runs. Outputs are written in a
+    staging directory that replaces ``annotations/gc`` only on success.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed options for ``annotate gc``.
+    record : ProjectRecord
+        Project record to read.
+    params : dict[str, Any]
+        Resolved options, recorded in the manifest.
+
+    Returns
+    -------
+    tuple[dict[str, Any], list[str]]
+        Workflow summary for the step record, and warnings.
+    """
+    context = source_context(record)
+    rt_range = load_kovats(args.kovats)
+    n_library, warnings = check_db(args.db)
+    for w in warnings:
+        print(f"[pcpfm] Warning: {w}")
+    table, sample_cols = load_table(record, args.table)
+    asari_params = {
+        "ri_tolerance": args.ri_tolerance,
+        "score_cutoff_cosine": args.score_cutoff_cosine,
+        "score_cutoff_entropy": args.score_cutoff_entropy,
+        "corr_cutoff": args.corr_cutoff,
+        "denovo": args.denovo == "T",
+        "max_core_features": args.denovo_limit,
+    }
+    out_dir = os.path.join(record.subdir("annotations"), WORKFLOW)
+    with staged_dir(out_dir) as staging:
+        asari = run_asari_gc(
+            table, sample_cols, args.kovats, args.db, asari_params, staging
+        )
+        rows, n_outside = gc_evidence_rows(
+            asari["features_tsv"], os.path.basename(args.db), rt_range
+        )
+        if n_outside:
+            warnings.append(
+                f"{n_outside} matched features outside the Kovats range were dropped."
+            )
+            print(f"[pcpfm] Warning: {warnings[-1]}")
+        n_rows = write_evidence(rows, os.path.join(staging, EVIDENCE_FILE))
+        counts = {
+            "n_evidence_rows": n_rows,
+            "n_features": int(rows["feature_id"].nunique()),
+            "n_empcpds": int(rows["empcpd_id"].nunique()),
+            "n_outside_kovats": n_outside,
+            "n_library_entries": n_library,
+        }
+        manifest = {
+            "workflow": WORKFLOW,
+            "created": now(),
+            "pcpfm_version": __version__,
+            "params": params,
+            "source_context": context,
+            "counts": counts,
+            "outputs": {
+                "evidence": EVIDENCE_FILE,
+                "asari_features": os.path.basename(asari["features_tsv"]),
+                "asari_log": os.path.basename(asari["log"]),
+            },
+            "warnings": warnings,
+        }
+        write_manifest(manifest, os.path.join(staging, MANIFEST_FILE))
+    print(
+        f"[pcpfm] Annotation (gc): {counts['n_empcpds']} library matches on "
+        f"{counts['n_features']} features, {n_rows} evidence rows in {out_dir}"
+    )
+    return {"finished": now(), **counts}, warnings
