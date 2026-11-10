@@ -7,7 +7,8 @@ from unittest import mock
 
 import pandas as pd
 
-from pcpfm.annotate.gc_asari import run_asari_gc, write_asari_input
+from pcpfm.annotate.gc_asari import gc_evidence_rows, run_asari_gc, write_asari_input
+from pcpfm.annotate.gc_evidence import GC_EVIDENCE_COLUMNS
 from pcpfm.tables import FEATURE_COLUMNS
 
 
@@ -133,3 +134,38 @@ class TestRunAsariGc(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "wrote no Features"),
         ):
             self.run_gc(PARAMS)
+
+
+# two rows of Asari's Features table: one empCpd matched through two features
+FEATURES_TSV = (
+    "feature\tmz\trtime\tRI\tempCpd\tquant_ion\tscore_cosine\tscore_entropy\tname\t"
+    "inchikey\tlib_RI\tdelta_RI\tpeak_area\tcSelectivity\tpeak_shape\tsnr\tdetection_counts\n"
+    "F75\t42.04\t414.29\t1188.0\tempCpd_0002\tF107\t0.397\t0.587\t3'-Hydroxy\"butanone\t"
+    "NBEGXSQMVJTIAR-UHFFFAOYSA-N\t1178.0\t10.046\t1e8\t0.65\t0.91\t70.0\t4\n"
+    "F1470\t71.05\t401.63\t1155.1\tempCpd_0002\tF107\t0.397\t0.587\tHydroxybutanone\t"
+    "NBEGXSQMVJTIAR-UHFFFAOYSA-N\t1178.0\t-22.886\t2e8\t1.0\t0.94\t675.0\t4\n"
+)
+
+
+class TestEvidenceRows(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.path = os.path.join(tmp.name, "Features_gc_annotation.tsv")
+        with open(self.path, "w") as f:
+            f.write(FEATURES_TSV)
+
+    def test_one_row_per_matched_feature(self):
+        rows = gc_evidence_rows(self.path, "lib.msp")
+        self.assertEqual(list(rows.columns), GC_EVIDENCE_COLUMNS)
+        self.assertEqual(list(rows["feature_id"]), ["F75", "F1470"])
+        first = rows.iloc[0]
+        self.assertEqual(first["empcpd_id"], "empCpd_0002")
+        self.assertEqual(first["reference_id"], "NBEGXSQMVJTIAR-UHFFFAOYSA-N")
+        self.assertEqual(first["reference_source"], "lib.msp")
+        self.assertEqual(first["reference_name"], "3'-Hydroxy\"butanone")
+        self.assertEqual(
+            (first["level"], first["evidence_type"]), ("GC", "ei_ri_library")
+        )
+        self.assertEqual(list(rows["ri_error"]), [10.046, -22.886])
+        self.assertEqual(first["score_entropy"], 0.587)

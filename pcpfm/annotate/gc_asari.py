@@ -8,6 +8,7 @@ order from the named pcpfm columns.
 """
 
 import contextlib
+import csv
 import os
 import tempfile
 from collections.abc import Sequence
@@ -17,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ..tables import FEATURE_COLUMNS
+from .gc_evidence import EVIDENCE_TYPE, LEVEL, SCHEME, evidence_frame
 
 # Asari parses these with int(), which rejects "12.0"
 _INT_COLUMNS = ("parent_masstrack_id", "detection_counts")
@@ -164,3 +166,44 @@ def _log_tail(path: str, n: int = 5) -> str:
     with open(path, encoding="utf-8", errors="replace") as f:
         lines = [line.strip() for line in f if line.strip()]
     return " | ".join(lines[-n:]) or "(empty)"
+
+
+def gc_evidence_rows(features_tsv: str, db_name: str) -> pd.DataFrame:
+    """Turn Asari's Features table into GC evidence rows.
+
+    Parameters
+    ----------
+    features_tsv : str
+        Asari's ``Features_<job>.tsv``: one row per feature of a pseudospectrum
+        matched to a library entry.
+    db_name : str
+        Library name recorded as ``reference_source``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Evidence rows with ``GC_EVIDENCE_COLUMNS``.
+    """
+    # Asari writes names unquoted, so a '"' in a library name is plain text
+    hits = pd.read_csv(
+        features_tsv,
+        sep="\t",
+        quoting=csv.QUOTE_NONE,
+        dtype={"feature": str, "empCpd": str},
+    )
+    rows = pd.DataFrame(
+        {
+            "feature_id": hits["feature"],
+            "empcpd_id": hits["empCpd"],
+            "scheme": SCHEME,
+            "level": LEVEL,
+            "evidence_type": EVIDENCE_TYPE,
+            "reference_id": hits["inchikey"],
+            "reference_name": hits["name"],
+            "reference_source": db_name,
+            "ri_error": hits["delta_RI"],
+            "score_entropy": hits["score_entropy"],
+            "score_cosine": hits["score_cosine"],
+        }
+    )
+    return evidence_frame(rows)
