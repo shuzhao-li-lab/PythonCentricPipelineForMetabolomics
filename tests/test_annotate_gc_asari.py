@@ -3,10 +3,11 @@
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 import pandas as pd
 
-from pcpfm.annotate.gc_asari import write_asari_input
+from pcpfm.annotate.gc_asari import run_asari_gc, write_asari_input
 from pcpfm.tables import FEATURE_COLUMNS
 
 
@@ -69,3 +70,48 @@ class TestAsariInput(unittest.TestCase):
         table.loc[0, "detection_counts"] = 1.5
         with self.assertRaisesRegex(ValueError, "detection_counts"):
             write_asari_input(table, ["S1", "S2"], self.path)
+
+
+PARAMS = {
+    "ri_tolerance": 30,
+    "score_cutoff_cosine": 0.4,
+    "score_cutoff_entropy": 0.4,
+    "corr_cutoff": 0.6,
+    "denovo": False,
+    "max_core_features": 20000,
+}
+
+
+def fake_gc_annotation(infile, outdir, KovatsIndex, database_file, **kwargs):
+    """Stand-in for Asari: print like Asari and write a header-only Features table."""
+    print("Done targeted annotation.")
+    name = f"Features_{kwargs['project_name_handle']}.tsv"
+    with open(os.path.join(outdir, name), "w") as f:
+        f.write("feature\tmz\trtime\n")
+
+
+class TestRunAsariGc(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.out = tmp.name
+
+    def run_gc(self, params):
+        return run_asari_gc(
+            gc_table(), ["S1", "S2"], "k.tsv", "lib.msp", params, self.out
+        )
+
+    def test_passes_user_and_fixed_parameters(self):
+        for denovo in (False, True):
+            with mock.patch(
+                "asari.annotate.annotate_gcms_full", side_effect=fake_gc_annotation
+            ) as call:
+                result = self.run_gc({**PARAMS, "denovo": denovo})
+            kwargs = call.call_args.kwargs
+            expected = {**PARAMS, "denovo": denovo, "max_ri_delta": 100}
+            self.assertEqual(kwargs, kwargs | expected)
+            self.assertFalse(kwargs["do_mirror_plot"])
+            self.assertEqual(call.call_args.args[2:], ("k.tsv", "lib.msp"))
+            self.assertTrue(os.path.exists(result["features_tsv"]))
+            with open(result["log"]) as f:
+                self.assertIn("Done targeted annotation", f.read())
