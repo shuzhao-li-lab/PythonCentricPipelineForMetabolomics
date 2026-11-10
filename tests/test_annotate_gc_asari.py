@@ -156,7 +156,8 @@ class TestEvidenceRows(unittest.TestCase):
             f.write(FEATURES_TSV)
 
     def test_one_row_per_matched_feature(self):
-        rows = gc_evidence_rows(self.path, "lib.msp")
+        rows, dropped = gc_evidence_rows(self.path, "lib.msp", (300.0, 600.0))
+        self.assertEqual(dropped, 0)
         self.assertEqual(list(rows.columns), GC_EVIDENCE_COLUMNS)
         self.assertEqual(list(rows["feature_id"]), ["F75", "F1470"])
         first = rows.iloc[0]
@@ -169,3 +170,16 @@ class TestEvidenceRows(unittest.TestCase):
         )
         self.assertEqual(list(rows["ri_error"]), [10.046, -22.886])
         self.assertEqual(first["score_entropy"], 0.587)
+
+    def test_features_outside_kovats_range_dropped(self):
+        # F75 at 414.29 s, F1470 at 401.63 s; the range bounds are inclusive
+        rows, dropped = gc_evidence_rows(self.path, "lib.msp", (401.63, 410.0))
+        self.assertEqual((list(rows["feature_id"]), dropped), (["F1470"], 1))
+        self.assertEqual(list(rows.index), [0])
+
+    def test_zero_hits_give_header_only_evidence(self):
+        with open(self.path, "w") as f:
+            f.write(FEATURES_TSV.splitlines()[0] + "\n")
+        rows, dropped = gc_evidence_rows(self.path, "lib.msp", (300.0, 600.0))
+        self.assertEqual((len(rows), dropped), (0, 0))
+        self.assertEqual(list(rows.columns), GC_EVIDENCE_COLUMNS)

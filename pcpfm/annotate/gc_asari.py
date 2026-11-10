@@ -168,8 +168,14 @@ def _log_tail(path: str, n: int = 5) -> str:
     return " | ".join(lines[-n:]) or "(empty)"
 
 
-def gc_evidence_rows(features_tsv: str, db_name: str) -> pd.DataFrame:
+def gc_evidence_rows(
+    features_tsv: str, db_name: str, rt_range: tuple[float, float]
+) -> tuple[pd.DataFrame, int]:
     """Turn Asari's Features table into GC evidence rows.
+
+    Matches whose feature lies outside the Kovats calibration range are
+    dropped: Asari gives those features the RI of the nearest alkane, which is
+    not a calibrated value.
 
     Parameters
     ----------
@@ -178,11 +184,13 @@ def gc_evidence_rows(features_tsv: str, db_name: str) -> pd.DataFrame:
         matched to a library entry.
     db_name : str
         Library name recorded as ``reference_source``.
+    rt_range : tuple[float, float]
+        First and last Kovats calibrant retention time, in seconds.
 
     Returns
     -------
-    pd.DataFrame
-        Evidence rows with ``GC_EVIDENCE_COLUMNS``.
+    tuple[pd.DataFrame, int]
+        Evidence rows with ``GC_EVIDENCE_COLUMNS``, and the number of dropped rows.
     """
     # Asari writes names unquoted, so a '"' in a library name is plain text
     hits = pd.read_csv(
@@ -191,6 +199,8 @@ def gc_evidence_rows(features_tsv: str, db_name: str) -> pd.DataFrame:
         quoting=csv.QUOTE_NONE,
         dtype={"feature": str, "empCpd": str},
     )
+    inside = hits["rtime"].between(*rt_range)
+    hits = hits[inside]
     rows = pd.DataFrame(
         {
             "feature_id": hits["feature"],
@@ -206,4 +216,4 @@ def gc_evidence_rows(features_tsv: str, db_name: str) -> pd.DataFrame:
             "score_cosine": hits["score_cosine"],
         }
     )
-    return evidence_frame(rows)
+    return evidence_frame(rows.reset_index(drop=True)), int((~inside).sum())
