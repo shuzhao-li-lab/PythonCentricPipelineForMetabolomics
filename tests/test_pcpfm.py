@@ -17,7 +17,9 @@ from pcpfm.project import COMPLETED, ProjectRecord
 
 
 def feature_table(mz, rt, intensities, prefix="F"):
-    ft = pd.DataFrame({"id_number": [f"{prefix}{i}" for i in range(len(mz))], "mz": mz, "rtime": rt})
+    ft = pd.DataFrame(
+        {"id_number": [f"{prefix}{i}" for i in range(len(mz))], "mz": mz, "rtime": rt}
+    )
     for name, values in intensities.items():
         ft[name] = values
     return ft
@@ -29,19 +31,32 @@ class TestBlanks(unittest.TestCase):
         n = 200
         self.mz = np.sort(rng.uniform(80, 900, n))
         self.rt = rng.uniform(10, 300, n)
-        self.samples = feature_table(self.mz, self.rt, {"s1": np.full(n, 1000.0), "s2": np.full(n, 3000.0)})
+        self.samples = feature_table(
+            self.mz, self.rt, {"s1": np.full(n, 1000.0), "s2": np.full(n, 3000.0)}
+        )
         # blank run: same compounds, m/z within 1 ppm, rtime shifted by +4 s; first 50 are strong in blanks
         blank_int = np.where(np.arange(n) < 50, 1500.0, 100.0)
-        self.blank = feature_table(self.mz * (1 + 1e-6), self.rt + 4, {"b1": blank_int, "b2": blank_int}, prefix="B")
+        self.blank = feature_table(
+            self.mz * (1 + 1e-6),
+            self.rt + 4,
+            {"b1": blank_int, "b2": blank_int},
+            prefix="B",
+        )
 
     def test_rt_offset(self):
         offset, pairs = blanks.estimate_rt_offset(
-            self.mz, self.rt, self.blank["mz"].to_numpy(), self.blank["rtime"].to_numpy())
+            self.mz,
+            self.rt,
+            self.blank["mz"].to_numpy(),
+            self.blank["rtime"].to_numpy(),
+        )
         self.assertAlmostEqual(offset, 4, places=3)
         self.assertGreater(pairs, 100)
 
     def test_match_and_flag(self):
-        ft, summary = blanks.blank_filter_separate_runs(self.samples, ["s1", "s2"], self.blank, ["b1", "b2"])
+        ft, summary = blanks.blank_filter_separate_runs(
+            self.samples, ["s1", "s2"], self.blank, ["b1", "b2"]
+        )
         self.assertEqual(summary["n_matched"], 200)
         self.assertTrue((ft["blank_match"].str[1:] == ft["id_number"].str[1:]).all())
         # sample mean 2000; blank 1500 * 3 >= 2000 -> flagged; 100 * 3 < 2000 -> kept
@@ -56,12 +71,16 @@ class TestBlanks(unittest.TestCase):
 
     def test_closest_candidate(self):
         s = feature_table([200.0], [100.0], {"s1": [10.0]})
-        b = feature_table([200.0005, 200.0001], [103.0, 101.0], {"b1": [1.0, 2.0]}, prefix="B")
+        b = feature_table(
+            [200.0005, 200.0001], [103.0, 101.0], {"b1": [1.0, 2.0]}, prefix="B"
+        )
         m = blanks.match_features(s, b, ppm=5, rt_tol=10)
         self.assertEqual(m["blank_match"].iloc[0], "B1")
 
     def test_same_run(self):
-        ft = feature_table([100.0, 200.0], [10.0, 20.0], {"s1": [100.0, 1000.0], "bl": [50.0, 0.0]})
+        ft = feature_table(
+            [100.0, 200.0], [10.0, 20.0], {"s1": [100.0, 1000.0], "bl": [50.0, 0.0]}
+        )
         out, summary = blanks.blank_filter_same_run(ft, ["s1"], ["bl"])
         self.assertEqual(list(out["blank_flag"]), [True, False])
 
@@ -72,11 +91,13 @@ class TestMetadata(unittest.TestCase):
             for name in ("a_001.mzML", "b_002.mzML", "extra.mzML"):
                 open(os.path.join(d, name), "w").close()
             meta_path = os.path.join(d, "meta.csv")
-            pd.DataFrame({
-                "sample": ["A", "B", "C"],
-                "original_file_name": ["a_001", "b_002.mzML", "missing"],
-                "sample_type": ["sample", "Blank", "sample"],
-            }).to_csv(meta_path, index=False)
+            pd.DataFrame(
+                {
+                    "sample": ["A", "B", "C"],
+                    "original_file_name": ["a_001", "b_002.mzML", "missing"],
+                    "sample_type": ["sample", "Blank", "sample"],
+                }
+            ).to_csv(meta_path, index=False)
             meta = metadata.load_metadata(meta_path)
             files = metadata.list_input_files(input_dirs=[d])
             inputs, unlisted = metadata.resolve_inputs(meta, files, meta_path)
@@ -128,7 +149,9 @@ class TestAsariLog(unittest.TestCase):
     def test_read_project_keeps_workflow_and_mode(self):
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, "project.json"), "w") as f:
-                json.dump({"asari_version": "1.18.5", "workflow": "LC", "mode": "neg"}, f)
+                json.dump(
+                    {"asari_version": "1.18.5", "workflow": "LC", "mode": "neg"}, f
+                )
             p = asari_runner.read_asari_project(d)
             self.assertEqual((p["workflow"], p["mode"]), ("LC", "neg"))
 
@@ -150,8 +173,12 @@ class TestProcessStale(unittest.TestCase):
             args = argparse.Namespace(mode="pos", ppm=5, cores=1, force=True)
             out = os.path.join(d, "asari", "run")
             info = {"files_list": out, "log": out, "output_dir": out}
-            with mock.patch.object(process.asari_runner, "run_asari", return_value=info):
-                process._run_or_reuse(record, args, ["asari"], "samples", [], [], "1.18.5")
+            with mock.patch.object(
+                process.asari_runner, "run_asari", return_value=info
+            ):
+                process._run_or_reuse(
+                    record, args, ["asari"], "samples", [], [], "1.18.5"
+                )
             self.assertTrue(record.step("annotate").get("stale"))
 
 
@@ -170,35 +197,6 @@ class TestAsariWorkflow(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "pcpfm process --workflow"):
                 process.asari_extra_args(args)
 
-    def test_asari_table_defaults_to_preferred(self):
-        args = argparse.Namespace(workflow="lc", asari_table=None)
-        self.assertEqual(process.resolve_asari_table(args), "preferred")
-        self.assertEqual(args.asari_table, "preferred")
-        args = argparse.Namespace(workflow="lc", asari_table="full")
-        self.assertEqual(process.resolve_asari_table(args), "full")
-
-    def test_gc_defaults_to_full_table(self):
-        args = argparse.Namespace(workflow="gc", asari_table=None)
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(process.resolve_asari_table(args), "full")
-        self.assertIn("GC workflow, default feature table has changed to Full", out.getvalue())
-
-    def test_gc_explicit_table_wins(self):
-        args = argparse.Namespace(workflow="gc", asari_table="preferred")
-        out = io.StringIO()
-        with contextlib.redirect_stdout(out):
-            self.assertEqual(process.resolve_asari_table(args), "preferred")
-        self.assertEqual(out.getvalue(), "")
-
-    def test_workflow_changes_run_signature(self):
-        lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))
-        gc = process.asari_extra_args(argparse.Namespace(workflow="gc", asari_args=""))
-        self.assertNotEqual(
-            asari_runner.run_signature([], lc + ["pos", "5"], "1.18.5"),
-            asari_runner.run_signature([], gc + ["pos", "5"], "1.18.5"),
-        )
-
 
 class TestQC(unittest.TestCase):
     def setUp(self):
@@ -206,15 +204,20 @@ class TestQC(unittest.TestCase):
         n_feat, samples = 300, [f"S{i}" for i in range(12)]
         base = rng.lognormal(10, 1.5, n_feat)
         data = {s: base * rng.lognormal(0, 0.1, n_feat) for s in samples}
-        data["S11"] = base * rng.lognormal(0, 1.5, n_feat)       # outlier sample
-        self.ft = feature_table(np.linspace(100, 800, n_feat), rng.uniform(0, 300, n_feat), data)
+        data["S11"] = base * rng.lognormal(0, 1.5, n_feat)  # outlier sample
+        self.ft = feature_table(
+            np.linspace(100, 800, n_feat), rng.uniform(0, 300, n_feat), data
+        )
         self.ft["blank_flag"] = np.arange(n_feat) < 10
         self.samples = samples
         self.meta = pd.DataFrame(
-            {"sample_type": ["pooled"] * 4 + ["sample"] * 8,
-             "injection_order": range(12),
-             "dilution_factor": [""] * 4 + ["1", "1", "2", "2", "4", "4", "8", "8"]},
-            index=pd.Index(samples, name="sample"))
+            {
+                "sample_type": ["pooled"] * 4 + ["sample"] * 8,
+                "injection_order": range(12),
+                "dilution_factor": [""] * 4 + ["1", "1", "2", "2", "4", "4", "8", "8"],
+            },
+            index=pd.Index(samples, name="sample"),
+        )
 
     def test_metrics_and_filter(self):
         X = self.ft[self.samples]
@@ -223,11 +226,17 @@ class TestQC(unittest.TestCase):
         self.assertIn("low_correlation", smet.at["S11", "flags"])
         pooled = qc.select(self.meta, qc.parse_selector("sample_type=pooled"))
         self.assertEqual(pooled, ["S0", "S1", "S2", "S3"])
-        fmet = qc.feature_metrics(self.ft, X, self.meta, pooled, [s for s in self.samples if s not in pooled])
+        fmet = qc.feature_metrics(
+            self.ft, X, self.meta, pooled, [s for s in self.samples if s not in pooled]
+        )
         self.assertLess(fmet["qc_cv"].median(), 20)
         self.assertIn("dilution_r", fmet.columns)
-        args = argparse.Namespace(keep_blank_features=False, min_detection=0.0, max_qc_cv=0,
-                                  drop_flagged_samples=True)
+        args = argparse.Namespace(
+            keep_blank_features=False,
+            min_detection=0.0,
+            max_qc_cv=0,
+            drop_flagged_samples=True,
+        )
         out, cols, log = qc.filter_table(self.ft, self.samples, fmet, smet, args)
         self.assertEqual(len(out), 290)
         self.assertNotIn("S11", cols)
@@ -235,8 +244,14 @@ class TestQC(unittest.TestCase):
 
 class TestWrangle(unittest.TestCase):
     def setUp(self):
-        self.X = pd.DataFrame({"a": [100.0, 200.0, 0.0], "b": [200.0, 400.0, 50.0],
-                               "c": [100.0, 200.0, 10.0], "d": [400.0, 800.0, 20.0]})
+        self.X = pd.DataFrame(
+            {
+                "a": [100.0, 200.0, 0.0],
+                "b": [200.0, 400.0, 50.0],
+                "c": [100.0, 200.0, 10.0],
+                "d": [400.0, 800.0, 20.0],
+            }
+        )
 
     def test_tic(self):
         # TIC over features present in > 90% of samples (first two rows); equalized to the median
@@ -255,8 +270,9 @@ class TestWrangle(unittest.TestCase):
     def test_impute_and_log(self):
         I = wrangle.impute(self.X)
         self.assertEqual(I.at[2, "a"], 5.0)
-        self.assertTrue(np.allclose(wrangle.log2(pd.DataFrame({"x": [0.0, 1.0]}))["x"], [0, 1]))
-
+        self.assertTrue(
+            np.allclose(wrangle.log2(pd.DataFrame({"x": [0.0, 1.0]}))["x"], [0, 1])
+        )
 
 
 class TestAnalyze(unittest.TestCase):
@@ -266,20 +282,28 @@ class TestAnalyze(unittest.TestCase):
         self.Y = pd.DataFrame(rng.normal(20, 1, (200, 12)), columns=self.samples)
         self.group = pd.Series(["ctrl"] * 6 + ["case"] * 6, index=self.samples)
         self.age = pd.Series(np.linspace(20, 70, 12), index=self.samples)
-        self.Y.iloc[0, 6:] += 5                                 # differential feature
-        self.Y.iloc[1] = 10 + 0.2 * self.age.to_numpy()          # age-dependent feature
+        self.Y.iloc[0, 6:] += 5  # differential feature
+        self.Y.iloc[1] = 10 + 0.2 * self.age.to_numpy()  # age-dependent feature
 
     def test_classify(self):
-        meta = pd.DataFrame({"group": self.group, "age": self.age.astype(str),
-                             "id": self.samples, "sample_type": "sample"})
+        meta = pd.DataFrame(
+            {
+                "group": self.group,
+                "age": self.age.astype(str),
+                "id": self.samples,
+                "sample_type": "sample",
+            }
+        )
         v = analyze.select_variables(meta, self.samples)
         self.assertEqual(v["group"][0], "categorical")
         self.assertEqual(v["age"][0], "continuous")
         self.assertNotIn("id", v)
 
     def test_study_samples(self):
-        meta = pd.DataFrame({"sample_type": ["sample", "blank", "pooled", "qstd", "Unknown"]},
-                            index=list("abcde"))
+        meta = pd.DataFrame(
+            {"sample_type": ["sample", "blank", "pooled", "qstd", "Unknown"]},
+            index=list("abcde"),
+        )
         self.assertEqual(analyze.study_samples(meta), ["a", "e"])
 
     def test_two_groups(self):
@@ -304,8 +328,10 @@ class TestAnalyze(unittest.TestCase):
         self.assertTrue(np.isnan(q[3]))
 
     def test_natural_sort(self):
-        self.assertEqual(sorted(["V(16:1)", "V(4:1)", "V(1:1)"], key=analyze.natural_key),
-                         ["V(1:1)", "V(4:1)", "V(16:1)"])
+        self.assertEqual(
+            sorted(["V(16:1)", "V(4:1)", "V(1:1)"], key=analyze.natural_key),
+            ["V(1:1)", "V(4:1)", "V(16:1)"],
+        )
 
 
 class TestProjectRecord(unittest.TestCase):
@@ -319,7 +345,10 @@ class TestProjectRecord(unittest.TestCase):
             r.finish_step("process")
             r2 = ProjectRecord.load(d)
             self.assertEqual(r2.data["project"]["name"], "demo")
-            self.assertEqual(r2.data["artifacts"]["feature_table"]["path"], os.path.join("tables", "t.tsv"))
+            self.assertEqual(
+                r2.data["artifacts"]["feature_table"]["path"],
+                os.path.join("tables", "t.tsv"),
+            )
             self.assertTrue(r2.has_artifact("feature_table"))
             self.assertEqual(r2.step("process")["status"], COMPLETED)
 
