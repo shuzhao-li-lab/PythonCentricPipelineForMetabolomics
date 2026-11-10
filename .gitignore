@@ -2,9 +2,10 @@
 
 # raw mass spec data and test files/data
 *.mzML
-./test_data/
-./plans/
+test_data/
+plans/
 __pycache__/
+.ruff_cache/
 
 # dev environment used for module-type testing of new functions
 .dev
