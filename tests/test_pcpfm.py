@@ -1,6 +1,8 @@
 """Unit tests for pcpfm v2. Run with `python -m unittest discover tests` or `pytest tests`."""
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import tempfile
@@ -169,11 +171,25 @@ class TestAsariWorkflow(unittest.TestCase):
                 process.asari_extra_args(args)
 
     def test_asari_table_defaults_to_preferred(self):
-        args = argparse.Namespace(asari_table=None)
+        args = argparse.Namespace(workflow="lc", asari_table=None)
         self.assertEqual(process.resolve_asari_table(args), "preferred")
         self.assertEqual(args.asari_table, "preferred")
-        args = argparse.Namespace(asari_table="full")
+        args = argparse.Namespace(workflow="lc", asari_table="full")
         self.assertEqual(process.resolve_asari_table(args), "full")
+
+    def test_gc_defaults_to_full_table(self):
+        args = argparse.Namespace(workflow="gc", asari_table=None)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(process.resolve_asari_table(args), "full")
+        self.assertIn("GC workflow, default feature table has changed to Full", out.getvalue())
+
+    def test_gc_explicit_table_wins(self):
+        args = argparse.Namespace(workflow="gc", asari_table="preferred")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(process.resolve_asari_table(args), "preferred")
+        self.assertEqual(out.getvalue(), "")
 
     def test_workflow_changes_run_signature(self):
         lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))

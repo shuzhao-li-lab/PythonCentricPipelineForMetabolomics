@@ -236,7 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--asari-table",
         choices=["preferred", "full"],
-        help="which Asari feature table of the sample run to use (default: preferred)",
+        help="Asari feature table of the sample run (default: full for gc, else preferred)",
     )
     p.add_argument(
         "--asari-args",

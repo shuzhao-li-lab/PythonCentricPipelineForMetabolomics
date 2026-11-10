@@ -136,20 +136,26 @@ def asari_extra_args(args: Namespace) -> list[str]:
 def resolve_asari_table(args: Namespace) -> str:
     """Choose the Asari feature table when ``--asari-table`` was not given.
 
-    The choice is written back to ``args.asari_table``, so the recorded process
-    parameters show the table actually used.
+    The GC workflow uses the full table, the other workflows the preferred
+    table. An explicit ``--asari-table`` always wins. The choice is written
+    back to ``args.asari_table``, so the recorded process parameters show the
+    table actually used.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Process command options; ``asari_table`` is None when not given.
+        Process command options: ``workflow``, and ``asari_table`` (None when
+        not given).
 
     Returns
     -------
     str
         ``"preferred"`` or ``"full"``.
     """
-    if args.asari_table is None:
+    if args.asari_table is None and args.workflow == "gc":
+        print("[pcpfm] running GC workflow, default feature table has changed to Full")
+        args.asari_table = "full"
+    elif args.asari_table is None:
         args.asari_table = "preferred"
     return args.asari_table
 
