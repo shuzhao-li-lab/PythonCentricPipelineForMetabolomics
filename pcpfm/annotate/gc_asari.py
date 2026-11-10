@@ -116,12 +116,21 @@ def run_asari_gc(
     dict[str, Any]
         Path of Asari's Features table and log, the Asari version and every
         parameter passed to Asari.
+
+    Raises
+    ------
+    RuntimeError
+        If Asari fails or finishes without writing its Features table.
     """
     import asari
     from asari.annotate import annotate_gcms_full
 
     passed = {**params, **FIXED_PARAMS}
     log_path = os.path.join(out_dir, ASARI_LOG)
+    features = os.path.join(out_dir, FEATURES_FILE)
+    # a leftover file must not pass for this run's output
+    if os.path.exists(features):
+        os.remove(features)
     with tempfile.TemporaryDirectory() as tmp:
         infile = os.path.join(tmp, "asari_input.tsv")
         write_asari_input(table, sample_cols, infile)
@@ -130,12 +139,28 @@ def run_asari_gc(
             contextlib.redirect_stdout(log),
             contextlib.redirect_stderr(log),
         ):
-            annotate_gcms_full(
-                infile, out_dir, kovats, db, project_name_handle=JOB, **passed
-            )
+            try:
+                annotate_gcms_full(
+                    infile, out_dir, kovats, db, project_name_handle=JOB, **passed
+                )
+            except Exception as e:
+                failure = f"Asari GC annotation failed: {e!r}"
+            else:
+                failure = None
+    if failure is None and not os.path.exists(features):
+        failure = f"Asari GC annotation wrote no {FEATURES_FILE}"
+    if failure:
+        raise RuntimeError(f"{failure}. Asari's last output: {_log_tail(log_path)}")
     return {
-        "features_tsv": os.path.join(out_dir, FEATURES_FILE),
+        "features_tsv": features,
         "log": log_path,
         "asari_version": asari.__version__,
         "params": passed,
     }
+
+
+def _log_tail(path: str, n: int = 5) -> str:
+    """Return the last ``n`` non-empty lines of a log, joined with `` | ``."""
+    with open(path, encoding="utf-8", errors="replace") as f:
+        lines = [line.strip() for line in f if line.strip()]
+    return " | ".join(lines[-n:]) or "(empty)"

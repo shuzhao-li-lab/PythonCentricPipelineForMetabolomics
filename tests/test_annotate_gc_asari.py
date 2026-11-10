@@ -115,3 +115,21 @@ class TestRunAsariGc(unittest.TestCase):
             self.assertTrue(os.path.exists(result["features_tsv"]))
             with open(result["log"]) as f:
                 self.assertIn("Done targeted annotation", f.read())
+
+    def test_failure_reports_log_tail(self):
+        def broken(*args, **kwargs):
+            print("Imported 0 compound library entries.")
+            raise KeyError("ExactMass")
+
+        with (
+            mock.patch("asari.annotate.annotate_gcms_full", side_effect=broken),
+            self.assertRaisesRegex(RuntimeError, "Imported 0 compound"),
+        ):
+            self.run_gc(PARAMS)
+
+    def test_missing_features_table_fails(self):
+        with (
+            mock.patch("asari.annotate.annotate_gcms_full"),
+            self.assertRaisesRegex(RuntimeError, "wrote no Features"),
+        ):
+            self.run_gc(PARAMS)
