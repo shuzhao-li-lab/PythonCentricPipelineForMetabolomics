@@ -77,7 +77,9 @@ my_project/
 
 When `process` creates a new Asari run, downstream replicate, QC and analysis outputs remain on disk and in the project record, marked `STALE` by `pcpfm status`. Rerun those steps to refresh them.
 
-Annotation (`pcpfm annotate`) will be added at a later stage.
+GC-MS annotation: process with `pcpfm process ... --workflow gc` (uses Asari's full table by default), then run
+`pcpfm annotate gc -p my_project --kovats alkanes.tsv --db library.msp` to match features to an EI library within
+a Kovats retention-index window. Outputs go to `annotations/gc/`; see `docs/annotate_gc.md`.
 
 # Recent Changes 
 
