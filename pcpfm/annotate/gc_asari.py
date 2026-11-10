@@ -9,6 +9,7 @@ order from the named pcpfm columns.
 
 import contextlib
 import csv
+import json
 import os
 import tempfile
 from collections.abc import Sequence
@@ -78,6 +79,7 @@ ASARI_LOG = "asari_gc_annotation.log"
 # Asari names its outputs after this job name, e.g. Features_gc_annotation.tsv
 JOB = "gc_annotation"
 FEATURES_FILE = f"Features_{JOB}.tsv"
+DENOVO_JSON = f"{JOB}_denovo_pseudospectra.json"
 # fixed Asari settings: HR-EI fragment tolerance, RI spread of one compound, no PDFs
 FIXED_PARAMS = {
     "ms2_tolerance_in_da": 0.005,
@@ -130,9 +132,10 @@ def run_asari_gc(
     passed = {**params, **FIXED_PARAMS}
     log_path = os.path.join(out_dir, ASARI_LOG)
     features = os.path.join(out_dir, FEATURES_FILE)
-    # a leftover file must not pass for this run's output
-    if os.path.exists(features):
-        os.remove(features)
+    # leftover files must not pass for this run's output
+    for name in (FEATURES_FILE, DENOVO_JSON, DENOVO_JSON.replace(".json", ".msp")):
+        if os.path.exists(os.path.join(out_dir, name)):
+            os.remove(os.path.join(out_dir, name))
     with tempfile.TemporaryDirectory() as tmp:
         infile = os.path.join(tmp, "asari_input.tsv")
         write_asari_input(table, sample_cols, infile)
@@ -217,3 +220,32 @@ def gc_evidence_rows(
         }
     )
     return evidence_frame(rows.reset_index(drop=True)), int((~inside).sum())
+
+
+def denovo_outputs(out_dir: str) -> dict[str, Any]:
+    """Describe Asari's de novo pseudospectra, written with ``--denovo T``.
+
+    De novo pseudospectra are not matched to the library, so they give no
+    evidence rows; the manifest only points to them.
+
+    Parameters
+    ----------
+    out_dir : str
+        Directory holding Asari's outputs.
+
+    Returns
+    -------
+    dict[str, Any]
+        File names of the JSON and MSP outputs and the number of pseudospectra,
+        or an empty dict when Asari wrote none.
+    """
+    path = os.path.join(out_dir, DENOVO_JSON)
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        n = len(json.load(f))
+    return {
+        "json": DENOVO_JSON,
+        "msp": DENOVO_JSON.replace(".json", ".msp"),
+        "n_pseudospectra": n,
+    }

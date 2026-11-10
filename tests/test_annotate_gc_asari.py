@@ -1,5 +1,6 @@
 """Tests for ``pcpfm.annotate.gc_asari``. Run with `python -m unittest tests.test_annotate_gc_asari -v`."""
 
+import json
 import os
 import tempfile
 import unittest
@@ -7,7 +8,12 @@ from unittest import mock
 
 import pandas as pd
 
-from pcpfm.annotate.gc_asari import gc_evidence_rows, run_asari_gc, write_asari_input
+from pcpfm.annotate.gc_asari import (
+    denovo_outputs,
+    gc_evidence_rows,
+    run_asari_gc,
+    write_asari_input,
+)
 from pcpfm.annotate.gc_evidence import GC_EVIDENCE_COLUMNS
 from pcpfm.tables import FEATURE_COLUMNS
 
@@ -183,3 +189,21 @@ class TestEvidenceRows(unittest.TestCase):
         rows, dropped = gc_evidence_rows(self.path, "lib.msp", (300.0, 600.0))
         self.assertEqual((len(rows), dropped), (0, 0))
         self.assertEqual(list(rows.columns), GC_EVIDENCE_COLUMNS)
+
+
+class TestDenovoOutputs(unittest.TestCase):
+    def test_counts_denovo_pseudospectra(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(denovo_outputs(d), {})
+            with open(
+                os.path.join(d, "gc_annotation_denovo_pseudospectra.json"), "w"
+            ) as f:
+                json.dump([{"id": "ps1"}, {"id": "ps2"}], f)
+            self.assertEqual(
+                denovo_outputs(d),
+                {
+                    "json": "gc_annotation_denovo_pseudospectra.json",
+                    "msp": "gc_annotation_denovo_pseudospectra.msp",
+                    "n_pseudospectra": 2,
+                },
+            )
