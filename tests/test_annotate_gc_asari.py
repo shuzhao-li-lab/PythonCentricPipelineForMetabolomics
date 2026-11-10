@@ -207,3 +207,35 @@ class TestDenovoOutputs(unittest.TestCase):
                     "n_pseudospectra": 2,
                 },
             )
+
+
+class TestRealAsari(unittest.TestCase):
+    """Unmocked: real Asari matches three co-eluting, correlated fragments to a library entry."""
+
+    PEAKS = ((73.0469, 999.0), (147.0657, 400.0), (191.0890, 250.0))
+
+    def test_synthetic_compound_is_annotated(self):
+        table = gc_table(n=3, samples=("S1", "S2", "S3"))
+        table["mz"] = [mz for mz, _ in self.PEAKS]
+        table["rtime"] = [450.0, 450.1, 450.2]  # RI 1250 with the Kovats file below
+        for k, s in enumerate(("S1", "S2", "S3")):
+            table[s] = [i * 1000 * 2**k for _, i in self.PEAKS]
+        with tempfile.TemporaryDirectory() as d:
+            kovats = os.path.join(d, "k.tsv")
+            with open(kovats, "w") as f:
+                f.write(
+                    "RI\tRT\n"
+                    + "".join(f"{1000 + 100 * j}\t{5 + j}\n" for j in range(6))
+                )
+            db = os.path.join(d, "lib.msp")
+            with open(db, "w") as f:
+                f.write("Name: TestCpd\nInChIKey: TEST-KEY\nRETENTIONTIME: 1250\n")
+                f.write(f"ExactMass: 191.089\nNum Peaks: {len(self.PEAKS)}\n")
+                f.write("".join(f"{mz} {i}\n" for mz, i in self.PEAKS) + "\n")
+            result = run_asari_gc(table, ["S1", "S2", "S3"], kovats, db, PARAMS, d)
+            rows, dropped = gc_evidence_rows(
+                result["features_tsv"], "lib.msp", (300, 600)
+            )
+        self.assertEqual(sorted(rows["feature_id"]), ["F0", "F1", "F2"])
+        self.assertEqual(set(rows["reference_id"]), {"TEST-KEY"})
+        self.assertEqual(dropped, 0)
