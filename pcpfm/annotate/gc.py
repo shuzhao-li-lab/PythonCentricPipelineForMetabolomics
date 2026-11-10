@@ -19,12 +19,13 @@ from typing import Any
 from .. import __version__
 from ..project import ProjectRecord, now
 from ..tables import load_table
-from .gc_asari import gc_evidence_rows, run_asari_gc
-from .gc_evidence import staged_dir, write_evidence, write_manifest
+from .gc_asari import denovo_outputs, gc_evidence_rows, run_asari_gc
+from .gc_evidence import file_sha256, staged_dir, write_evidence, write_manifest
 from .gc_references import check_db, load_kovats
 
 WORKFLOW = "gc"
 ASARI_WORKFLOW = "GC"
+ARTIFACT = "annotations_gc"
 EVIDENCE_FILE = "annotations.tsv"
 MANIFEST_FILE = "manifest.json"
 
@@ -73,7 +74,7 @@ def _annotate(
     args : argparse.Namespace
         Parsed options for ``annotate gc``.
     record : ProjectRecord
-        Project record to read.
+        Project record to read; the ``annotations_gc`` artifact is registered.
     params : dict[str, Any]
         Resolved options, recorded in the manifest.
 
@@ -88,6 +89,14 @@ def _annotate(
     for w in warnings:
         print(f"[pcpfm] Warning: {w}")
     table, sample_cols = load_table(record, args.table)
+    source_path = record.artifact_path(args.table)
+    source = {
+        "artifact": args.table,
+        "path": record.relpath(source_path),
+        "sha256": file_sha256(source_path),
+        "n_features": len(table),
+        "sample_columns": sample_cols,
+    }
     asari_params = {
         "ri_tolerance": args.ri_tolerance,
         "score_cutoff_cosine": args.score_cutoff_cosine,
@@ -122,18 +131,41 @@ def _annotate(
             "created": now(),
             "pcpfm_version": __version__,
             "params": params,
+            "source": source,
             "source_context": context,
+            "references": {
+                "kovats": {**_fingerprint(args.kovats), "rt_range_s": list(rt_range)},
+                "db": _fingerprint(args.db),
+            },
+            "asari": {"version": asari["asari_version"], "params": asari["params"]},
             "counts": counts,
             "outputs": {
                 "evidence": EVIDENCE_FILE,
                 "asari_features": os.path.basename(asari["features_tsv"]),
                 "asari_log": os.path.basename(asari["log"]),
+                "denovo": denovo_outputs(staging),
             },
             "warnings": warnings,
         }
         write_manifest(manifest, os.path.join(staging, MANIFEST_FILE))
+    record.add_artifact(
+        ARTIFACT,
+        os.path.join(out_dir, EVIDENCE_FILE),
+        "GC annotation evidence (one row per matched feature) of the newest successful run",
+        "annotate",
+        manifest=record.relpath(os.path.join(out_dir, MANIFEST_FILE)),
+        source_table=args.table,
+        source_sha256=source["sha256"],
+        n_rows=n_rows,
+    )
+    record.save()
     print(
         f"[pcpfm] Annotation (gc): {counts['n_empcpds']} library matches on "
         f"{counts['n_features']} features, {n_rows} evidence rows in {out_dir}"
     )
     return {"finished": now(), **counts}, warnings
+
+
+def _fingerprint(path: str) -> dict[str, str]:
+    """Return the absolute path and SHA-256 of a reference file, for the manifest."""
+    return {"path": os.path.abspath(path), "sha256": file_sha256(path)}

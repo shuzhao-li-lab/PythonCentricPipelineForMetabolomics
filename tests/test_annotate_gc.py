@@ -158,3 +158,11 @@ class TestAnnotateGc(unittest.TestCase):
             manifest = json.load(f)
         self.assertEqual(manifest["source_context"], {"workflow": "GC"})
         self.assertEqual(manifest["counts"]["n_library_entries"], 1)
+        self.assertEqual(manifest["references"]["kovats"]["rt_range_s"], [300.0, 600.0])
+        self.assertEqual(manifest["outputs"]["denovo"], {})
+        artifact = ProjectRecord.load(self.d).data["artifacts"]["annotations_gc"]
+        self.assertEqual(artifact["manifest"], "annotations/gc/manifest.json")
+        self.assertEqual(
+            (artifact["n_rows"], artifact["source_table"]), (1, "feature_table")
+        )
+        self.assertEqual(artifact["source_sha256"], manifest["source"]["sha256"])
