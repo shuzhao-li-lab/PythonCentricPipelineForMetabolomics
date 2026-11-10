@@ -16,6 +16,71 @@ import tempfile
 from collections.abc import Iterator
 from typing import Any
 
+import pandas as pd
+
+SCHEME = "pcpfm_gc_v1"
+LEVEL = "GC"
+EVIDENCE_TYPE = "ei_ri_library"
+
+# one row per feature of an accepted library match (Asari's Features table):
+# reference_id is the library InChIKey, ri_error is feature RI minus library RI
+GC_EVIDENCE_COLUMNS = [
+    "feature_id",
+    "empcpd_id",
+    "scheme",
+    "level",
+    "evidence_type",
+    "reference_id",
+    "reference_name",
+    "reference_source",
+    "ri_error",
+    "score_entropy",
+    "score_cosine",
+]
+
+
+def evidence_frame(rows: pd.DataFrame) -> pd.DataFrame:
+    """Return evidence rows in the fixed column order, with missing columns empty.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        GC evidence rows.
+
+    Returns
+    -------
+    pd.DataFrame
+        ``rows`` with exactly ``GC_EVIDENCE_COLUMNS``.
+
+    Raises
+    ------
+    ValueError
+        If ``rows`` has columns outside ``GC_EVIDENCE_COLUMNS``.
+    """
+    unknown = [c for c in rows.columns if c not in GC_EVIDENCE_COLUMNS]
+    if unknown:
+        raise ValueError(f"Unknown evidence columns: {unknown}")
+    return rows.reindex(columns=GC_EVIDENCE_COLUMNS)
+
+
+def write_evidence(rows: pd.DataFrame, path: str) -> int:
+    """Write evidence rows as TSV in the fixed column order.
+
+    Parameters
+    ----------
+    rows : pd.DataFrame
+        GC evidence rows; missing columns are written empty.
+    path : str
+        Output TSV path.
+
+    Returns
+    -------
+    int
+        Number of rows written; zero writes a header-only file.
+    """
+    evidence_frame(rows).to_csv(path, sep="\t", index=False)
+    return len(rows)
+
 
 def file_sha256(path: str) -> str:
     """Return the SHA-256 hex digest of a file's content.
