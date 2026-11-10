@@ -56,3 +56,45 @@ def load_kovats(path: str) -> tuple[float, float]:
             f"Kovats file {path}: RI must be the first column and RT (min) the second."
         )
     return float(rt.iloc[0] * 60), float(rt.iloc[-1] * 60)
+
+
+def check_db(path: str) -> tuple[int, list[str]]:
+    """Check an EI library the way Asari reads it and count the usable entries.
+
+    Asari keeps the entries that have peaks and a ``RETENTIONTIME`` (used as
+    the retention index) and drops the others without notice.
+
+    Parameters
+    ----------
+    path : str
+        Library file in MSP or JSON format.
+
+    Returns
+    -------
+    tuple[int, list[str]]
+        Number of entries Asari will use, and warnings about dropped entries.
+
+    Raises
+    ------
+    ValueError
+        If the format is not MSP or JSON, or no entry is usable.
+    """
+    from asari.gcms import load_gcms_dbfile
+
+    # the suffixes asari.gcms.load_gcms_dbfile recognizes
+    if not path.endswith((".msp", ".MSP", ".json", ".JSON")):
+        raise ValueError(f"EI library {path} must be an MSP or JSON file.")
+    entries = load_gcms_dbfile(path) or []
+    # same rule as asari.gcms.reformat_gcms_lib
+    kept = [e for e in entries if "peaks" in e and e.get("RETENTIONTIME")]
+    if not kept:
+        raise ValueError(
+            f"EI library {path} has no entry with peaks and RETENTIONTIME."
+        )
+    dropped = len(entries) - len(kept)
+    warnings = []
+    if dropped:
+        warnings.append(
+            f"EI library {path}: {dropped} entries without peaks or RETENTIONTIME are not used."
+        )
+    return len(kept), warnings

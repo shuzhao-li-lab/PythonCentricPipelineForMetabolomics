@@ -4,7 +4,50 @@ import os
 import tempfile
 import unittest
 
-from pcpfm.annotate.gc_references import load_kovats
+from pcpfm.annotate.gc_references import check_db, load_kovats
+
+
+def msp_entry(
+    name, ri="1305", mass="116.095", peaks=("73.0396 999.0", "44.0131 412.75")
+):
+    """One MSP record; pass None to leave a field out."""
+    lines = [f"Name: {name}"]
+    if ri is not None:
+        lines.append(f"RETENTIONTIME: {ri}")
+    if mass is not None:
+        lines.append(f"ExactMass: {mass}")
+    if peaks is not None:
+        lines += [f"Num Peaks: {len(peaks)}", *peaks]
+    return "\n".join(lines) + "\n\n"
+
+
+class TestCheckDb(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.dir = tmp.name
+
+    def write(self, *entries, name="lib.msp"):
+        path = os.path.join(self.dir, name)
+        with open(path, "w") as f:
+            f.write("".join(entries))
+        return path
+
+    def test_counts_used_entries_and_warns_on_drops(self):
+        path = self.write(msp_entry("A"), msp_entry("B"), msp_entry("no RI", ri=None))
+        n, warnings = check_db(path)
+        self.assertEqual(n, 2)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("1 entries", warnings[0])
+
+    def test_no_usable_entry_fails(self):
+        with self.assertRaisesRegex(ValueError, "no entry"):
+            check_db(self.write(msp_entry("A", ri=None)))
+
+    def test_other_format_fails(self):
+        for name in ("lib.txt", "lib.Msp"):
+            with self.subTest(name), self.assertRaisesRegex(ValueError, "MSP or JSON"):
+                check_db(self.write(msp_entry("A"), name=name))
 
 
 class TestKovats(unittest.TestCase):
