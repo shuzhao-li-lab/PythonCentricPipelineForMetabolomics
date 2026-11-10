@@ -118,8 +118,18 @@ def asari_extra_args(args: Namespace) -> list[str]:
     -------
     list[str]
         The user's ``--asari-args`` followed by ``--workflow LC|GC|LCMSMS``.
+
+    Raises
+    ------
+    ValueError
+        If ``--asari-args`` sets the workflow too, which could disagree with
+        ``--workflow``.
     """
     extra = args.asari_args.split() if args.asari_args else []
+    if any(x == "--workflow" or x.startswith("--workflow=") for x in extra):
+        raise ValueError(
+            "Set the workflow with `pcpfm process --workflow`, not in --asari-args."
+        )
     return extra + ["--workflow", args.workflow.upper()]
 
 

@@ -162,6 +162,12 @@ class TestAsariWorkflow(unittest.TestCase):
                 ["--autoheight", "True", "--workflow", flag],
             )
 
+    def test_workflow_in_asari_args_rejected(self):
+        for asari_args in ("--workflow GC", "--workflow=GC"):
+            args = argparse.Namespace(workflow="lc", asari_args=asari_args)
+            with self.assertRaisesRegex(ValueError, "pcpfm process --workflow"):
+                process.asari_extra_args(args)
+
     def test_workflow_changes_run_signature(self):
         lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))
         gc = process.asari_extra_args(argparse.Namespace(workflow="gc", asari_args=""))
