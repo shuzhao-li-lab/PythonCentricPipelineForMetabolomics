@@ -64,11 +64,6 @@ class TestAnnotateGcFlags(unittest.TestCase):
             parse(REQUIRED + ["--ms1-standards", "std.csv"])
         self.assertIn("unrecognized arguments: --ms1-standards", str(cm.exception))
 
-    def test_not_implemented_yet(self):
-        with self.assertRaises(SystemExit) as cm:
-            cli.main(REQUIRED)
-        self.assertIn("not implemented yet", str(cm.exception))
-
 
 class TestSourceContext(unittest.TestCase):
     def record(self, d, workflow):
@@ -196,3 +191,33 @@ class TestAnnotateGc(unittest.TestCase):
         self.assertEqual(step["status"], FAILED)
         self.assertIn("gc", step["summary"]["workflows"])
         self.assertTrue(os.path.exists(self.out("annotations.tsv")))
+
+    def test_command_line_runs_and_logs_history(self):
+        argv = [
+            "annotate",
+            "gc",
+            "-p",
+            self.d,
+            "--kovats",
+            os.path.join(self.d, "kovats.tsv"),
+        ]
+        argv += ["--db", os.path.join(self.d, "lib.msp"), "--ri-tolerance", "12"]
+        with contextlib.redirect_stdout(io.StringIO()):
+            cli.main(argv)
+        record = ProjectRecord.load(self.d)
+        self.assertEqual(record.data["history"][-1]["status"], "completed")
+        self.assertTrue(record.has_artifact("annotations_gc"))
+        with open(self.out("manifest.json")) as f:
+            self.assertEqual(json.load(f)["asari"]["params"]["ri_tolerance"], 12)
+
+    def test_missing_reference_fails_before_asari(self):
+        argv = ["annotate", "gc", "-p", self.d, "--kovats", "missing.tsv"]
+        argv += ["--db", os.path.join(self.d, "lib.msp")]
+        with (
+            mock.patch("asari.annotate.annotate_gcms_full") as asari,
+            contextlib.redirect_stdout(io.StringIO()),
+            self.assertRaises(FileNotFoundError),
+        ):
+            cli.main(argv)
+        asari.assert_not_called()
+        self.assertEqual(ProjectRecord.load(self.d).step("annotate")["status"], FAILED)

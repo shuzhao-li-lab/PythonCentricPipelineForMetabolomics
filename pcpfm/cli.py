@@ -90,8 +90,17 @@ def cmd_annotate_lc(args: argparse.Namespace) -> None:
 
 
 def cmd_annotate_gc(args: argparse.Namespace) -> None:
-    """Annotate a GC-MS feature table of an existing project (not implemented yet)."""
-    raise SystemExit("[pcpfm] Error: annotate gc is not implemented yet")
+    """Annotate a GC-MS feature table of an existing project.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command options for this pipeline step.
+    """
+    from .annotate import gc
+
+    record = ProjectRecord.load(args.project)
+    _run(record, gc.run, args)
 
 
 def cmd_status(args: argparse.Namespace) -> None:
