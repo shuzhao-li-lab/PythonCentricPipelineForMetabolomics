@@ -2,9 +2,12 @@
 
 import contextlib
 import io
+import tempfile
 import unittest
 
 from pcpfm import cli
+from pcpfm.annotate import gc
+from pcpfm.project import ProjectRecord
 
 REQUIRED = ["annotate", "gc", "-p", "proj", "--kovats", "k.tsv", "--db", "lib.msp"]
 
@@ -59,3 +62,22 @@ class TestAnnotateGcFlags(unittest.TestCase):
         with self.assertRaises(SystemExit) as cm:
             cli.main(REQUIRED)
         self.assertIn("not implemented yet", str(cm.exception))
+
+
+class TestSourceContext(unittest.TestCase):
+    def record(self, d, workflow):
+        record = ProjectRecord.load_or_create(d)
+        record.data["runs"]["samples"] = {"workflow": workflow, "mode": "pos"}
+        return record
+
+    def test_requires_gc_workflow(self):
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(
+                gc.source_context(self.record(d, "GC")), {"workflow": "GC"}
+            )
+        for workflow, found in (("LC", "Asari LC workflow"), (None, "unrecorded")):
+            with (
+                tempfile.TemporaryDirectory() as d,
+                self.assertRaisesRegex(ValueError, found),
+            ):
+                gc.source_context(self.record(d, workflow))
