@@ -17,7 +17,7 @@ from argparse import Namespace
 from typing import Any
 
 from .. import __version__
-from ..project import ProjectRecord, now
+from ..project import COMPLETED, FAILED, ProjectRecord, now
 from ..tables import load_table
 from .gc_asari import denovo_outputs, gc_evidence_rows, run_asari_gc
 from .gc_evidence import file_sha256, staged_dir, write_evidence, write_manifest
@@ -59,6 +59,44 @@ def source_context(record: ProjectRecord) -> dict[str, Any]:
             "Rerun `pcpfm process --workflow gc`."
         )
     return {"workflow": workflow}
+
+
+def run(args: Namespace, record: ProjectRecord) -> None:
+    """Run GC annotation and record it under the ``annotate`` step.
+
+    The step summary keeps one entry per workflow, so a GC run does not erase
+    the result of another annotation workflow, such as ``annotate lc``.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed options for ``annotate gc``.
+    record : ProjectRecord
+        Project record to update.
+
+    Raises
+    ------
+    Exception
+        Re-raises errors after printing them and marking the step as failed.
+    """
+    params = {k: v for k, v in vars(args).items() if k not in ("func", "argv")}
+    previous = record.step("annotate").get("summary", {}).get("workflows", {})
+    record.start_step("annotate", params)
+    try:
+        summary, warnings = _annotate(args, record, params)
+    except Exception as e:
+        print(f"[pcpfm] Error: {e}")
+        # keep the last successful results of every workflow visible
+        record.finish_step(
+            "annotate", FAILED, summary={"workflows": previous}, message=str(e)
+        )
+        raise
+    record.finish_step(
+        "annotate",
+        COMPLETED,
+        summary={"workflows": {**previous, WORKFLOW: summary}},
+        message="; ".join(warnings) or None,
+    )
 
 
 def _annotate(
@@ -163,7 +201,11 @@ def _annotate(
         f"[pcpfm] Annotation (gc): {counts['n_empcpds']} library matches on "
         f"{counts['n_features']} features, {n_rows} evidence rows in {out_dir}"
     )
-    return {"finished": now(), **counts}, warnings
+    # `pcpfm status` prints each workflow's levels with their n_* counts
+    return {
+        "finished": now(),
+        "levels": {"GC": {"status": COMPLETED, **counts}},
+    }, warnings
 
 
 def _fingerprint(path: str) -> dict[str, str]:

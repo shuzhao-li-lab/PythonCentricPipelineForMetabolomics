@@ -12,7 +12,7 @@ import pandas as pd
 
 from pcpfm import cli
 from pcpfm.annotate import gc
-from pcpfm.project import ProjectRecord
+from pcpfm.project import COMPLETED, FAILED, ProjectRecord
 from tests.test_annotate_gc_asari import gc_table
 
 REQUIRED = ["annotate", "gc", "-p", "proj", "--kovats", "k.tsv", "--db", "lib.msp"]
@@ -151,7 +151,11 @@ class TestAnnotateGc(unittest.TestCase):
         rows = pd.read_csv(self.out("annotations.tsv"), sep="\t")
         self.assertEqual(list(rows["feature_id"]), ["F0"])
         self.assertEqual(
-            (summary["n_evidence_rows"], summary["n_outside_kovats"]), (1, 1)
+            (
+                summary["levels"]["GC"]["n_evidence_rows"],
+                summary["levels"]["GC"]["n_outside_kovats"],
+            ),
+            (1, 1),
         )
         self.assertIn("outside the Kovats range", warnings[0])
         with open(self.out("manifest.json")) as f:
@@ -166,3 +170,29 @@ class TestAnnotateGc(unittest.TestCase):
             (artifact["n_rows"], artifact["source_table"]), (1, "feature_table")
         )
         self.assertEqual(artifact["source_sha256"], manifest["source"]["sha256"])
+
+    def test_run_records_gc_next_to_other_workflows(self):
+        self.record.start_step("annotate")
+        self.record.finish_step("annotate", summary={"workflows": {"lc": {"n": 1}}})
+        with contextlib.redirect_stdout(io.StringIO()):
+            gc.run(gc_args(self.d), self.record)
+        step = self.record.step("annotate")
+        self.assertEqual(step["status"], COMPLETED)
+        self.assertEqual(set(step["summary"]["workflows"]), {"lc", "gc"})
+        status = "\n".join(self.record.status_lines())
+        self.assertIn("gc: GC 1 evidence_rows", status)
+
+    def test_failed_run_keeps_previous_outputs(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            gc.run(gc_args(self.d), self.record)
+            with (
+                mock.patch(
+                    "asari.annotate.annotate_gcms_full", side_effect=KeyError("x")
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                gc.run(gc_args(self.d), self.record)
+        step = self.record.step("annotate")
+        self.assertEqual(step["status"], FAILED)
+        self.assertIn("gc", step["summary"]["workflows"])
+        self.assertTrue(os.path.exists(self.out("annotations.tsv")))
