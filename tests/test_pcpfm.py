@@ -170,6 +170,7 @@ class TestAsariWorkflow(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "pcpfm process --workflow"):
                 process.asari_extra_args(args)
 
+<<<<<<< HEAD
     def test_asari_table_defaults_to_preferred(self):
         args = argparse.Namespace(workflow="lc", asari_table=None)
         self.assertEqual(process.resolve_asari_table(args), "preferred")
@@ -191,6 +192,8 @@ class TestAsariWorkflow(unittest.TestCase):
             self.assertEqual(process.resolve_asari_table(args), "preferred")
         self.assertEqual(out.getvalue(), "")
 
+=======
+>>>>>>> bdb3d38 (Reject --workflow inside --asari-args)
     def test_workflow_changes_run_signature(self):
         lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))
         gc = process.asari_extra_args(argparse.Namespace(workflow="gc", asari_args=""))
