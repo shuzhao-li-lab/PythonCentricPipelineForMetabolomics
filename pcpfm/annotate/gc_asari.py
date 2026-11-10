@@ -9,9 +9,13 @@ order from the named pcpfm columns.
 
 from collections.abc import Sequence
 
+import numpy as np
 import pandas as pd
 
 from ..tables import FEATURE_COLUMNS
+
+# Asari parses these with int(), which rejects "12.0"
+_INT_COLUMNS = ("parent_masstrack_id", "detection_counts")
 
 
 def write_asari_input(
@@ -31,7 +35,8 @@ def write_asari_input(
     Raises
     ------
     ValueError
-        If a feature column is missing or a sample column is named like one.
+        If a feature column is missing, has missing values, or an integer
+        column holds non-integer values.
 
     Notes
     -----
@@ -46,5 +51,18 @@ def write_asari_input(
     clash = [c for c in sample_cols if c in FEATURE_COLUMNS]
     if clash:
         raise ValueError(f"Sample columns named like feature columns: {clash}")
-    out = table[FEATURE_COLUMNS + list(sample_cols)]
+    out = table[FEATURE_COLUMNS + list(sample_cols)].copy()
+    # float turns pd.NA of nullable dtypes into NaN, which isfinite rejects
+    numeric = (
+        out[FEATURE_COLUMNS[1:]].apply(pd.to_numeric, errors="coerce").astype(float)
+    )
+    incomplete = [c for c in numeric.columns if not np.isfinite(numeric[c]).all()]
+    if incomplete or out["id_number"].isna().any():
+        raise ValueError(
+            f"Feature columns with missing or non-finite values: {incomplete or ['id_number']}"
+        )
+    for c in _INT_COLUMNS:
+        if not (out[c] == out[c].round()).all():
+            raise ValueError(f"Column '{c}' must hold integers.")
+        out[c] = out[c].astype(int)
     out.to_csv(path, sep="\t", index=False)

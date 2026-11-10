@@ -48,3 +48,24 @@ class TestAsariInput(unittest.TestCase):
     def test_missing_feature_column_fails(self):
         with self.assertRaisesRegex(ValueError, "snr"):
             write_asari_input(gc_table().drop(columns="snr"), ["S1", "S2"], self.path)
+
+    def test_asari_reader_accepts_float_counts(self):
+        from asari.tools.file_io import read_features_from_asari_table
+
+        write_asari_input(gc_table(), ["S1", "S2"], self.path)
+        with open(self.path) as f:
+            n_samples, features = read_features_from_asari_table(f.read())
+        self.assertEqual((n_samples, len(features)), (2, 3))
+        self.assertEqual(features[0]["detection_counts"], 2)
+
+    def test_missing_feature_value_fails(self):
+        table = gc_table()
+        table.loc[0, "snr"] = None
+        with self.assertRaisesRegex(ValueError, "snr"):
+            write_asari_input(table, ["S1", "S2"], self.path)
+
+    def test_fractional_integer_column_fails(self):
+        table = gc_table()
+        table.loc[0, "detection_counts"] = 1.5
+        with self.assertRaisesRegex(ValueError, "detection_counts"):
+            write_asari_input(table, ["S1", "S2"], self.path)
