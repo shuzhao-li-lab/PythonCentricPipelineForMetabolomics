@@ -197,6 +197,35 @@ class TestAsariWorkflow(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "pcpfm process --workflow"):
                 process.asari_extra_args(args)
 
+    def test_asari_table_defaults_to_preferred(self):
+        args = argparse.Namespace(workflow="lc", asari_table=None)
+        self.assertEqual(process.resolve_asari_table(args), "preferred")
+        self.assertEqual(args.asari_table, "preferred")
+        args = argparse.Namespace(workflow="lc", asari_table="full")
+        self.assertEqual(process.resolve_asari_table(args), "full")
+
+    def test_gc_defaults_to_full_table(self):
+        args = argparse.Namespace(workflow="gc", asari_table=None)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(process.resolve_asari_table(args), "full")
+        self.assertIn("GC workflow, default feature table has changed to Full", out.getvalue())
+
+    def test_gc_explicit_table_wins(self):
+        args = argparse.Namespace(workflow="gc", asari_table="preferred")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(process.resolve_asari_table(args), "preferred")
+        self.assertEqual(out.getvalue(), "")
+
+    def test_workflow_changes_run_signature(self):
+        lc = process.asari_extra_args(argparse.Namespace(workflow="lc", asari_args=""))
+        gc = process.asari_extra_args(argparse.Namespace(workflow="gc", asari_args=""))
+        self.assertNotEqual(
+            asari_runner.run_signature([], lc + ["pos", "5"], "1.18.5"),
+            asari_runner.run_signature([], gc + ["pos", "5"], "1.18.5"),
+        )
+
 
 class TestQC(unittest.TestCase):
     def setUp(self):
